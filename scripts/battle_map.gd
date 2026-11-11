@@ -235,6 +235,17 @@ func damage_walls(at: Vector2, radius: float, dmg: float) -> Array:
 	return fell
 
 
+func wall_near(at: Vector2, reach: float) -> bool:
+	var c0 := cell_of(at)
+	var n := int(ceil(reach / CELL))
+	for dx in range(-n, n + 1):
+		for dy in range(-n, n + 1):
+			var c := c0 + Vector2i(dx, dy)
+			if get_t(c) == T.WALL and in_bounds(c) and center_of(c).distance_to(at) <= reach:
+				return true
+	return false
+
+
 ## First point on the line a->b that runs into a wall or wreck, or b if none.
 func first_obstacle(a: Vector2, b: Vector2) -> Vector2:
 	var d := b - a

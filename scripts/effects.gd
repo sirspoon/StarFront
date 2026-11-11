@@ -43,6 +43,8 @@ func marker(pos: Vector2, color: Color) -> void:
 
 
 func _process(dt: float) -> void:
+	if get_parent().paused:
+		return  # freeze tracers and blasts while the game is paused
 	for list in [tracers, puffs, sparks, markers, blasts, chunks]:
 		for e in list:
 			e.t += dt

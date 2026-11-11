@@ -417,6 +417,32 @@ func _draw_chapel_floor() -> void:
 		draw_colored_polygon(pts, Color(glass, 0.85))
 
 
+## Blast damage on a surface: layered soot that is heaviest at the centre, scorch
+## streaks thrown outwards, and pits from shrapnel with a pale broken rim.
+## Everything is clipped to the surface outline.
+func _soot(outline: PackedVector2Array, centre: Vector2, amount: int, seed_v: int) -> void:
+	_seed(seed_v, amount, 101)
+	var focus := centre + Vector2(rng.randf_range(-5, 5), rng.randf_range(-5, 5))
+	for k in 2 + amount:
+		var blob := _blob(focus + Vector2(rng.randf_range(-4, 4), rng.randf_range(-4, 4)),
+				rng.randf_range(4, 9) * (0.7 + amount * 0.25), rng.randf_range(0.6, 1.0), 0.6, seed_v + k * 13)
+		for piece in Geometry2D.intersect_polygons(blob, outline):
+			_poly(piece, Color(0.03, 0.025, 0.02, 0.17 + 0.07 * amount))
+	for k in 5 + amount * 4:
+		var a := rng.randf() * TAU
+		var p0 := focus + Vector2.from_angle(a) * rng.randf_range(1, 4)
+		var p1 := focus + Vector2.from_angle(a + rng.randf_range(-0.2, 0.2)) * rng.randf_range(6, 14)
+		var seg := Geometry2D.clip_polyline_with_polygon(PackedVector2Array([p0, p1]), outline)
+		for line in seg:
+			draw_polyline(line, Color(0.03, 0.02, 0.02, 0.3), rng.randf_range(0.5, 1.2))
+	for k in 6 + amount * 9:
+		var p := focus + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1, 11)
+		if Geometry2D.is_point_in_polygon(p, outline):
+			var rr := rng.randf_range(0.3, 0.8)
+			draw_circle(p + Vector2(-0.3, -0.3), rr + 0.3, Color(0.75, 0.72, 0.68, 0.35))
+			draw_circle(p, rr, Color(0.06, 0.05, 0.05, 0.9))
+
+
 func _draw_rubble(c: Vector2i) -> void:
 	_seed(c.x, c.y, 31)
 	var o := Vector2(c) * C
@@ -462,6 +488,8 @@ func _draw_foundation(c: Vector2i) -> void:
 	if across == Vector2(1, 0) or across == Vector2.ZERO:
 		draw_rect(Rect2(o + Vector2(0.3, 0), Vector2(1.8, C)), edge)
 		draw_rect(Rect2(o + Vector2(C - 2.1, 0), Vector2(1.8, C)), edge.darkened(0.3))
+	if map.wall_hp[c.y * BattleMap.W + c.x] <= 0.0:
+		_soot(bed, o + Vector2(8, 8), 2, c.x * 5 + c.y * 11)  # it was blown down, not just old
 	# stubs of the broken wall: low, jagged slabs of concrete
 	_seed(c.x, c.y, 75)
 	for k in rng.randi_range(1, 3):
@@ -663,8 +691,9 @@ func _draw_wall(c: Vector2i) -> void:
 			var q := e[rng.randi_range(1, e.size() - 1)]
 			var out := (q - (o + Vector2(8, 8 - h))).normalized()
 			_rebar(q - out * 1.5, q + out * rng.randf_range(2.5, 5.5) + out.orthogonal() * rng.randf_range(-1.5, 1.5))
-	# damage: chunks blown out showing the rebar inside, and cracks
+	# damage: soot, shrapnel pitting, chunks blown out showing the rebar inside, and cracks
 	if stage > 0:
+		_soot(poly, o + Vector2(8, 8 - h), stage, c.x * 7 + c.y)
 		_seed(c.x, c.y, 45)
 		for n in stage * 2:
 			var p := o + Vector2(rng.randf_range(3, 13), rng.randf_range(3, 13) - h)

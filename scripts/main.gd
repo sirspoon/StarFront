@@ -13,6 +13,8 @@ const DecalsScript := preload("res://scripts/decals.gd")
 var map: BattleMap
 var map_view: MapView
 var effects: Effects
+var light_fx: LightFX
+var smokes: Array = []  # lingering smoke emitters [node, time left]
 var decals: Node2D
 var units_layer: Node2D
 var overlay: Node2D
@@ -94,7 +96,7 @@ func _demo_damage() -> void:
 
 func _build_world(seed_value: int) -> void:
 	var cm := CanvasModulate.new()
-	cm.color = Color(0.84, 0.8, 0.78)
+	cm.color = Color(0.68, 0.65, 0.64)  # dim, so fires and weapons light the scene
 	add_child(cm)
 	map = BattleMap.new()
 	add_child(map)
@@ -116,6 +118,10 @@ func _build_world(seed_value: int) -> void:
 	overlay.z_index = 10
 	add_child(overlay)
 	_add_fires()
+	light_fx = LightFX.new()
+	light_fx.z_index = 6
+	add_child(light_fx)
+	light_fx.setup(_light_tex if _light_tex != null else _soft_dot(256))
 	camera = Camera2D.new()
 	camera.zoom = Vector2(1.2, 1.2)
 	camera.position = Vector2(30 * BattleMap.CELL, map.world_size().y * 0.5)
@@ -169,6 +175,9 @@ func add_fire(p: Vector2) -> void:
 	light.energy = 1.1
 	light.texture_scale = 1.6
 	light.position = p
+	light.shadow_enabled = true
+	light.shadow_filter = Light2D.SHADOW_FILTER_PCF5
+	light.shadow_color = Color(0, 0, 0, 0.7)
 	add_child(light)
 	fire_lights.append([light, 1.1, randf() * TAU])
 
@@ -310,6 +319,13 @@ func _spawn_vehicle(team: int, kind_id: String, cy: int, counts: Dictionary) -> 
 
 func _process(dt: float) -> void:
 	_camera_keys(dt)
+	for sm in smokes.duplicate():
+		sm[1] -= dt
+		if sm[1] <= 0.0:
+			smokes.erase(sm)
+			var node: CPUParticles2D = sm[0]
+			node.emitting = false
+			get_tree().create_timer(6.5).timeout.connect(node.queue_free)
 	for fl in fire_lights:
 		fl[2] += dt * 9.0
 		fl[0].energy = fl[1] + sin(fl[2]) * 0.12 + randf() * 0.12
@@ -458,6 +474,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 		end = map.first_obstacle(muzzle, end)  # a stray shell bursts on the first wall in its way
 	if show:
 		effects.tracer(muzzle, end, w.tracer, w.width)
+		_shot_lights(muzzle, end, w)
 	if target.is_vehicle and hit:
 		var got_in: bool = target.receive_hit(w, shooter.position, shooter)
 		if show:
@@ -498,7 +515,76 @@ func resolve_point_shot(shooter: Soldier, p: Vector2, w: Dictionary, muzzle: Vec
 	var show := shooter.visible or effects_visible_at(end)
 	if show:
 		effects.tracer(muzzle, end, w.tracer, w.width)
+		_shot_lights(muzzle, end, w)
 	_blast(end, w, shooter, show)
+
+
+## The muzzle flash lights up the shooter's surroundings and the bolt, tracer or
+## rocket lights the ground as it flies.
+func _shot_lights(muzzle: Vector2, end: Vector2, w: Dictionary) -> void:
+	var col: Color = w.tracer
+	var size: float = w.width
+	light_fx.flash(muzzle, col, 0.9 + size * 0.15, 36.0 + size * 10.0, 0.08)
+	light_fx.streak(muzzle, end, col, 0.55 + size * 0.1, 26.0 + size * 9.0, Effects.TRACER_TIME * 1.1)
+
+
+## Smoke that keeps rising from a hit for a while afterwards.
+func add_smoke(pos: Vector2, duration: float, size: float) -> void:
+	if not map_view.enabled:
+		return
+	var sm := CPUParticles2D.new()
+	sm.texture = _dot_tex if _dot_tex != null else _soft_dot(64)
+	sm.position = pos
+	sm.amount = int(14 + size * 8)
+	sm.lifetime = 6.0
+	sm.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	sm.emission_sphere_radius = 6.0 * size
+	sm.direction = Vector2(0.4, -1)
+	sm.spread = 25.0
+	sm.gravity = Vector2(7, -6)
+	sm.initial_velocity_min = 6.0
+	sm.initial_velocity_max = 14.0
+	sm.scale_amount_min = 0.35 * size
+	sm.scale_amount_max = 0.7 * size
+	var curve := Curve.new()
+	curve.add_point(Vector2(0, 0.4))
+	curve.add_point(Vector2(1, 1.8))
+	sm.scale_amount_curve = curve
+	sm.color_ramp = _ramp([Color(0.2, 0.19, 0.18, 0.0), Color(0.2, 0.19, 0.18, 0.45), Color(0.34, 0.33, 0.31, 0.0)])
+	sm.z_index = 5
+	add_child(sm)
+	smokes.append([sm, duration])
+	while smokes.size() > 18:
+		var old: CPUParticles2D = smokes.pop_front()[0]
+		old.emitting = false
+		get_tree().create_timer(6.5).timeout.connect(old.queue_free)
+
+
+func _dust_burst(pos: Vector2, size: float) -> void:
+	if not map_view.enabled:
+		return
+	var d := CPUParticles2D.new()
+	d.texture = _dot_tex if _dot_tex != null else _soft_dot(64)
+	d.position = pos
+	d.one_shot = true
+	d.explosiveness = 0.85
+	d.amount = 26
+	d.lifetime = 2.6
+	d.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	d.emission_sphere_radius = 8.0
+	d.spread = 180.0
+	d.gravity = Vector2(4, -3)
+	d.initial_velocity_min = 15.0
+	d.initial_velocity_max = 45.0
+	d.damping_min = 20.0
+	d.damping_max = 30.0
+	d.scale_amount_min = 0.4 * size
+	d.scale_amount_max = 0.9 * size
+	d.color_ramp = _ramp([Color(0.5, 0.46, 0.4, 0.6), Color(0.45, 0.42, 0.38, 0.3), Color(0.4, 0.38, 0.35, 0.0)])
+	d.z_index = 5
+	d.emitting = true
+	add_child(d)
+	get_tree().create_timer(3.0).timeout.connect(d.queue_free)
 
 
 func effects_visible_at(p: Vector2) -> bool:
@@ -514,10 +600,16 @@ func _blast(at: Vector2, w: Dictionary, shooter: Soldier, show: bool) -> void:
 	var r: float = w.blast
 	if show:
 		effects.explosion(at, r)
+		light_fx.flash(at, Color(1.0, 0.6, 0.3), 2.4, r * 3.0 + 40.0, 0.6, true)
 	decals.add_scorch(at, r * 0.7)
 	if w.get("wall", 0.0) > 0.0:
+		var hit_wall := map.wall_near(at, r * 0.5 + BattleMap.CELL)
 		var fell := map.damage_walls(at, r, w.wall)
 		walls_destroyed += fell.size()
+		if hit_wall:
+			add_smoke(at, 20.0 + randf() * 15.0, 1.0)  # the shattered wall smoulders
+		if not fell.is_empty():
+			_dust_burst(map.center_of(fell[0]), 1.4)
 		for c in fell:
 			effects.debris(map.center_of(c))
 			last_wall_down = map.center_of(c)
@@ -540,6 +632,7 @@ func on_vehicle_destroyed(v: Vehicle, killer: Soldier) -> void:
 	if autotest:
 		print("  vehicle lost: %s at %ds, killed by %s" % [v.squad.name, int(time), killer.kind if killer != null else "?"])
 	effects.explosion(v.position, 40.0)
+	light_fx.flash(v.position, Color(1.0, 0.55, 0.25), 3.2, 240.0, 1.3, true)
 	decals.add_scorch(v.position, 40.0)
 	add_fire(v.position + Vector2(randf_range(-6, 6), randf_range(-6, 6)))
 	for o in soldiers:

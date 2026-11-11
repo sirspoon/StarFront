@@ -12,6 +12,7 @@ var map: BattleMap
 var enabled := true
 var ready_drawn := false
 var sprites := {}  # Vector2i tile -> Sprite2D
+var occluders := {}  # row -> Array of LightOccluder2D: walls cast shadows from lights
 var dirty := {}
 var baking := false
 var ground_big: Texture2D
@@ -30,8 +31,35 @@ func setup(m: BattleMap) -> void:
 	for cx in ceili(float(BattleMap.W) / CHUNK.x):
 		for cy in ceili(float(BattleMap.H) / CHUNK.y):
 			all.append(Vector2i(cx, cy))
+	for y in BattleMap.H:
+		_build_occluders(y)
 	await _bake(all)
 	ready_drawn = true
+
+
+## One occluder per run of wall cells in a row, so fires and explosions throw
+## shadows past walls and light spills through gaps and doorways.
+func _build_occluders(y: int) -> void:
+	for o in occluders.get(y, []):
+		o.queue_free()
+	var list: Array = []
+	var x := 0
+	while x < BattleMap.W:
+		if map.get_t(Vector2i(x, y)) != BattleMap.T.WALL:
+			x += 1
+			continue
+		var x0 := x
+		while x < BattleMap.W and map.get_t(Vector2i(x, y)) == BattleMap.T.WALL:
+			x += 1
+		var poly := OccluderPolygon2D.new()
+		var c := float(BattleMap.CELL)
+		poly.polygon = PackedVector2Array([Vector2(x0 * c, y * c), Vector2(x * c, y * c),
+				Vector2(x * c, (y + 1) * c), Vector2(x0 * c, (y + 1) * c)])
+		var occ := LightOccluder2D.new()
+		occ.occluder = poly
+		add_child(occ)
+		list.append(occ)
+	occluders[y] = list
 
 
 func _noise_tex(w: int, h: int, freq: float, octaves: int, seamless: bool, cellular: bool, ramp: Gradient) -> NoiseTexture2D:
@@ -127,6 +155,11 @@ func _bake(keys: Array) -> void:
 func _on_cells_changed(cells: Array) -> void:
 	if not enabled:
 		return
+	var rows := {}
+	for c in cells:
+		rows[c.y] = true
+	for y in rows:
+		_build_occluders(y)
 	for c in cells:
 		# walls are drawn raised and cast shadows, so neighbouring tiles may need it too
 		for d in [Vector2i(0, 0), Vector2i(-2, -2), Vector2i(2, -2), Vector2i(-2, 2), Vector2i(2, 2)]:

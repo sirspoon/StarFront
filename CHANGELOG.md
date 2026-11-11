@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.07 (2026-11-11)
+Lighting, soot and smoke.
+- The battlefield is darker, and combat lights it up: muzzle flashes, laser bolts and tracers that
+  light the ground as they fly, rockets with a moving glow, and explosions that flare and fade.
+  Exploding vehicles light up the whole area.
+- Walls cast shadows: fires and explosions throw shadows past them, and light spills through
+  doorways and breaches.
+- Shelled walls are blackened with soot, scorch streaks and shrapnel pits. Footings of walls
+  that were blown down are scorched too.
+- Hit walls smoulder, with smoke rising for 20-35 seconds; collapsing walls throw up a dust cloud.
+- Pausing now freezes flashes, tracers and explosions instead of letting them fade.
+
 ## v0.06 (2026-11-11)
 Concrete walls.
 - Walls are now cast concrete instead of bricks: weathered slabs with the same gritty texture as
