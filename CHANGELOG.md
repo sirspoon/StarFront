@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.15 (2026-11-11)
+Touch controls refined.
+- Tapping a soldier or vehicle always selects its squad (it no longer toggles off).
+- Moving now always takes a drag: with a squad selected, drag to where it should go (infantry line
+  up along the drag in cover; vehicles drive to where the drag ends).
+- Tapping empty ground clears the selection, so a one-finger drag then scrolls the map. Taps on an
+  enemy (focus fire) or a wall (shell it, with a tank or lance team) still give orders.
+- Orders can be given while paused, and while paused every squad's planned route is shown.
+
 ## v0.14 (2026-11-11)
 - Phones draw the detailed map one tile per frame with a short pause between (desktop still does
   four), since `?safe` showed the crash happens while drawing map tiles. `?batch=1/2/4/8` overrides it.

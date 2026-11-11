@@ -95,10 +95,11 @@ func setup(m: Node) -> void:
 	help_panel.add_child(help)
 	if main.touch_mode:
 		help.text = "TOUCH CONTROLS  (? hides)\n" \
-				+ "Tap a soldier: select his squad (again: deselect)\n" \
-				+ "Tap ground: move there   (Run on: run)\n" \
-				+ "Drag with a squad selected: line up along it, in cover\n" \
-				+ "Drag with nothing selected, or two fingers: scroll\n" \
+				+ "Tap a soldier or vehicle: select it\n" \
+				+ "Drag with it selected: move there (infantry line up\n" \
+				+ "   along the drag, in cover; Run on: run)\n" \
+				+ "Tap empty ground: deselect, then drag to scroll\n" \
+				+ "Two fingers: scroll   Pause: orders still work\n" \
 				+ "Pinch: zoom\n" \
 				+ "Tap an enemy: focus fire   Tap your carrier: board\n" \
 				+ "Tap a wall (tank / lance team selected): shell it\n" \

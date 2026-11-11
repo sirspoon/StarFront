@@ -21,7 +21,7 @@ func _draw() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, col)
 	# orders of the selected squads
 	for sq in main.squads:
-		if not sq.selected:
+		if not sq.selected and not (main.paused and sq.team == main.player_team):
 			continue
 		for m in sq.members:
 			if m.is_alive() and m.path_i < m.path.size():

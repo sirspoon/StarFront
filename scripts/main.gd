@@ -1147,6 +1147,9 @@ func _touch_input(e: InputEvent) -> void:
 				if t_mode == "line":
 					rdragging = false
 					_order_line(rdrag_start, wp, run_toggle)
+					for sq in _player_squads():
+						if sq.selected and sq.vehicle() != null and sq.vehicle().is_alive():
+							sq.order_move(map, wp, run_toggle)  # vehicles drive to where the drag ends
 				elif t_mode == "":
 					_tap(wp)
 				t_mode = ""
@@ -1174,7 +1177,7 @@ func _touch_input(e: InputEvent) -> void:
 			_clamp_camera()
 			return
 		if t_mode == "" and sd.position.distance_to(t_start) > 18.0:
-			if started and not over and _player_squads().any(func(q): return q.selected and q.vehicle() == null and not q.alive().is_empty()):
+			if started and not over and _player_squads().any(func(q): return q.selected and (q.vehicle() != null or not q.alive().is_empty())):
 				t_mode = "line"
 				rdragging = true
 				rdrag_start = _screen_to_world(t_start)
@@ -1209,17 +1212,22 @@ func _tap(wp: Vector2) -> void:
 		if s.is_vehicle and s.free_space() > 0 and infantry_selected and not s.squad.selected:
 			_order(wp, false)  # climb aboard
 			return
-		if s.squad.selected:
-			for sq in squads:
-				sq.selected = false
-				sq.sub.clear()
-			return
 		for sq in squads:
 			sq.sub.clear()
 		select_squad(s.squad, false)
 		return
-	if _player_squads().any(func(q): return q.selected):
-		_order(wp, run_toggle)
+	# with squads selected, a tap on an enemy or (for tanks and lance teams) a wall is an order;
+	# anything else clears the selection so a drag scrolls the map. Moving takes a drag.
+	var sel := _player_squads().filter(func(q): return q.selected)
+	if not sel.is_empty():
+		var on_enemy := _soldier_at(wp, 1 - player_team, 16.0) != null
+		var on_wall := map.get_t(map.cell_of(wp)) == BattleMap.T.WALL and sel.any(func(q): return q.can_breach())
+		if on_enemy or on_wall:
+			_order(wp, run_toggle)
+			return
+	for sq in squads:
+		sq.selected = false
+		sq.sub.clear()
 
 
 ## The touch bar's buttons.
