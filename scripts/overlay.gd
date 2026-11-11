@@ -34,6 +34,9 @@ func _draw() -> void:
 		if sq.focus != null and is_instance_valid(sq.focus) and sq.focus.is_alive():
 			draw_line(sq.center(), sq.focus.position, Color(1.0, 0.3, 0.2, 0.4), 1.5)
 	for sq in main.squads:
+		if sq.team == main.player_team and (sq.selected or main.paused):
+			_draw_route(sq)
+	for sq in main.squads:
 		if not sq.selected or sq.vehicle() != null:
 			continue
 		_draw_links(sq)
@@ -112,3 +115,39 @@ func _draw_line_preview() -> void:
 			var mid: Vector2 = (spots[0] + spots[spots.size() - 1]) * 0.5
 			_arrow(mid, mid + face * 40.0, Color(0.6, 0.8, 1.0, 0.9))
 		done += n
+
+
+## A squad's planned route: numbered waypoints joined up, ending in its final spot
+## (or the line it will spread along).
+func _draw_route(sq: Squad) -> void:
+	var r: Array = sq.route()
+	if r.is_empty() or sq.alive().is_empty() and sq.vehicle() == null:
+		return
+	var col := Color(0.55, 1.0, 0.6, 0.75)
+	var prev := sq.center()
+	for i in r.size():
+		var o: Dictionary = r[i]
+		var p: Vector2 = (o.a + o.b) * 0.5 if o.kind == "line" else o.b
+		if o.run:
+			col = Color(1.0, 0.8, 0.35, 0.8)
+		_dashed(prev, p, col)
+		if o.kind == "line":
+			draw_line(o.a, o.b, col, 2.0)
+			draw_circle(o.a, 3.0, col)
+			draw_circle(o.b, 3.0, col)
+		var last := i == r.size() - 1
+		draw_circle(p, 7.0 if last else 6.0, Color(0, 0, 0, 0.55))
+		draw_arc(p, 7.0 if last else 6.0, 0, TAU, 20, col, 1.5)
+		draw_string(ThemeDB.fallback_font, p + Vector2(-3.5, 4), str(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, col)
+		prev = p
+
+
+func _dashed(a: Vector2, b: Vector2, col: Color) -> void:
+	var d := a.distance_to(b)
+	if d < 1.0:
+		return
+	var dir := (b - a) / d
+	var t := 0.0
+	while t < d:
+		draw_line(a + dir * t, a + dir * minf(t + 6.0, d), col, 1.2)
+		t += 11.0

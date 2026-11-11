@@ -52,6 +52,11 @@ const DOUBLE_TAP_MS := 450
 var tap_pending := false  # a lone tap on the ground that may become a double tap
 var tap_time := 0
 var tap_frame := 0
+var tap_screen := Vector2.ZERO
+var t_second := false       # this touch began just after a tap close by (double tap / tap-drag)
+var t_press_ms := 0         # when the current one-finger touch began (for tap-hold)
+const HOLD_MS := 500
+var plan_fresh := true      # the next order replaces the selected squads' orders (else it's added to the route)
 var tap_pos := Vector2.ZERO
 var face_mode := false
 var pick_mode := false
@@ -132,6 +137,20 @@ func _test_orders() -> void:
 				nearest = minf(nearest, o.position.distance_to(m.position))
 		far = maxf(far, nearest)
 	print("picked soldiers sent 600px away: furthest from the rest %d px (limit %d), coherent=%s" % [far, Squad.COH, sq.is_coherent()])
+	# a planned route: two waypoints then a line
+	sq.sub.clear()
+	var c2 := sq.center()
+	var w1 := c2 + Vector2(150, 0)
+	var w2 := c2 + Vector2(150, 150)
+	sq.enqueue(map, {"kind": "move", "a": w1, "b": w1, "face": Vector2.ZERO, "run": false}, true)
+	sq.enqueue(map, {"kind": "move", "a": w2, "b": w2, "face": Vector2.ZERO, "run": false}, false)
+	sq.enqueue(map, {"kind": "line", "a": w2 + Vector2(100, -60), "b": w2 + Vector2(100, 60), "face": Vector2(1, 0), "run": false}, false)
+	var seen_w1 := false
+	for k in 40:
+		await get_tree().create_timer(1.0).timeout
+		if sq.center().distance_to(w1) < 60.0:
+			seen_w1 = true
+	print("route: passed waypoint 1 %s, now %d px from the final line's centre, orders left %d" % [seen_w1, sq.center().distance_to(w2 + Vector2(100, 0)), sq.route().size()])
 
 
 ## Test aid: shell the chapel's west wall so screenshots show every damage stage.
@@ -423,6 +442,11 @@ func _process(dt: float) -> void:
 	if not touch_mode:
 		pointer_world = get_global_mouse_position()
 	# wait for both the time and a few frames, so a slow device still sees the second tap
+	if touch_mode and touches.size() == 1 and t_mode == "" and not t_second \
+			and Time.get_ticks_msec() - t_press_ms >= HOLD_MS:
+		t_mode = "done"
+		tap_pending = false
+		_hold(t_start)
 	if tap_pending and Time.get_ticks_msec() - tap_time >= DOUBLE_TAP_MS and Engine.get_process_frames() - tap_frame > 10:
 		tap_pending = false
 		_deselect_all()
@@ -451,6 +475,7 @@ func _process(dt: float) -> void:
 		_update_spotting()
 	for sq in squads:
 		sq.think(self, dt)
+		sq.advance(map)
 	for s in soldiers:
 		if s.is_alive() and not s.is_vehicle:
 			field_time[s.team] += dt
@@ -879,6 +904,7 @@ func log_message(text: String) -> void:
 # ---------------------------------------------------------------- input
 
 func select_squad(sq: Squad, add: bool) -> void:
+	plan_fresh = true
 	if not add:
 		for o in squads:
 			o.selected = false
@@ -1026,6 +1052,56 @@ func _order_line(a: Vector2, b: Vector2, run: bool) -> void:
 	effects.marker(b, Color(0.5, 1.0, 0.5))
 
 
+## The selected squads that can take a move order, each with where its own part
+## of the order goes: a spot near p (move), or its share of the line a-b.
+func _plan(kind: String, a: Vector2, b: Vector2, final: bool) -> void:
+	var sel: Array = _player_squads().filter(func(q): return q.selected and (q.vehicle() != null or not q.alive().is_empty() or q.carrier() != null))
+	if sel.is_empty():
+		return
+	var orders: Array = []  # [squad, order]
+	if kind == "line":
+		var inf: Array = sel.filter(func(q): return q.vehicle() == null and q.carrier() == null)
+		var total := 0
+		for sq in inf:
+			total += sq.movers().size()
+		var dir := (b - a).normalized()
+		inf.sort_custom(func(x, y): return (x.center() - a).dot(dir) < (y.center() - a).dot(dir))
+		var done := 0
+		for sq in inf:
+			var n: int = sq.movers().size()
+			var sa := a.lerp(b, float(done) / maxf(total, 1))
+			var sb := a.lerp(b, float(done + n - 1) / maxf(total - 1, 1))
+			if inf.size() == 1:
+				sa = a
+				sb = b
+			orders.append([sq, {"kind": "line", "a": sa, "b": sb, "face": line_facing(sq, a, b), "run": run_toggle}])
+			done += n
+		for sq in sel:
+			if not inf.has(sq):
+				var mover: Squad = sq.carrier().squad if sq.carrier() != null else sq
+				orders.append([mover, {"kind": "move", "a": b, "b": b, "face": Vector2.ZERO, "run": run_toggle}])
+	else:
+		var group_c := Vector2.ZERO
+		for sq in sel:
+			group_c += sq.center()
+		group_c /= sel.size()
+		for sq in sel:
+			var off: Vector2 = (sq.center() - group_c).limit_length(120.0) if sel.size() > 1 else Vector2.ZERO
+			var mover: Squad = sq.carrier().squad if sq.carrier() != null else sq
+			orders.append([mover, {"kind": "move", "a": a + off, "b": a + off, "face": Vector2.ZERO, "run": run_toggle}])
+	for o in orders:
+		o[0].enqueue(map, o[1], plan_fresh)
+	plan_fresh = final
+	var col := Color(1.0, 0.8, 0.3) if run_toggle else Color(0.5, 1.0, 0.5)
+	effects.marker(a, col)
+	if kind == "line":
+		effects.marker(b, col)
+
+
+func _has_selection() -> bool:
+	return _player_squads().any(func(q): return q.selected and (q.vehicle() != null or not q.alive().is_empty() or q.carrier() != null))
+
+
 func _order_face(wp: Vector2) -> void:
 	for sq in _player_squads():
 		if sq.selected and not sq.alive().is_empty():
@@ -1142,6 +1218,12 @@ func _touch_input(e: InputEvent) -> void:
 			if touches.size() == 1:
 				t_start = st.position
 				t_mode = ""
+				t_press_ms = Time.get_ticks_msec()
+				# a second touch right after a tap close by: double tap, or tap-drag
+				t_second = tap_pending and st.position.distance_to(tap_screen) < 50.0 \
+						and (t_press_ms - tap_time < DOUBLE_TAP_MS or Engine.get_process_frames() - tap_frame <= 10)
+				if t_second:
+					tap_pending = false
 			elif touches.size() == 2:
 				t_mode = "pinch"
 				rdragging = false
@@ -1155,12 +1237,11 @@ func _touch_input(e: InputEvent) -> void:
 				var wp := _screen_to_world(st.position)
 				if t_mode == "line":
 					rdragging = false
-					_order_line(rdrag_start, wp, run_toggle)
-					for sq in _player_squads():
-						if sq.selected and sq.vehicle() != null and sq.vehicle().is_alive():
-							sq.order_move(map, wp, run_toggle)  # vehicles drive to where the drag ends
+					_plan("line", rdrag_start, wp, true)
+				elif t_mode == "" and t_second:
+					_double_tap(wp)
 				elif t_mode == "":
-					_tap(wp)
+					_tap(wp, st.position)
 				t_mode = ""
 			elif touches.size() == 1:
 				t_mode = "done"  # the finger left after a pinch shouldn't count as a tap
@@ -1186,9 +1267,8 @@ func _touch_input(e: InputEvent) -> void:
 			_clamp_camera()
 			return
 		if t_mode == "" and sd.position.distance_to(t_start) > 18.0:
-			if started and not over and _player_squads().any(func(q): return q.selected and (q.vehicle() != null or not q.alive().is_empty())):
-				t_mode = "line"
-				tap_pending = false
+			if t_second and started and not over and _has_selection():
+				t_mode = "line"  # tap, then drag: spread out along the drag
 				rdragging = true
 				rdrag_start = _screen_to_world(t_start)
 			else:
@@ -1205,7 +1285,7 @@ func _pinch_begin() -> void:
 	pinch_prev_dist = pts[0].distance_to(pts[1])
 
 
-func _tap(wp: Vector2) -> void:
+func _tap(wp: Vector2, screen := Vector2.ZERO) -> void:
 	if not started or over:
 		return
 	if face_mode:
@@ -1236,22 +1316,43 @@ func _tap(wp: Vector2) -> void:
 		if on_enemy or on_wall:
 			_order(wp, run_toggle)
 			return
-		# a second tap close by soon after: move there. A lone tap clears the
-		# selection once it's clear no second tap is coming.
-		var now := Time.get_ticks_msec()
-		if tap_pending and (now - tap_time < DOUBLE_TAP_MS or Engine.get_process_frames() - tap_frame <= 10) and wp.distance_to(tap_pos) < 40.0 / camera.zoom.x:
-			tap_pending = false
-			_order(wp, run_toggle)
-			return
+		# a lone tap clears the selection, once it's clear no second tap is coming
 		tap_pending = true
-		tap_time = now
+		tap_screen = screen
+		tap_time = Time.get_ticks_msec()
 		tap_frame = Engine.get_process_frames()
 		tap_pos = wp
 		return
 	_deselect_all()
 
 
+func _double_tap(wp: Vector2) -> void:
+	if not started or over or not _has_selection():
+		return
+	var on_enemy := _soldier_at(wp, 1 - player_team, 16.0) != null
+	var on_wall := map.get_t(map.cell_of(wp)) == BattleMap.T.WALL
+	if on_enemy or on_wall:
+		_order(wp, run_toggle)
+	else:
+		_plan("move", wp, wp, true)
+
+
+## Holding a finger still on the ground: add a waypoint to the selected squads' route.
+func _hold(screen: Vector2) -> void:
+	var wp := _screen_to_world(screen)
+	if not started or over or not _has_selection():
+		return
+	var own := _soldier_at(wp, player_team, 16.0)
+	if own != null:
+		for sq in squads:
+			sq.sub.clear()
+		select_squad(own.squad, false)
+		return
+	_plan("move", wp, wp, false)
+
+
 func _deselect_all() -> void:
+	plan_fresh = true
 	for sq in squads:
 		sq.selected = false
 		sq.sub.clear()

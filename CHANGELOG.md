@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.19 (2026-11-11)
+Touch controls reworked.
+- Drag always scrolls the map, even with a squad selected.
+- Double-tap the ground: move there. Tap, then drag: move there, spread out along the drag.
+- Tap and hold the ground: add a waypoint; hold again for more, and finish the route with a
+  double-tap or tap-drag. The route shows as numbered points, and the squad follows it in order.
+- The first order after selecting a squad replaces its old orders; waypoints then add on.
+
 ## v0.18 (2026-11-11)
 - On phones the first tap switches the browser to full screen (no address bar) and locks it to
   landscape. Browsers only allow full screen after a tap, so it can't happen on load.

@@ -14,6 +14,8 @@ var start_size := 0
 var facing := Vector2.ZERO  # the direction the squad watches (ZERO = no order)
 var sub: Array = []          # soldiers picked out individually (Alt+click); orders go to them only
 var think_timer := randf() * 1.2
+var queue: Array = []   # orders still to come: {kind: "move"/"line", a, b, face, run}
+var current = null      # the order being carried out now (for drawing the route), or null
 
 ## Squad coherency, as in Epik: every soldier must be within this distance of
 ## another, forming one connected group. Stragglers make their way back.
@@ -157,7 +159,60 @@ func clamp_coherent(m: Soldier, target: Vector2) -> Vector2:
 	return best.position + (target - best.position).limit_length(COH * 0.9)
 
 
-func order_move(map: BattleMap, pos: Vector2, run: bool) -> void:
+## Give an order now (replace = true) or after the ones already planned.
+func enqueue(map: BattleMap, o: Dictionary, replace: bool) -> void:
+	if replace:
+		queue.clear()
+		_exec(map, o)
+	elif current == null and queue.is_empty() and not busy():
+		_exec(map, o)
+	else:
+		queue.append(o)
+
+
+func _exec(map: BattleMap, o: Dictionary) -> void:
+	focus = null
+	current = o
+	if o.kind == "line" and vehicle() == null:
+		order_line(map, o.a, o.b, o.face, o.run, true)
+	else:
+		order_move(map, o.b, o.run, true)
+
+
+## Still on the way to the current order's destination?
+func busy() -> bool:
+	var v = vehicle()
+	if v != null:
+		return v.is_alive() and v.path_i < v.path.size()
+	for m in members:
+		if m.is_alive() and m.state != Soldier.State.ROUTING and m.path_i < m.path.size():
+			return true
+	return false
+
+
+## Called every frame: once the squad reaches one planned point, set off for the next.
+func advance(map: BattleMap) -> void:
+	if current == null or busy():
+		return
+	if queue.is_empty():
+		current = null
+	else:
+		_exec(map, queue.pop_front())
+
+
+## The planned route's points, in order (for drawing it).
+func route() -> Array:
+	var out: Array = []
+	if current != null:
+		out.append(current)
+	out.append_array(queue)
+	return out
+
+
+func order_move(map: BattleMap, pos: Vector2, run: bool, from_queue := false) -> void:
+	if not from_queue:
+		queue.clear()
+		current = null
 	running = run
 	fire_point = null
 	var v = vehicle()
@@ -198,7 +253,10 @@ func _assign(ms: Array, slots: Array, run: bool) -> void:
 
 ## Spread out along the line a-b, each man taking the best cover near his spot,
 ## then watch towards face.
-func order_line(map: BattleMap, a: Vector2, b: Vector2, face: Vector2, run: bool) -> void:
+func order_line(map: BattleMap, a: Vector2, b: Vector2, face: Vector2, run: bool, from_queue := false) -> void:
+	if not from_queue:
+		queue.clear()
+		current = null
 	running = run
 	fire_point = null
 	if vehicle() != null:
@@ -339,6 +397,8 @@ func think(main: Node, dt: float) -> void:
 
 
 func halt() -> void:
+	queue.clear()
+	current = null
 	focus = null
 	fire_point = null
 	for m in members:

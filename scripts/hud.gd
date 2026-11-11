@@ -100,17 +100,15 @@ func setup(m: Node) -> void:
 	if main.touch_mode:
 		help.text = "TOUCH CONTROLS  (? hides)\n" \
 				+ "Tap a soldier or vehicle: select it\n" \
-				+ "Drag with it selected: move there (infantry line up\n" \
-				+ "   along the drag, in cover; Run on: run)\n" \
-				+ "Or double-tap the ground: move there\n" \
-				+ "Tap empty ground: deselect, then drag to scroll\n" \
-				+ "Tap a squad card: select it and go to it\n" \
-				+ "Two fingers: scroll   Pause: orders still work\n" \
-				+ "Pinch: zoom\n" \
+				+ "Double-tap ground: move there\n" \
+				+ "Tap, then drag: move there, spread along the drag\n" \
+				+ "Tap and hold ground: add a waypoint (hold again for more;\n" \
+				+ "   finish with a double-tap or tap-drag)\n" \
+				+ "Drag: scroll   Pinch: zoom   Tap empty ground: deselect\n" \
+				+ "First order after selecting replaces old orders\n" \
 				+ "Tap an enemy: focus fire   Tap your carrier: board\n" \
-				+ "Tap a wall (tank / lance team selected): shell it\n" \
-				+ "Face, then tap: look that way\n" \
-				+ "Pick, then tap soldiers: order single men\n\n" \
+				+ "Double-tap a wall (tank / lance team): shell it\n" \
+				+ "Face, then tap: look that way   Pause: orders still work\n\n" \
 				+ "Hold the Ashen Chapel. Sandbags, barricades and\n" \
 				+ "low walls stop most fire from their far side.\n" \
 				+ "Men must stay in contact with their squad."
