@@ -350,6 +350,7 @@ func show_menu() -> void:
 		warn.add_theme_color_override("font_color", Color(1.0, 0.6, 0.45))
 		warn.add_theme_font_size_override("font_size", 13)
 		v.add_child(warn)
+	_tick_breadcrumbs()
 	var info := Label.new()
 	info.text = "Graphics: " + Settings.summary()
 	info.add_theme_font_size_override("font_size", 11)
@@ -384,3 +385,14 @@ func show_end(text: String) -> void:
 	b.focus_mode = Control.FOCUS_NONE
 	b.pressed.connect(func(): main.get_tree().reload_current_scene())
 	v.add_child(b)
+
+
+## While the menu is up, note every couple of seconds that the game is still alive,
+## so a crash report shows whether it died with nothing else happening.
+func _tick_breadcrumbs() -> void:
+	for i in 5:
+		await get_tree().create_timer(2.0).timeout
+		if main.started:
+			return
+		if main.map_view.ready_drawn:
+			Settings.stage("menu up %d s, map ready (%s)" % [(i + 1) * 2, Settings.summary()])

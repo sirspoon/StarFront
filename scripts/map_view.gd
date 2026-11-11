@@ -8,6 +8,7 @@ extends Node2D
 ## tests) nothing is painted.
 
 var use_normals := true
+var _where := ""  # for the crash breadcrumbs
 var SCALE := 2.0  # map pixels drawn per world pixel (detail level)
 const BATCH := 4  # tiles prepared at once: keeps the burst of graphics memory small enough for phones
 const CHUNK := Vector2i(20, 20)  # tile size in cells
@@ -31,6 +32,15 @@ func setup(m: BattleMap) -> void:
 	if DisplayServer.get_name() == "headless":
 		enabled = false
 		return
+	if not Settings.on("bake", true):
+		# minimal mode: a plain flat map, no off-screen drawing at all
+		var flat := FlatMap.new()
+		flat.map = map
+		add_child(flat)
+		ready_drawn = true
+		Settings.stage("flat map shown (%s)" % Settings.summary())
+		return
+	Settings.stage("making ground textures")
 	await _make_ground_textures()
 	var all: Array = []
 	for cx in ceili(float(BattleMap.W) / CHUNK.x):
@@ -42,7 +52,7 @@ func setup(m: BattleMap) -> void:
 	SCALE = Settings.detail()
 	use_normals = Settings.on("normals", true)
 	for i in range(0, all.size(), BATCH):
-		Settings.stage("preparing map tiles %d-%d of %d (%s)" % [i + 1, mini(i + BATCH, all.size()), all.size(), Settings.summary()])
+		_where = "map tiles %d-%d of %d (%s)" % [i + 1, mini(i + BATCH, all.size()), all.size(), Settings.summary()]
 		await _bake(all.slice(i, i + BATCH))
 	Settings.stage("map ready (%s)" % Settings.summary())
 	ready_drawn = true
@@ -134,7 +144,9 @@ func _bake(keys: Array) -> void:
 			hvp = _viewport(size)
 			hvp.add_child(_painter(HeightPainter.new(), rect))
 		jobs.append([k, vp, rect, hvp, null])
+	Settings.stage(_where + ": drawing colour tiles")
 	await RenderingServer.frame_post_draw
+	Settings.stage(_where + ": colour tiles drawn")
 	# second pass: turn each tile's height and colour into a normal map
 	for j in jobs:
 		if not use_normals:
@@ -154,6 +166,8 @@ func _bake(keys: Array) -> void:
 		j[4] = nvp
 	if use_normals:
 		await RenderingServer.frame_post_draw
+		Settings.stage(_where + ": normal maps drawn")
+	Settings.stage(_where + ": reading tiles back")
 	for j in jobs:
 		var vp: SubViewport = j[1]
 		var img := vp.get_texture().get_image()
@@ -211,6 +225,10 @@ func _painter(p: MapPainter, rect: Rect2i) -> MapPainter:
 func _on_cells_changed(cells: Array) -> void:
 	if not enabled:
 		return
+	for ch in get_children():
+		if ch is FlatMap:
+			ch.queue_redraw()
+			return
 	var rows := {}
 	for c in cells:
 		rows[c.y] = true

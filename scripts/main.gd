@@ -263,6 +263,7 @@ func add_fire(p: Vector2) -> void:
 	light.energy = 1.6
 	light.texture_scale = 1.6
 	light.position = p
+	light.enabled = Settings.on("lights", true)
 	light.height = 36.0  # flames stand above the ground, so they light surfaces at an angle
 	light.shadow_enabled = Settings.on("shadows", not Settings.is_phone())
 	light.shadow_filter = Light2D.SHADOW_FILTER_PCF5

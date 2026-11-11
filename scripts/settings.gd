@@ -6,7 +6,8 @@ extends RefCounted
 ##   shadows=0|1         walls casting shadows from fires and explosions (off by default on phones)
 ##   normals=0           no normal maps (flat lighting)
 ##   lights=0            no combat lights or moonlight
-##   safe                all of the above off, low detail
+##   bake=0              no detailed map at all: a plain flat one (no off-screen drawing)
+##   safe                all of the above off
 
 static var _query := ""
 static var _read := false
@@ -68,5 +69,5 @@ static func last_stage() -> String:
 
 static func summary() -> String:
 	var oo := func(b: bool) -> String: return "on" if b else "off"
-	return "detail %sx, shadows %s, normal maps %s, lights %s" % [detail(), oo.call(on("shadows", not is_phone())),
-			oo.call(on("normals", true)), oo.call(on("lights", true))]
+	return "detail %sx, shadows %s, normal maps %s, lights %s, map drawing %s" % [detail(), oo.call(on("shadows", not is_phone())),
+			oo.call(on("normals", true)), oo.call(on("lights", true)), oo.call(on("bake", true))]

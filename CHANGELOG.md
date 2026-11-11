@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.13 (2026-11-11)
+More phone crash hunting.
+- Turned off 2D anti-aliasing in the project: the renderer used on the web doesn't support it, and it
+  may upset phone graphics chips.
+- `?safe` now goes further: no detailed map at all (a plain flat one, `?bake=0` on its own), and fire
+  lights off too. If that runs on a phone, the detailed map preparation is the problem.
+- The crash breadcrumbs now note each step of preparing the map, and keep ticking while the menu is up.
+
 ## v0.12 (2026-11-11)
 Finding what crashes phones.
 - Graphics switches in the web address: `?safe` (everything heavy off), or one at a time with
