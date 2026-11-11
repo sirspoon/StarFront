@@ -8,6 +8,7 @@ var faction := ""
 var members: Array[Soldier] = []
 var selected := false
 var focus: Soldier = null
+var fire_point = null  # a wall the squad has been told to shell (Vector2), or null
 var running := false
 var start_size := 0
 
@@ -113,8 +114,22 @@ func status() -> String:
 	return "Ready"
 
 
+## Can this squad blow holes in walls (does it have explosive weapons)?
+func can_breach() -> bool:
+	for m in members:
+		if m.is_alive() and m.can_breach():
+			return true
+	return false
+
+
+func order_fire_at(p: Vector2) -> void:
+	focus = null
+	fire_point = p
+
+
 func order_move(map: BattleMap, pos: Vector2, run: bool) -> void:
 	running = run
+	fire_point = null
 	var v = vehicle()
 	if v != null:
 		v.go_to(pos, run)
@@ -137,6 +152,7 @@ func order_move(map: BattleMap, pos: Vector2, run: bool) -> void:
 
 func halt() -> void:
 	focus = null
+	fire_point = null
 	for m in members:
 		m.board_vehicle = null
 		m.halt()

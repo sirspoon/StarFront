@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.03 (2026-11-11)
+Sharper battlefield and walls that can be destroyed.
+- The map is now painted at twice the detail, in tiles: textured ground with stones, cracks, dead
+  grass, puddles and stray bricks; craters with rims, thrown-out earth and water at the bottom;
+  roads with kerbs, worn markings and potholes; flagstone floors with soot and cracks; rubble heaps
+  with shaded stones, bricks and rebar.
+- Walls now look raised: brick coping on top, a shaded front face and lit edges. The chapel has a
+  marble floor, a torn red runner, a mosaic sunburst and shattered stained glass.
+- Walls can be destroyed. Explosions (tank shells, lance rockets) chip them: first cracks, then
+  missing stones, then they collapse into rubble you can walk and see through. Chapel walls are tougher.
+- New order: select a tank or the Lance Team and right-click a wall to shell it until it falls.
+- Stray shells now burst on the first wall in their way instead of passing through.
+- Scorch marks no longer pile up into black blots.
+
 ## v0.02 (2026-11-11)
 Vehicles.
 - Each side gets a troop carrier and a tank: the Legion's Drudge Carrier and Vigil Tank, the

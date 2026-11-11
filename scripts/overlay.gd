@@ -26,6 +26,11 @@ func _draw() -> void:
 		for m in sq.members:
 			if m.is_alive() and m.path_i < m.path.size():
 				draw_line(m.position, m.path[m.path.size() - 1], Color(0.5, 1.0, 0.5, 0.25), 1.0)
+		if sq.fire_point != null:
+			var fp: Vector2 = sq.fire_point
+			draw_line(sq.center(), fp, Color(1.0, 0.6, 0.2, 0.45), 1.5)
+			draw_line(fp + Vector2(-6, -6), fp + Vector2(6, 6), Color(1.0, 0.6, 0.2, 0.9), 2.0)
+			draw_line(fp + Vector2(-6, 6), fp + Vector2(6, -6), Color(1.0, 0.6, 0.2, 0.9), 2.0)
 		if sq.focus != null and is_instance_valid(sq.focus) and sq.focus.is_alive():
 			draw_line(sq.center(), sq.focus.position, Color(1.0, 0.3, 0.2, 0.4), 1.5)
 	if main.dragging:

@@ -73,6 +73,7 @@ func setup(m: Node) -> void:
 			+ "Right click ground: move   (Shift: run)\n" \
 			+ "Right click enemy: focus fire on it\n" \
 			+ "Right click your carrier: climb aboard   U: unload\n" \
+			+ "Right click a wall (tank / lance team): shell it\n" \
 			+ "H: halt   1-9: pick squad   Space: pause\n" \
 			+ "WASD / arrows / middle-drag: scroll   Wheel: zoom\n\n" \
 			+ "Hold the Ashen Chapel. Soldiers seek cover\n" \

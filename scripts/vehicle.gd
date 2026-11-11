@@ -55,6 +55,13 @@ func setup_vehicle(m: Node, sq: Squad, t: int, kind_id: String) -> void:
 	weapon = slots[0].weapon
 
 
+func can_breach() -> bool:
+	for sl in slots:
+		if sl.weapon.get("blast", 0.0) > 0.0:
+			return true
+	return false
+
+
 func main_range() -> float:
 	return slots[0].weapon.range
 
@@ -237,6 +244,24 @@ func _aim_and_fire(dt: float, now: float) -> void:
 					_fire(sl, t, now)
 				sl.burst_left -= 1
 				sl.burst_timer = sl.weapon.gap
+			continue
+		var bp = breach_point() if sl.weapon.get("blast", 0.0) > 0.0 else null
+		if bp != null:
+			var bwant: float = (bp - position).angle()
+			if sl.turret:
+				turret_goal = bwant
+			if sl.cooldown > 0.0 or shaken > 0.0:
+				continue
+			if position.distance_to(bp) <= sl.weapon.range and map.los_clear(position, bp) \
+					and (not sl.turret or absf(wrapf(bwant - turret_angle, -PI, PI)) < 0.08):
+				if not sl.turret:
+					sl.angle = bwant
+				sl.flash = 0.08
+				if sl.turret:
+					recoil = 1.0
+				last_fire_time = now
+				main.resolve_point_shot(self, bp, sl.weapon, _mount_pos(sl))
+				sl.cooldown = sl.weapon.cooldown * randf_range(0.9, 1.15)
 			continue
 		if sl.cooldown > 0.0 or shaken > 0.0:
 			continue

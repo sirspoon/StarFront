@@ -211,6 +211,15 @@ func _fight(dt: float, now: float) -> void:
 		return
 	if cooldown > 0.0 or (running and moving):
 		return
+	var bp = breach_point() if can_breach() else null
+	if bp != null:
+		if position.distance_to(bp) <= weapon.range and map.los_clear(position, bp):
+			facing = (bp - position).angle()
+			flash = 0.08
+			last_fire_time = now
+			main.resolve_point_shot(self, bp, weapon, muzzle_pos())
+			cooldown = weapon.cooldown * randf_range(0.9, 1.15) * (2.5 if state == State.PINNED else 1.0)
+			return
 	var t := pick_target(weapon, position)
 	if t == null:
 		cooldown = randf_range(0.3, 0.6)
@@ -222,6 +231,21 @@ func _fight(dt: float, now: float) -> void:
 	if state == State.PINNED:
 		cd *= 2.5
 	cooldown = cd
+
+
+func can_breach() -> bool:
+	return weapon.get("blast", 0.0) > 0.0
+
+
+## The wall this soldier's squad was told to shell, if it's still standing.
+func breach_point():
+	if squad.fire_point == null:
+		return null
+	var fp: Vector2 = squad.fire_point
+	if map.get_t(map.cell_of(fp)) != BattleMap.T.WALL:
+		squad.fire_point = null  # it's down
+		return null
+	return fp
 
 
 ## Whether weapon w could ever damage this unit (infantry: always; vehicles override).

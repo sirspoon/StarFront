@@ -2,12 +2,13 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.02"
+const VERSION := "0.03"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
 ## dmg = wounds to infantry. Against vehicles: pen is compared with the armour of the side hit
-## and vdmg is the hull damage if it gets through. blast = radius of the explosion (0 = none).
+## and vdmg is the hull damage if it gets through. blast = radius of the explosion (0 = none);
+## wall = damage it does to walls in that blast (walls have 100, chapel walls 160).
 const WEAPONS := {
 	"lumen_rifle": {"name": "Lumen rifle", "range": 340.0, "cooldown": 1.5, "burst": 1, "gap": 0.0,
 		"acc": 0.5, "ap": 0.0, "dmg": 1, "pen": 0, "supp": 7.0, "tracer": Color(1.0, 0.5, 0.25), "width": 1.6},
@@ -18,16 +19,16 @@ const WEAPONS := {
 	"rotor_cannon": {"name": "Rotor cannon", "range": 440.0, "cooldown": 3.0, "burst": 5, "gap": 0.1,
 		"acc": 0.26, "ap": 0.5, "dmg": 2, "pen": 4, "vdmg": 2, "supp": 18.0, "tracer": Color(0.55, 0.8, 1.0), "width": 2.6},
 	"lance_launcher": {"name": "Lance launcher", "range": 400.0, "cooldown": 6.0, "burst": 1, "gap": 0.0,
-		"acc": 0.42, "ap": 0.6, "dmg": 2, "pen": 8, "vdmg": 5, "blast": 18.0, "supp": 20.0,
+		"acc": 0.42, "ap": 0.6, "dmg": 2, "pen": 8, "vdmg": 5, "blast": 18.0, "wall": 45.0, "supp": 20.0,
 		"tracer": Color(1.0, 0.75, 0.4), "width": 3.0},
 	"fusion_carbine": {"name": "Fusion carbine", "range": 210.0, "cooldown": 3.5, "burst": 1, "gap": 0.0,
 		"acc": 0.6, "ap": 0.9, "dmg": 4, "pen": 9, "vdmg": 5, "supp": 20.0,
 		"tracer": Color(0.75, 0.9, 1.0), "width": 4.0},
 	"siege_cannon": {"name": "Siege cannon", "range": 620.0, "cooldown": 5.0, "burst": 1, "gap": 0.0,
-		"acc": 0.5, "ap": 0.6, "dmg": 3, "pen": 9, "vdmg": 6, "blast": 42.0, "supp": 40.0,
+		"acc": 0.5, "ap": 0.6, "dmg": 3, "pen": 9, "vdmg": 6, "blast": 42.0, "wall": 80.0, "supp": 40.0,
 		"tracer": Color(1.0, 0.9, 0.6), "width": 3.5},
 	"fusion_cannon": {"name": "Fusion cannon", "range": 540.0, "cooldown": 6.0, "burst": 1, "gap": 0.0,
-		"acc": 0.55, "ap": 0.9, "dmg": 4, "pen": 9, "vdmg": 6, "blast": 24.0, "supp": 40.0,
+		"acc": 0.55, "ap": 0.9, "dmg": 4, "pen": 9, "vdmg": 6, "blast": 24.0, "wall": 70.0, "supp": 40.0,
 		"tracer": Color(0.7, 0.9, 1.0), "width": 5.0},
 }
 

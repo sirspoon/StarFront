@@ -11,6 +11,7 @@ const OverlayScript := preload("res://scripts/overlay.gd")
 const DecalsScript := preload("res://scripts/decals.gd")
 
 var map: BattleMap
+var map_view: MapView
 var effects: Effects
 var decals: Node2D
 var units_layer: Node2D
@@ -40,6 +41,8 @@ var panning := false
 var shot_path := ""  # --shot=file.png saves a screenshot (needs a display)
 var shot_time := 60.0
 var shot_zoom := 1.2
+var walls_destroyed := 0
+var last_wall_down = null
 var shots := [0, 0]
 var hits := [0, 0]
 
@@ -65,8 +68,22 @@ func _ready() -> void:
 	if autotest:
 		print("StarFront autotest, seed %d" % seed_value)
 		start_battle("legion")
+		if "--demo-damage" in args:
+			_demo_damage()
 	else:
 		hud.show_menu()
+
+
+## Test aid: shell the chapel's west wall so screenshots show every damage stage.
+func _demo_damage() -> void:
+	var ch := map.chapel
+	var x := ch.position.x * BattleMap.CELL + 8
+	var w: Dictionary = GameData.WEAPONS["siege_cannon"]
+	for i in 3:
+		var y := (ch.position.y + 2 + i * 4) * BattleMap.CELL + 8
+		for k in i * 2 + 1:  # one, three and five hits
+			_blast(Vector2(x, y), w, null, true)
+	print("demo damage: %d wall cells down" % walls_destroyed)
 
 
 func _build_world(seed_value: int) -> void:
@@ -74,9 +91,12 @@ func _build_world(seed_value: int) -> void:
 	cm.color = Color(0.84, 0.8, 0.78)
 	add_child(cm)
 	map = BattleMap.new()
-	map.z_index = -10
 	add_child(map)
 	map.generate(seed_value)
+	map_view = MapView.new()
+	map_view.z_index = -10
+	add_child(map_view)
+	map_view.setup(map)
 	decals = DecalsScript.new()
 	decals.z_index = -5
 	add_child(decals)
@@ -323,6 +343,12 @@ func _take_shot() -> void:
 			if vehicles_only:
 				break
 	camera.position = c / maxi(n, 1)
+	if "--shot-wall" in OS.get_cmdline_user_args() and last_wall_down != null:
+		camera.position = last_wall_down
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--shot-at="):
+			var xy := a.trim_prefix("--shot-at=").split(",")
+			camera.position = Vector2(float(xy[0]), float(xy[1]))
 	camera.zoom = Vector2(shot_zoom, shot_zoom)
 	paused = true
 	for i in 3:
@@ -419,6 +445,8 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 	if not hit:
 		end += Vector2.from_angle(randf() * TAU) * randf_range(8.0, 24.0) * (2.0 if w.get("blast", 0.0) > 0.0 else 1.0)
 	var show := shooter.visible or target.visible
+	if w.get("blast", 0.0) > 0.0:
+		end = map.first_obstacle(muzzle, end)  # a stray shell bursts on the first wall in its way
 	if show:
 		effects.tracer(muzzle, end, w.tracer, w.width)
 	if target.is_vehicle and hit:
@@ -452,12 +480,40 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 		effects.puff(end, Color(0.55, 0.5, 0.42), 4.0)
 
 
-## High explosive: hurts and pins every soldier near the impact, friend or foe.
+## A shot at a spot rather than a soldier: used to blow holes in walls.
+func resolve_point_shot(shooter: Soldier, p: Vector2, w: Dictionary, muzzle: Vector2) -> void:
+	shots[shooter.team] += 1
+	var spread: float = lerpf(3.0, 26.0, clampf(muzzle.distance_to(p) / w.range, 0.0, 1.0)) * (1.2 - w.acc)
+	var end := p + Vector2.from_angle(randf() * TAU) * randf() * spread
+	end = map.first_obstacle(muzzle, end + (end - muzzle).normalized() * 8.0)
+	var show := shooter.visible or effects_visible_at(end)
+	if show:
+		effects.tracer(muzzle, end, w.tracer, w.width)
+	_blast(end, w, shooter, show)
+
+
+func effects_visible_at(p: Vector2) -> bool:
+	for s in soldiers:
+		if s.team == player_team and s.is_alive() and s.position.distance_to(p) < SIGHT:
+			return true
+	return autotest
+
+
+## High explosive: hurts and pins every soldier near the impact, friend or foe,
+## and knocks chunks out of nearby walls.
 func _blast(at: Vector2, w: Dictionary, shooter: Soldier, show: bool) -> void:
 	var r: float = w.blast
 	if show:
 		effects.explosion(at, r)
 	decals.add_scorch(at, r * 0.7)
+	if w.get("wall", 0.0) > 0.0:
+		var fell := map.damage_walls(at, r, w.wall)
+		walls_destroyed += fell.size()
+		for c in fell:
+			effects.debris(map.center_of(c))
+			last_wall_down = map.center_of(c)
+			if autotest and "--log-walls" in OS.get_cmdline_user_args():
+				print("  wall down at %s, t=%d" % [map.center_of(c), int(time)])
 	for o in soldiers.duplicate():
 		if not o.is_alive() or o.is_vehicle:
 			continue
@@ -573,9 +629,9 @@ func _end(winner: int, reason: String) -> void:
 		else:
 			fled[s.team] += 1
 	if autotest:
-		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s %s" % [
+		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d %s" % [
 				factions[winner] if winner >= 0 else "draw", int(time), shots, hits,
-				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], reason])
+				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, reason])
 		get_tree().quit()
 		return
 	var head := "DRAW"
@@ -704,6 +760,15 @@ func _order(wp: Vector2, run: bool) -> void:
 			effects.marker(own.position, Color(0.5, 0.8, 1.0))
 			return
 	var enemy := _soldier_at(wp, 1 - player_team)
+	if enemy == null and map.get_t(map.cell_of(wp)) == BattleMap.T.WALL:
+		var shelling := false
+		for sq in sel:
+			if sq.can_breach():
+				sq.order_fire_at(wp)
+				shelling = true
+		if shelling:
+			effects.marker(wp, Color(1.0, 0.6, 0.2))
+			return
 	if enemy != null:
 		for sq in sel:
 			sq.focus = enemy
