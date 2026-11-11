@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.23 (2026-11-11)
+- Tapping a carrier selects it straight away instead of waiting to see if a double tap follows.
+  Double-tapping it still sends the infantry that were selected aboard.
+
 ## v0.22 (2026-11-11)
 - Hold on your selected squad, then drag: they turn to face that way. If they have a route planned,
   that's the way they'll face when they get to the end of it.

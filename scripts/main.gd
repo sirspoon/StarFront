@@ -58,7 +58,8 @@ var t_press_ms := 0         # when the current one-finger touch began (for tap-h
 const HOLD_MS := 500
 var face_squads: Array = []  # squads being turned by a hold-drag
 var face_anchor := Vector2.ZERO
-var pending_select = null   # a carrier tapped once while infantry were selected (a double tap boards it)
+var board_from: Array = []  # infantry that were selected when their carrier was tapped (a double tap boards them)
+var board_carrier = null    # that carrier's squad
 var plan_fresh := true      # the next order replaces the selected squads' orders (else it's added to the route)
 var tap_pos := Vector2.ZERO
 var face_mode := false
@@ -187,9 +188,7 @@ func _test_carrier() -> void:
 	started = true
 	select_squad(inf, false)
 	_tap(car.position, Vector2(100, 100))
-	var t0 := Time.get_ticks_msec()
-	while Time.get_ticks_msec() - t0 < 800:
-		await get_tree().process_frame
+	await get_tree().process_frame
 	print("single tap on carrier: carrier selected=%s, infantry still selected=%s" % [car.squad.selected, inf.selected])
 	select_squad(inf, false)
 	_tap(car.position, Vector2(100, 100))
@@ -534,14 +533,7 @@ func _process(dt: float) -> void:
 			t_mode = "held"
 	if tap_pending and Time.get_ticks_msec() - tap_time >= DOUBLE_TAP_MS and Engine.get_process_frames() - tap_frame > 10:
 		tap_pending = false
-		if pending_select != null:
-			var ps: Squad = pending_select
-			pending_select = null
-			for sq in squads:
-				sq.sub.clear()
-			select_squad(ps, false)
-		else:
-			_deselect_all()
+		_deselect_all()
 	for sm in smokes.duplicate():
 		sm[1] -= dt
 		if sm[1] <= 0.0:
@@ -1312,8 +1304,11 @@ func _touch_input(e: InputEvent) -> void:
 				t_mode = ""
 				t_press_ms = Time.get_ticks_msec()
 				# a second touch right after a tap close by: double tap, or tap-drag
-				t_second = tap_pending and st.position.distance_to(tap_screen) < 50.0 \
+				var recent := st.position.distance_to(tap_screen) < 50.0 \
 						and (t_press_ms - tap_time < DOUBLE_TAP_MS or Engine.get_process_frames() - tap_frame <= 10)
+				t_second = recent and (tap_pending or board_carrier != null)
+				if not recent:
+					board_carrier = null
 				if t_second:
 					tap_pending = false
 			elif touches.size() == 2:
@@ -1407,13 +1402,13 @@ func _tap(wp: Vector2, screen := Vector2.ZERO) -> void:
 			return
 		var infantry_selected := _player_squads().any(func(q): return q.selected and q.vehicle() == null)
 		if s.is_vehicle and s.free_space() > 0 and infantry_selected and not s.squad.selected:
-			# maybe the first half of a double tap (board it): select it only if no second tap comes
-			pending_select = s.squad
-			tap_pending = true
+			# select the carrier straight away, but remember the infantry: if a second
+			# tap follows, they climb aboard instead
+			board_from = _player_squads().filter(func(q): return q.selected and q.vehicle() == null)
+			board_carrier = s.squad
 			tap_screen = screen
 			tap_time = Time.get_ticks_msec()
 			tap_frame = Engine.get_process_frames()
-			return
 		for sq in squads:
 			sq.sub.clear()
 		select_squad(s.squad, false)
@@ -1438,13 +1433,20 @@ func _tap(wp: Vector2, screen := Vector2.ZERO) -> void:
 
 
 func _double_tap(wp: Vector2) -> void:
-	var board_target = pending_select
-	pending_select = null
-	if not started or over or not _has_selection():
+	var board_target = board_carrier
+	board_carrier = null
+	if not started or over:
 		return
 	var carrier := _soldier_at(wp, player_team, 16.0)
-	if carrier != null and carrier.is_vehicle and board_target != null and carrier.squad == board_target:
-		_order(wp, false)  # double-tap your carrier: the selected infantry climb aboard
+	if carrier != null and carrier.is_vehicle and board_target != null and carrier.squad == board_target \
+			and not board_from.is_empty():
+		# double-tap your carrier: the infantry that were selected climb aboard
+		_deselect_all()
+		for q in board_from:
+			q.selected = true
+		_order(wp, false)
+		return
+	if not _has_selection():
 		return
 	var on_enemy := _soldier_at(wp, 1 - player_team, 16.0) != null
 	var on_wall := map.get_t(map.cell_of(wp)) == BattleMap.T.WALL
