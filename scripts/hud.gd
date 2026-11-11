@@ -102,6 +102,7 @@ func setup(m: Node) -> void:
 				+ "Tap a soldier or vehicle: select it\n" \
 				+ "Double-tap ground: move there\n" \
 				+ "Hold, then drag: move there, spread along the drag\n" \
+				+ "   (pause at the end, then keep dragging to set facing)\n" \
 				+ "Hold on your selected squad, then drag: face that way\n" \
 				+ "   (or the way they'll face at the end of their route;\n" \
 				+ "   hold-drag the last waypoint to set it too)\n" \

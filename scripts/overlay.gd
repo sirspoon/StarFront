@@ -92,6 +92,13 @@ func _arrow(a: Vector2, b: Vector2, col: Color) -> void:
 func _draw_line_preview() -> void:
 	var a: Vector2 = main.rdrag_start
 	var b: Vector2 = main.pointer_world
+	var fixed_face := Vector2.ZERO
+	if main.t_mode == "line_face":
+		b = main.line_b
+		var mid := (a + b) * 0.5
+		draw_arc(b, 16.0 / main.camera.zoom.x, 0, TAU, 28, Color(0.6, 0.8, 1.0, 0.9), 2.5 / main.camera.zoom.x)
+		if main.pointer_world.distance_to(mid) > 14.0 / main.camera.zoom.x:
+			fixed_face = (main.pointer_world - mid).normalized()
 	if a.distance_to(b) <= 24.0 or Input.is_key_pressed(KEY_CTRL):
 		if Input.is_key_pressed(KEY_CTRL):
 			for sq in main.squads:
@@ -115,7 +122,7 @@ func _draw_line_preview() -> void:
 		if sel.size() == 1:
 			sa = a
 			sb = b
-		var face: Vector2 = main.line_facing(sq, a, b)
+		var face: Vector2 = fixed_face if fixed_face != Vector2.ZERO else main.line_facing(sq, a, b)
 		var spots: Array = sq.line_positions(main.map, sa, sb, n, face)
 		for p in spots:
 			var good: bool = main.map.cell_cover_dir(main.map.cell_of(p), face) >= 0.6

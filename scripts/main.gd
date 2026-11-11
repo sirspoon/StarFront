@@ -58,6 +58,10 @@ var t_press_ms := 0         # when the current one-finger touch began (for tap-h
 const HOLD_MS := 500
 var face_squads: Array = []  # squads being turned by a hold-drag
 var face_anchor := Vector2.ZERO
+var line_still_at := Vector2.ZERO  # while drawing a line: where the finger last moved
+var line_still_ms := 0
+var line_still_frame := 0
+var line_b := Vector2.ZERO          # the line's end, once fixed by pausing
 var board_from: Array = []  # infantry that were selected when their carrier was tapped (a double tap boards them)
 var board_carrier = null    # that carrier's squad
 var plan_fresh := true      # the next order replaces the selected squads' orders (else it's added to the route)
@@ -531,6 +535,14 @@ func _process(dt: float) -> void:
 			_hold(t_start)  # holding on one of your own units just selects it
 		else:
 			t_mode = "held"
+	# drawing a line, then pausing: fix the line and go on to set the facing
+	if touch_mode and t_mode == "line" and touches.size() == 1 and Time.get_ticks_msec() - line_still_ms >= HOLD_MS \
+			and Engine.get_process_frames() - line_still_frame > 10:
+		var tp: Vector2 = touches.values()[0]
+		line_b = _screen_to_world(tp)
+		if line_b.distance_to(rdrag_start) > 20.0 / camera.zoom.x:
+			t_mode = "line_face"
+			pointer_world = line_b
 	if tap_pending and Time.get_ticks_msec() - tap_time >= DOUBLE_TAP_MS and Engine.get_process_frames() - tap_frame > 10:
 		tap_pending = false
 		_deselect_all()
@@ -1138,7 +1150,7 @@ func _order_line(a: Vector2, b: Vector2, run: bool) -> void:
 
 ## The selected squads that can take a move order, each with where its own part
 ## of the order goes: a spot near p (move), or its share of the line a-b.
-func _plan(kind: String, a: Vector2, b: Vector2, final: bool) -> void:
+func _plan(kind: String, a: Vector2, b: Vector2, final: bool, face_override := Vector2.ZERO) -> void:
 	var sel: Array = _player_squads().filter(func(q): return q.selected and (q.vehicle() != null or not q.alive().is_empty() or q.carrier() != null))
 	if sel.is_empty():
 		return
@@ -1158,7 +1170,7 @@ func _plan(kind: String, a: Vector2, b: Vector2, final: bool) -> void:
 			if inf.size() == 1:
 				sa = a
 				sb = b
-			orders.append([sq, {"kind": "line", "a": sa, "b": sb, "face": line_facing(sq, a, b), "run": run_toggle}])
+			orders.append([sq, {"kind": "line", "a": sa, "b": sb, "face": face_override if face_override != Vector2.ZERO else line_facing(sq, a, b), "run": run_toggle}])
 			done += n
 		for sq in sel:
 			if not inf.has(sq):
@@ -1325,6 +1337,12 @@ func _touch_input(e: InputEvent) -> void:
 				if t_mode == "line":
 					rdragging = false
 					_plan("line", rdrag_start, wp, true)
+				elif t_mode == "line_face":
+					# the line was fixed by pausing; the finger since then sets the way they face
+					rdragging = false
+					var mid := (rdrag_start + line_b) * 0.5
+					var fdir := wp - mid
+					_plan("line", rdrag_start, line_b, true, fdir.normalized() if fdir.length() > 14.0 / camera.zoom.x else Vector2.ZERO)
 				elif t_mode == "held":
 					_hold(t_start)
 				elif t_mode == "face":
@@ -1369,11 +1387,18 @@ func _touch_input(e: InputEvent) -> void:
 				t_mode = "line"  # hold, then drag: spread out along the drag
 				rdragging = true
 				rdrag_start = _screen_to_world(t_start)
+				line_still_at = sd.position
+				line_still_ms = Time.get_ticks_msec()
+				line_still_frame = Engine.get_process_frames()
 			else:
 				t_mode = "pan"
-		if t_mode == "face":
+		if t_mode == "face" or t_mode == "line_face":
 			pointer_world = _screen_to_world(sd.position)
 			return
+		if t_mode == "line" and sd.position.distance_to(line_still_at) > 8.0:
+			line_still_at = sd.position  # still moving: restart the pause timer
+			line_still_ms = Time.get_ticks_msec()
+			line_still_frame = Engine.get_process_frames()
 		if t_mode == "pan":
 			camera.position -= sd.relative / camera.zoom
 			_clamp_camera()

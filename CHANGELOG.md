@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.24 (2026-11-11)
+- When hold-dragging a line for a squad to spread along, pause at the end of the line: it locks
+  (a blue ring shows) and further dragging sets the way they'll face, without lifting your finger.
+
 ## v0.23 (2026-11-11)
 - Tapping a carrier selects it straight away instead of waiting to see if a double tap follows.
   Double-tapping it still sends the infantry that were selected aboard.
