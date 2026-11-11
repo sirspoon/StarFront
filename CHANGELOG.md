@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.06 (2026-11-11)
+Concrete walls.
+- Walls are now cast concrete instead of bricks: weathered slabs with the same gritty texture as
+  the ground, damp and bleached patches, aggregate showing through, panel joints where the formwork
+  met, and a front face with rain streaks and tie holes. Each building has its own batch of
+  concrete; the chapel's is paler and older.
+- Where a wall has collapsed the standing part ends in a torn, jagged edge with rusty reinforcing
+  bars sticking out. Damaged walls have chunks blown out showing the rebar inside.
+- Collapsed walls leave a broken concrete footing, slab chunks and twisted rebar instead of bricks.
+
 ## v0.05 (2026-11-11)
 Textured floors and deeper cracks.
 - Floor slabs now have a worn stone surface like the ground outside (each slab gets its own patch,

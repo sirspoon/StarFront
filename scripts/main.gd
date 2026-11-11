@@ -362,6 +362,7 @@ func _take_shot() -> void:
 	for i in 3:
 		await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(path)
+	print("polygons skipped while painting: %d" % MapPainter.skipped)
 	print("saved ", path)
 	get_tree().quit()
 

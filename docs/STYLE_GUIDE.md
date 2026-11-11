@@ -12,7 +12,8 @@ over street by street.
 
 ## Look and feel
 - **Gothic industrial:** pointed arches, buttresses, statues of saints with their faces worn away,
-  pipework and cabling bolted onto old stone.
+  pipework and cabling bolted onto old stone. Buildings are mostly cast concrete ("ferrocrete"),
+  weathered and stained, breaking into slabs and twisted rebar rather than bricks.
 - **Ruin everywhere:** collapsed floors, craters, scorched rubble, burnt-out vehicles, drifting ash and smoke.
 - **Colours:** mostly ash grey, soot, rust, bone and dull bronze. Strong colour is rare and means
   something: firelight, weapon glow, faction colours, stained glass.

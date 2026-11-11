@@ -438,9 +438,9 @@ func _draw_rubble(c: Vector2i) -> void:
 		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
 
 
-## What's left where a wall collapsed: its footing, still in line with the
-## standing wall either side, with broken base stones and its rubble spilled
-## out on both sides.
+## What's left where a wall collapsed: a broken concrete footing still in line
+## with the standing wall either side, slab chunks and twisted rebar thrown out
+## to both sides.
 func _draw_foundation(c: Vector2i) -> void:
 	var o := Vector2(c) * C
 	var wb := _wall_base(c)
@@ -450,48 +450,29 @@ func _draw_foundation(c: Vector2i) -> void:
 	var horiz: bool = linked.call(Vector2i(-1, 0)) or linked.call(Vector2i(1, 0))
 	var vert: bool = linked.call(Vector2i(0, -1)) or linked.call(Vector2i(0, 1))
 	var across := Vector2(0, 1) if horiz and not vert else (Vector2(1, 0) if vert and not horiz else Vector2.ZERO)
-	# footing: dark bed with a slightly raised lip
+	# the footing: a dark bed with the wall's outline still showing along its edges
 	draw_rect(Rect2(o + Vector2(1.5, 2.0), Vector2(C, C)), Color(0, 0, 0, 0.3))
-	draw_rect(Rect2(o, Vector2(C, C)), Color(0.12, 0.11, 0.1))
-	# the outline of the old wall: its lowest stones still mark the edges
-	var edge_col := wb.darkened(0.25)
+	var bed := PackedVector2Array([o, o + Vector2(C, 0), o + Vector2(C, C), o + Vector2(0, C)])
+	_poly(bed, wb.darkened(0.45))
+	_tex_poly(bed, c.x / 4, c.y / 4, 1.0)
+	var edge := wb.darkened(0.2)
 	if across == Vector2(0, 1) or across == Vector2.ZERO:
-		draw_rect(Rect2(o + Vector2(0, 0.3), Vector2(C, 1.6)), edge_col)
-		draw_rect(Rect2(o + Vector2(0, C - 1.9), Vector2(C, 1.6)), edge_col.darkened(0.3))
+		draw_rect(Rect2(o + Vector2(0, 0.3), Vector2(C, 1.8)), edge)
+		draw_rect(Rect2(o + Vector2(0, C - 2.1), Vector2(C, 1.8)), edge.darkened(0.3))
 	if across == Vector2(1, 0) or across == Vector2.ZERO:
-		draw_rect(Rect2(o + Vector2(0.3, 0), Vector2(1.6, C)), edge_col)
-		draw_rect(Rect2(o + Vector2(C - 1.9, 0), Vector2(1.6, C)), edge_col.darkened(0.3))
-	# the bottom course of stones, in the same bond as the standing wall, many broken off
-	for k in 4:
-		var y := o.y + k * 4.0
-		var row := c.y * 4 + k
-		var off := 4.0 if row % 2 == 1 else 0.0
-		var x := o.x - off
-		while x < o.x + C:
-			var bx0 := maxf(x, o.x)
-			var bx1 := minf(x + 8.0, o.x + C)
-			var bi := int(floor((x + off) / 8.0))
-			var v := _h(bi, row, 71)
-			if bx1 - bx0 > 0.8 and v > 0.35:
-				var col := wb.darkened(0.05 + _h(bi, row, 72) * 0.2)
-				var br := Rect2(bx0 + 0.5, y + 0.4, bx1 - bx0 - 1.0, 3.2)
-				# stones snap off unevenly
-				var pts := PackedVector2Array([br.position, br.position + Vector2(br.size.x, 0),
-						br.end - Vector2(0, _h(bi, row, 73) * 1.5), br.position + Vector2(br.size.x * 0.4, br.size.y),
-						br.position + Vector2(0, br.size.y - _h(bi, row, 74) * 1.5)])
-				draw_colored_polygon(pts, col)
-				draw_line(pts[0], pts[1], col.lightened(0.25), 0.5)
-				draw_line(pts[2], pts[3], col.darkened(0.4), 0.5)
-			x += 8.0
-	# a few stones still standing proud of the rest
+		draw_rect(Rect2(o + Vector2(0.3, 0), Vector2(1.8, C)), edge)
+		draw_rect(Rect2(o + Vector2(C - 2.1, 0), Vector2(1.8, C)), edge.darkened(0.3))
+	# stubs of the broken wall: low, jagged slabs of concrete
 	_seed(c.x, c.y, 75)
-	for k in rng.randi_range(0, 2):
-		var p := o + Vector2(rng.randf_range(2, 11), rng.randf_range(2, 11))
-		draw_rect(Rect2(p + Vector2(1, 1.5), Vector2(5, 3.5)), Color(0, 0, 0, 0.35))
-		draw_rect(Rect2(p, Vector2(5, 3.5)), wb.darkened(0.05))
-		draw_line(p, p + Vector2(5, 0), wb.lightened(0.3), 0.6)
-	# masonry thrown out to both sides of the old wall line
-	for k in 10:
+	for k in rng.randi_range(1, 3):
+		var p := o + Vector2(rng.randf_range(2, 14), rng.randf_range(2, 14))
+		_chunk(p, rng.randf_range(2.5, 4.5), wb.darkened(rng.randf_range(0.05, 0.25)), c.x * 13 + k, c.y)
+	# rebar left standing out of the footing
+	for k in rng.randi_range(1, 3):
+		var p := o + Vector2(rng.randf_range(3, 13), rng.randf_range(3, 13))
+		_rebar(p, p + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(3, 6))
+	# slab chunks thrown out to both sides of the old wall line
+	for k in 9:
 		var along := rng.randf_range(0, C)
 		var side := rng.randf_range(-1.0, 1.0)
 		var p: Vector2
@@ -501,67 +482,88 @@ func _draw_foundation(c: Vector2i) -> void:
 			p = o + Vector2(8.0 + side * 15.0, along)
 		else:
 			p = o + Vector2(8, 8) + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(4, 15)
-		draw_set_transform(p, rng.randf_range(-0.8, 0.8), Vector2.ONE)
-		var bc := wb.lightened(rng.randf_range(-0.2, 0.08))
-		var bw := rng.randf_range(3.5, 7.0)
-		draw_rect(Rect2(-bw * 0.5 + 0.6, -1.4, bw, 3.2), Color(0, 0, 0, 0.35))
-		draw_rect(Rect2(-bw * 0.5, -2.0, bw, 3.2), bc)
-		draw_line(Vector2(-bw * 0.5, -2.0), Vector2(bw * 0.5, -2.0), bc.lightened(0.25), 0.6)
-		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+		_chunk(p, rng.randf_range(1.5, 4.0), wb.darkened(rng.randf_range(0.0, 0.3)), c.x * 31 + k, c.y * 7)
+		if rng.randf() < 0.2:
+			_rebar(p, p + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(3, 7))
+
+
+## A broken piece of concrete: an angular slab with a lit top edge and a shadow.
+func _chunk(p: Vector2, size: float, col: Color, a: int, b: int) -> void:
+	if size < 2.2:
+		_stone(p, size, col, 4)
+		return
+	var pts := PackedVector2Array()
+	var n := 4 + int(_h(a, b, 81) * 3.0)
+	var a0 := _h(a, b, 82) * TAU
+	for k in n:
+		var ang := a0 + k * TAU / n + (_h(a, b, 83 + k) - 0.5) * 0.8
+		pts.append(p + Vector2.from_angle(ang) * size * (0.55 + _h(a, b, 90 + k) * 0.45))
+	var sh := PackedVector2Array()
+	for q in pts:
+		sh.append(q + Vector2(0.9, 1.1))
+	_poly(sh, Color(0, 0, 0, 0.35))
+	_poly(pts, col)
+	_tex_poly(pts, a, b, 0.8)
+	draw_line(pts[n - 1], pts[0], col.lightened(0.28), 0.6)
+	draw_line(pts[0], pts[1], col.lightened(0.18), 0.5)
+	draw_line(pts[n / 2], pts[n / 2 + 1 if n / 2 + 1 < n else 0], col.darkened(0.35), 0.5)
+
+
+## draw_colored_polygon, but skipping shapes too thin or twisted to fill.
+static var skipped := 0
+func _poly(pts: PackedVector2Array, col: Color, uvs := PackedVector2Array(), tex: Texture2D = null) -> void:
+	if pts.size() < 3 or Geometry2D.triangulate_polygon(pts).is_empty():
+		skipped += 1
+		return
+	draw_colored_polygon(pts, col, uvs, tex)
+
+
+func _rebar(a: Vector2, b: Vector2) -> void:
+	var mid := a.lerp(b, 0.6) + (b - a).orthogonal().normalized() * 0.8
+	draw_polyline(PackedVector2Array([a + Vector2(0.4, 0.5), mid + Vector2(0.4, 0.5), b + Vector2(0.4, 0.5)]), Color(0, 0, 0, 0.4), 0.7)
+	draw_polyline(PackedVector2Array([a, mid, b]), Color(0.42, 0.22, 0.12), 0.6)
+
+
+## Lay the ground's grit texture over a polygon, aligned to the world so
+## neighbouring pieces of the same wall join up.
+func _tex_poly(pts: PackedVector2Array, a: int, b: int, alpha: float) -> void:
+	var uvs := PackedVector2Array()
+	var off := Vector2(_h(a, b, 95), _h(a, b, 96))
+	for q in pts:
+		uvs.append(q / 256.0 + off)
+	_poly(pts, Color(1, 1, 1, alpha), uvs, ground_grit)
+	var uvs2 := PackedVector2Array()
+	for q in pts:
+		uvs2.append(q / 300.0 + off * 0.7)
+	_poly(pts, Color(1, 1, 1, alpha * 0.8), uvs2, ground_fine)
 
 
 func _wall_base(c: Vector2i) -> Color:
 	if map.chapel.grow(1).has_point(c):
-		return Color(0.6, 0.57, 0.53)
-	# each building has its own stone
+		return Color(0.52, 0.5, 0.47)  # pale, older ferrocrete
+	# each building was cast from its own batch of concrete
 	for i in map.buildings.size():
 		if map.buildings[i].grow(1).has_point(c):
 			var v := _h(i, 0, 41)
-			return Color(0.5, 0.47, 0.42).lerp(Color(0.46, 0.4, 0.35), v)
-	return Color(0.5, 0.47, 0.43)
+			return Color(0.41, 0.4, 0.38).lerp(Color(0.4, 0.37, 0.33), v)
+	return Color(0.4, 0.39, 0.37)
 
 
 func _is_fallen(c: Vector2i) -> bool:
 	return map.in_bounds(c) and map.get_t(c) != T.WALL and map.fallen[c.y * BattleMap.W + c.x] == 1
 
 
-## Where each of the wall's four courses of coping stones starts and ends. Next
-## to a collapsed section the courses break off at different lengths, so the
-## end of the wall looks torn rather than cut.
-func _course_extents(c: Vector2i) -> Array:
-	var o := Vector2(c) * C
-	var fl := _is_fallen(c + Vector2i(-1, 0))
-	var fr := _is_fallen(c + Vector2i(1, 0))
-	var fu := _is_fallen(c + Vector2i(0, -1))
-	var fd := _is_fallen(c + Vector2i(0, 1))
-	var out: Array = []
-	for k in 4:
-		var x0 := o.x
-		var x1 := o.x + C
-		if fl:
-			x0 += 1.0 + floorf(_h(c.x, c.y * 4 + k, 61) * 6.0) * 2.0
-		if fr:
-			x1 -= 1.0 + floorf(_h(c.x, c.y * 4 + k, 62) * 6.0) * 2.0
-		# courses nearest a collapse above or below are mostly gone
-		var gone_chance := 0.0
-		if fu:
-			gone_chance = maxf(gone_chance, [0.6, 0.3, 0.0, 0.0][k])
-		if fd:
-			gone_chance = maxf(gone_chance, [0.0, 0.0, 0.3, 0.6][k])
-		if gone_chance > 0.0:
-			var v := _h(c.x, c.y * 4 + k, 63)
-			if v < gone_chance:
-				# only a jagged stub of this course is left
-				var mid := (x0 + x1) * 0.5 + (_h(c.x, k, 60) - 0.5) * 6.0
-				var half := 1.0 + _h(c.y, k, 59) * 3.0
-				x0 = maxf(x0, mid - half)
-				x1 = minf(x1, mid + half)
-			elif v < gone_chance + 0.3:
-				if _h(c.x, k, 64) < 0.5:
-					x0 += 3.0 + _h(c.x, k, 65) * 8.0
-				else:
-					x1 -= 3.0 + _h(c.x, k, 66) * 8.0
-		out.append([x0, x1] if x1 - x0 >= 2.0 else [x0, x0])
+## Points along one edge of a wall's top, from a towards b (b not included).
+## Next to a collapse the edge is torn into a jagged line bitten into the slab.
+func _edge(c: Vector2i, a: Vector2, b: Vector2, inward: Vector2, torn: bool, salt: int) -> PackedVector2Array:
+	var out := PackedVector2Array([a])
+	if not torn:
+		return out
+	var n := 7
+	for k in range(1, n):
+		var t := float(k) / n
+		var depth := (0.8 + _h(c.x * 3 + salt, c.y * 3 + k, 51) * 6.0) * pow(sin(PI * t), 2.0)  # shallow at corners so edges never cross
+		out.append(a.lerp(b, t) + inward * depth)
 	return out
 
 
@@ -574,99 +576,107 @@ func _draw_wall(c: Vector2i) -> void:
 	var above := map.get_t(c + Vector2i(0, -1)) == T.WALL
 	var left := map.get_t(c + Vector2i(-1, 0)) == T.WALL
 	var right := map.get_t(c + Vector2i(1, 0)) == T.WALL
-	var broken := _is_fallen(c + Vector2i(-1, 0)) or _is_fallen(c + Vector2i(1, 0)) \
-			or _is_fallen(c + Vector2i(0, -1)) or _is_fallen(c + Vector2i(0, 1))
+	var fu := _is_fallen(c + Vector2i(0, -1))
+	var fr := _is_fallen(c + Vector2i(1, 0))
+	var fd := _is_fallen(c + Vector2i(0, 1))
+	var fl := _is_fallen(c + Vector2i(-1, 0))
 	var top_y := o.y - h
-	var ext := _course_extents(c)
-	# south face, in courses of brick, under whatever is left of the bottom course
+	var tl := Vector2(o.x, top_y)
+	var tr := Vector2(o.x + C, top_y)
+	var br := Vector2(o.x + C, top_y + C)
+	var bl := Vector2(o.x, top_y + C)
+	# the outline of the slab's top, torn where the wall next to it fell
+	var e_top := _edge(c, tl, tr, Vector2(0, 1), fu, 0)
+	var e_right := _edge(c, tr, br, Vector2(-1, 0), fr, 1)
+	var e_bottom := _edge(c, br, bl, Vector2(0, -1), fd, 2)
+	var e_left := _edge(c, bl, tl, Vector2(1, 0), fl, 3)
+	var poly := PackedVector2Array()
+	poly.append_array(e_top)
+	poly.append_array(e_right)
+	poly.append_array(e_bottom)
+	poly.append_array(e_left)
+	# the front face, hanging below the bottom edge of the top
 	if not below:
-		var fx0: float = ext[3][0]
-		var fx1: float = ext[3][1]
-		if fx1 > fx0:
-			var face := Rect2(fx0, o.y + C - h, fx1 - fx0, h)
-			draw_rect(face, base.darkened(0.5))
-			var rows := int(h / 2.0)
-			for k in rows:
-				var y := face.position.y + k * 2.0
-				var off := 2.0 if (k % 2) == 1 else 0.0
-				var x := o.x - off
-				while x < o.x + C:
-					var bx0 := maxf(x, fx0)
-					var bx1 := minf(x + 4.0, fx1)
-					if bx1 - bx0 > 0.6:
-						draw_rect(Rect2(bx0 + 0.25, y + 0.25, bx1 - bx0 - 0.5, 1.5), base.darkened(0.38 + _h(int(x), int(y), 42) * 0.12))
-					x += 4.0
-	# the top: coping stones in a running bond, lit from the top left
-	for k in 4:
-		var y := top_y + k * 4.0
-		var cx0: float = ext[k][0]
-		var cx1: float = ext[k][1]
-		if cx1 <= cx0:
+		var chain := PackedVector2Array(e_bottom)
+		chain.append(bl)
+		var face := PackedVector2Array()
+		for q in chain:
+			face.append(q)
+		for i in range(chain.size() - 1, -1, -1):
+			face.append(chain[i] + Vector2(0, h))
+		var fcol := base.darkened(0.42)
+		_poly(face, fcol)
+		_tex_poly(face, c.x, c.y + 1000, 0.9)
+		# rain streaks and formwork tie holes
+		_seed(c.x, c.y, 47)
+		for k in 3:
+			var x := o.x + rng.randf_range(1, C - 1)
+			draw_line(Vector2(x, top_y + C), Vector2(x, top_y + C + h * rng.randf_range(0.5, 1.0)), Color(0.05, 0.05, 0.05, 0.25), rng.randf_range(0.6, 1.4))
+		if c.x % 2 == 0 and not fl and not fr:
+			draw_circle(Vector2(o.x + 4, top_y + C + h * 0.5), 0.5, Color(0.08, 0.08, 0.08))
+			draw_circle(Vector2(o.x + 12, top_y + C + h * 0.5), 0.5, Color(0.08, 0.08, 0.08))
+	# the top of the slab
+	_poly(poly, base)
+	_tex_poly(poly, c.x / 4, c.y / 4, 1.0)
+	_tex_poly(poly, c.x / 4 + 9, c.y / 4 + 9, 0.7)
+	_seed(c.x, c.y, 46)
+	# mottling: damp patches and paler, sun-bleached ones
+	for k in 3:
+		var p := o + Vector2(rng.randf_range(0, C), rng.randf_range(0, C) - h)
+		var dark := rng.randf() < 0.6
+		var blob := _blob(p, rng.randf_range(3, 7), rng.randf_range(0.6, 1.0), 0.5, c.x * 17 + c.y * 3 + k)
+		var clip := Geometry2D.intersect_polygons(blob, poly)
+		for piece in clip:
+			_poly(piece, Color(0.05, 0.05, 0.04, 0.16) if dark else Color(1, 1, 0.95, 0.06))
+	for k in 14:
+		var p := o + Vector2(rng.randf_range(1, C - 1), rng.randf_range(1, C - 1) - h)
+		if Geometry2D.is_point_in_polygon(p, poly):
+			draw_circle(p, rng.randf_range(0.2, 0.5), base.darkened(0.3) if rng.randf() < 0.6 else base.lightened(0.15))  # aggregate
+	if rng.randf() < 0.35:
+		var p := o + Vector2(rng.randf_range(3, 13), rng.randf_range(3, 13) - h)
+		draw_colored_polygon(_blob(p, rng.randf_range(2, 5), 0.8, 0.5, c.x * 5 + c.y), Color(0.08, 0.08, 0.06, 0.18))  # weathering
+	# panel joints where the formwork met
+	var runs_x := left or right or fl or fr
+	var runs_y := above or below or fu or fd
+	if runs_x and not runs_y and c.x % 3 == 0 and not fl:
+		draw_line(tl + Vector2(0, 1), bl - Vector2(0, 1), base.darkened(0.35), 0.6)
+		draw_line(tl + Vector2(0.6, 1), bl + Vector2(0.6, -1), base.lightened(0.12), 0.4)
+	elif runs_y and not runs_x and c.y % 3 == 0 and not fu:
+		draw_line(tl + Vector2(1, 0), tr - Vector2(1, 0), base.darkened(0.35), 0.6)
+		draw_line(tl + Vector2(1, 0.6), tr + Vector2(-1, 0.6), base.lightened(0.12), 0.4)
+	# edges: lit where the wall ends cleanly, dark and broken where it was torn off
+	if not above and not fu:
+		draw_line(tl, tr, base.lightened(0.25), 0.7)
+	if not left and not fl:
+		draw_line(tl, bl, base.lightened(0.2), 0.7)
+	if not right and not fr:
+		draw_line(tr, br, base.darkened(0.5), 0.9)
+	for torn in [[fu, e_top], [fr, e_right], [fd, e_bottom], [fl, e_left]]:
+		if not torn[0]:
 			continue
-		draw_rect(Rect2(cx0, y, cx1 - cx0, 4), base.darkened(0.42))  # mortar
-		var row := c.y * 4 + k
-		var off := 4.0 if row % 2 == 1 else 0.0
-		var x := o.x - off
-		while x < o.x + C:
-			var bx0 := maxf(x, cx0)
-			var bx1 := minf(x + 8.0, cx1)
-			if bx1 - bx0 < 0.8:
-				x += 8.0
-				continue
-			var bi := int(floor((x + off) / 8.0))
-			var v := _h(bi, row, 43)
-			if stage > 0 and v < (0.22 if stage == 1 else 0.5):
-				# a stone knocked out: broken rubble and dust in the gap
-				draw_rect(Rect2(bx0, y, bx1 - bx0, 4), Color(0.24, 0.22, 0.2))
-				draw_circle(Vector2(bx0 + (bx1 - bx0) * 0.35, y + 2.2), 1.1, base.darkened(0.2))
-				draw_circle(Vector2(bx0 + (bx1 - bx0) * 0.75, y + 1.6), 0.8, base.darkened(0.3))
-			else:
-				var col := base.lightened((v - 0.5) * 0.22)
-				var gl := 0.5 if bx0 == x else 0.0
-				var gr := 0.5 if bx1 == x + 8.0 else 0.0
-				var br := Rect2(bx0 + gl, y + 0.4, bx1 - bx0 - gl - gr, 3.2)
-				draw_rect(br, col)
-				_tex_patch(ground_grit, br, bi, row, 0.6)
-				_tex_patch(ground_fine, br, bi, row + 3, 0.5)
-				draw_line(br.position, br.position + Vector2(br.size.x, 0), col.lightened(0.25), 0.5)
-				if _h(bi, row, 44) < 0.15:
-					draw_circle(br.position + Vector2(br.size.x * 0.7, 2), 0.8, col.darkened(0.3))  # pitting
-			x += 8.0
-		# torn ends: the exposed core of the wall in shadow, and a stone hanging loose
-		if cx0 > o.x + 0.5:
-			draw_rect(Rect2(cx0 - 1.0, y, 1.2, 4), base.darkened(0.6))
-			if _h(c.x, row, 67) < 0.5:
-				draw_colored_polygon(PackedVector2Array([Vector2(cx0, y + 0.5), Vector2(cx0 - 2.5, y + 1.2), Vector2(cx0 - 1.5, y + 3.5), Vector2(cx0, y + 3.5)]), base.darkened(0.1))
-		if cx1 < o.x + C - 0.5:
-			draw_rect(Rect2(cx1 - 0.2, y, 1.2, 4), base.darkened(0.65))
-			if _h(c.x, row, 68) < 0.5:
-				draw_colored_polygon(PackedVector2Array([Vector2(cx1, y + 0.5), Vector2(cx1 + 2.2, y + 1.0), Vector2(cx1 + 1.8, y + 3.5), Vector2(cx1, y + 3.5)]), base.darkened(0.15))
-	# lit and shaded edges where the wall ends cleanly
-	if not above and ext[0][1] > ext[0][0]:
-		draw_line(Vector2(ext[0][0], top_y), Vector2(ext[0][1], top_y), base.lightened(0.4), 1.0)
-	if not left and ext[0][0] <= o.x + 0.5:
-		draw_line(Vector2(o.x, top_y), Vector2(o.x, top_y + C), base.lightened(0.25), 0.8)
-	if not right and ext[0][1] >= o.x + C - 0.5:
-		draw_line(Vector2(o.x + C, top_y), Vector2(o.x + C, top_y + C), base.darkened(0.55), 1.0)
-	if broken:
-		# loose stones fallen into the gaps the torn courses left
-		_seed(c.x, c.y, 69)
-		for k in 4:
-			var cx0: float = ext[k][0]
-			var cx1: float = ext[k][1]
-			var y := top_y + k * 4.0 + 2.0
-			if cx0 > o.x + 2.0:
-				_stone(Vector2(rng.randf_range(o.x, cx0 - 1.0), y + rng.randf_range(-1, 1)), rng.randf_range(1.0, 2.2), base.darkened(rng.randf_range(0.15, 0.4)), 5)
-			if cx1 < o.x + C - 2.0:
-				_stone(Vector2(rng.randf_range(cx1 + 1.0, o.x + C), y + rng.randf_range(-1, 1)), rng.randf_range(1.0, 2.2), base.darkened(rng.randf_range(0.15, 0.4)), 5)
+		var e: PackedVector2Array = torn[1]
+		for i in range(1, e.size() - 1):
+			draw_line(e[i], e[i + 1], base.darkened(0.55), 0.8)
+		# reinforcing bars sticking out of the break
+		_seed(c.x, c.y, 48 + e.size())
+		for k in 2:
+			var q := e[rng.randi_range(1, e.size() - 1)]
+			var out := (q - (o + Vector2(8, 8 - h))).normalized()
+			_rebar(q - out * 1.5, q + out * rng.randf_range(2.5, 5.5) + out.orthogonal() * rng.randf_range(-1.5, 1.5))
+	# damage: chunks blown out showing the rebar inside, and cracks
 	if stage > 0:
-		var top := Rect2(o.x, top_y, C, C)
 		_seed(c.x, c.y, 45)
+		for n in stage * 2:
+			var p := o + Vector2(rng.randf_range(3, 13), rng.randf_range(3, 13) - h)
+			var hole := _blob(p, rng.randf_range(1.5, 3.2) * stage, 0.8, 0.6, c.x * 11 + c.y + n)
+			_poly(hole, base.darkened(0.6))
+			draw_line(p + Vector2(-2.5, -0.8), p + Vector2(2.5, 0.8), Color(0.42, 0.22, 0.12), 0.5)
+		var top := Rect2(o.x, top_y, C, C)
 		for n in stage + 1:
 			var p := top.position + Vector2(rng.randf() * C, rng.randf() * C)
 			var q := p + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(6, 12)
 			_crack(p, q, top, rng.randf_range(0.7, 1.1), base)
-		draw_rect(top, Color(0.05, 0.04, 0.03, 0.12 * stage))  # soot
+		_poly(poly, Color(0.05, 0.04, 0.03, 0.12 * stage))  # soot
 
 
 func _draw_wreck(rect: Rect2i, horiz: bool) -> void:
