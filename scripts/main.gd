@@ -38,12 +38,17 @@ var over := false
 var paused := false
 var autotest := false
 var dragging := false
+var rdragging := false
+var rdrag_start := Vector2.ZERO
 var drag_start := Vector2.ZERO
 var panning := false
 var shot_path := ""  # --shot=file.png saves a screenshot (needs a display)
 var shot_time := 60.0
 var shot_zoom := 1.2
 var walls_destroyed := 0
+var cover_blocks := [0, 0]   # shots at each side stopped by low cover
+var cover_time := [0.0, 0.0] # soldier-seconds spent in cover, per side
+var field_time := [0.0, 0.0]
 var last_wall_down = null
 var shots := [0, 0]
 var hits := [0, 0]
@@ -72,8 +77,37 @@ func _ready() -> void:
 		start_battle("legion")
 		if "--demo-damage" in args:
 			_demo_damage()
+		if "--test-orders" in args:
+			_test_orders()
 	else:
 		hud.show_menu()
+
+
+## Test aid: exercise the line and picked-soldier orders without the computer
+## player interfering, and print whether the squad kept in contact.
+func _test_orders() -> void:
+	ais = ais.filter(func(ai): return ai.team != 0)
+	var sq: Squad = _player_squads().filter(func(q): return q.vehicle() == null and q.carrier() == null and q.members.size() >= 5)[0]
+	var c := sq.center()
+	var a := c + Vector2(120, -60)
+	var b := c + Vector2(120, 90)
+	sq.order_line(map, a, b, Vector2(1, 0), false)
+	await get_tree().create_timer(8.0 / Engine.time_scale).timeout
+	var out := []
+	for m in sq.members:
+		out.append("(%d,%d)" % [m.position.x, m.position.y])
+	print("line order %s -> %s: %s coherent=%s" % [a, b, " ".join(out), sq.is_coherent()])
+	sq.sub = [sq.members[0], sq.members[1]]
+	sq.order_move(map, c + Vector2(600, 0), false)
+	await get_tree().create_timer(8.0).timeout
+	var far := 0.0
+	for m in sq.sub:
+		var nearest := INF
+		for o in sq.members:
+			if not sq.sub.has(o):
+				nearest = minf(nearest, o.position.distance_to(m.position))
+		far = maxf(far, nearest)
+	print("picked soldiers sent 600px away: furthest from the rest %d px (limit %d), coherent=%s" % [far, Squad.COH, sq.is_coherent()])
 
 
 ## Test aid: shell the chapel's west wall so screenshots show every damage stage.
@@ -359,6 +393,13 @@ func _process(dt: float) -> void:
 	if spot_timer <= 0.0:
 		spot_timer = 0.25
 		_update_spotting()
+	for sq in squads:
+		sq.think(self, dt)
+	for s in soldiers:
+		if s.is_alive() and not s.is_vehicle:
+			field_time[s.team] += dt
+			if s.in_cover:
+				cover_time[s.team] += dt
 	for ai in ais:
 		ai.tick(dt)
 	_update_objective(dt)
@@ -392,6 +433,9 @@ func _take_shot() -> void:
 			var xy := a.trim_prefix("--shot-at=").split(",")
 			camera.position = Vector2(float(xy[0]), float(xy[1]))
 	camera.zoom = Vector2(shot_zoom, shot_zoom)
+	if "--shot-select" in OS.get_cmdline_user_args():
+		for sq in _player_squads():
+			sq.selected = true
 	if "--shot-nohud" in OS.get_cmdline_user_args():
 		hud.visible = false
 	paused = true
@@ -490,6 +534,16 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 	if not hit:
 		end += Vector2.from_angle(randf() * TAU) * randf_range(8.0, 24.0) * (2.0 if w.get("blast", 0.0) > 0.0 else 1.0)
 	var show := shooter.visible or target.visible
+	# a miss on a man behind low cover usually strikes the cover, chewing it up
+	var lc := Vector2i(-1, -1) if target.is_vehicle else map.cover_cell(target.position, shooter.position)
+	if not hit and lc.x >= 0 and randf() < 0.75:
+		cover_blocks[target.team] += 1
+		end = map.center_of(lc) + Vector2(randf_range(-5, 5), randf_range(-5, 5))
+		if w.get("blast", 0.0) <= 0.0:
+			if map.chip_low(lc, 0.6 + float(w.get("pen", 0)) * 0.9) and show:
+				effects.debris(map.center_of(lc), 6)
+			elif show:
+				effects.puff(end, Color(0.55, 0.5, 0.4), 3.0)
 	if w.get("blast", 0.0) > 0.0:
 		end = map.first_obstacle(muzzle, end)  # a stray shell bursts on the first wall in its way
 	if show:
@@ -751,9 +805,9 @@ func _end(winner: int, reason: String) -> void:
 		else:
 			fled[s.team] += 1
 	if autotest:
-		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d %s" % [
+		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d cover=%d%%/%d%% blocked=%s %s" % [
 				factions[winner] if winner >= 0 else "draw", int(time), shots, hits,
-				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, reason])
+				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, reason])
 		get_tree().quit()
 		return
 	var head := "DRAW"
@@ -816,15 +870,28 @@ func _unhandled_input(e: InputEvent) -> void:
 			MOUSE_BUTTON_LEFT:
 				if not started or over:
 					return
-				if mb.pressed:
+				if mb.pressed and mb.alt_pressed:
+					_pick_soldier(wp)
+				elif mb.pressed:
 					dragging = true
 					drag_start = wp
 				elif dragging:
 					dragging = false
 					_select(drag_start, wp, mb.shift_pressed)
 			MOUSE_BUTTON_RIGHT:
-				if mb.pressed and started and not over:
-					_order(wp, mb.shift_pressed)
+				if not started or over:
+					return
+				if mb.pressed:
+					rdragging = true
+					rdrag_start = wp
+				elif rdragging:
+					rdragging = false
+					if mb.ctrl_pressed:
+						_order_face(wp)
+					elif rdrag_start.distance_to(wp) > 24.0:
+						_order_line(rdrag_start, wp, mb.shift_pressed)
+					else:
+						_order(rdrag_start, mb.shift_pressed)
 	elif e is InputEventMouseMotion and panning:
 		camera.position -= (e as InputEventMouseMotion).relative / camera.zoom
 		_clamp_camera()
@@ -852,10 +919,68 @@ func _unhandled_input(e: InputEvent) -> void:
 				_clamp_camera()
 
 
+## Alt+click: pick out individual soldiers of a squad to order on their own.
+func _pick_soldier(wp: Vector2) -> void:
+	var s := _soldier_at(wp, player_team)
+	if s == null or s.is_vehicle:
+		return
+	if not s.squad.selected:
+		for sq in squads:
+			sq.selected = false
+			sq.sub.clear()
+		s.squad.selected = true
+	if s.squad.sub.has(s):
+		s.squad.sub.erase(s)
+	else:
+		s.squad.sub.append(s)
+
+
+## The facing a line order gets: square to the line, away from where the squad is now.
+func line_facing(sq: Squad, a: Vector2, b: Vector2) -> Vector2:
+	var n := (b - a).orthogonal().normalized()
+	var mid := (a + b) * 0.5
+	if (sq.center() - mid).dot(n) > 0.0:
+		n = -n
+	return n
+
+
+func _order_line(a: Vector2, b: Vector2, run: bool) -> void:
+	var sel: Array = _player_squads().filter(func(sq): return sq.selected and not sq.alive().is_empty() and sq.vehicle() == null)
+	if sel.is_empty():
+		return
+	# several squads share the line out between them, in order along it
+	var total := 0
+	for sq in sel:
+		total += sq.movers().size()
+	var dir := (b - a).normalized()
+	sel.sort_custom(func(x, y): return (x.center() - a).dot(dir) < (y.center() - a).dot(dir))
+	var done := 0
+	for sq in sel:
+		var n: int = sq.movers().size()
+		var sa := a.lerp(b, float(done) / total)
+		var sb := a.lerp(b, float(done + n - 1) / maxf(total - 1, 1))
+		if sel.size() == 1:
+			sa = a
+			sb = b
+		sq.focus = null
+		sq.order_line(map, sa, sb, line_facing(sq, a, b), run)
+		done += n
+	effects.marker(a, Color(0.5, 1.0, 0.5))
+	effects.marker(b, Color(0.5, 1.0, 0.5))
+
+
+func _order_face(wp: Vector2) -> void:
+	for sq in _player_squads():
+		if sq.selected and not sq.alive().is_empty():
+			sq.order_face(wp - sq.center())
+	effects.marker(wp, Color(0.6, 0.8, 1.0))
+
+
 func _select(a: Vector2, b: Vector2, add: bool) -> void:
 	if not add:
 		for sq in squads:
 			sq.selected = false
+			sq.sub.clear()
 	if a.distance_to(b) < 8.0:
 		var s := _soldier_at(b, player_team)
 		if s != null:

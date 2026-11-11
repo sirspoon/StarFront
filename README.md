@@ -14,7 +14,7 @@ drawn in code, so the game can be played and tuned before real sprites are made.
 1. Download Godot 4 (standard version, not .NET) from https://godotengine.org/download.
 2. In the Project Manager choose **Import**, pick this folder's `project.godot`, then **Run** (F5).
 
-## The prototype (v0.03)
+## The prototype (v0.09)
 - One procedurally generated ruined city map, different every battle, with the Ashen Chapel at its centre.
   Walls can be blown down.
 - Two factions: the **Dominion Legion** (many brittle conscripts) and **The Sworn** (a few armoured warrior-monks),
@@ -26,6 +26,9 @@ drawn in code, so the game can be played and tuned before real sprites are made.
 |---|---|
 | Left click / drag | Select squads (Shift adds) |
 | Right click ground | Move there (soldiers pick cover nearby). Shift + right click runs |
+| Right drag | Line the squad up along the line, in cover, facing away from where they came |
+| Ctrl + right click | Face that way (they prefer targets in that arc) |
+| Alt + click a soldier | Pick out individual soldiers to order on their own |
 | Right click a visible enemy | Concentrate fire on that soldier or vehicle |
 | Right click your own carrier (infantry selected) | Climb aboard |
 | U | Unload the selected carriers |
@@ -39,8 +42,10 @@ drawn in code, so the game can be played and tuned before real sprites are made.
 ## How the battle works
 - **Line of sight:** walls and wrecks block it. You only see enemies your men can see, and an enemy
   lying still in cover is only spotted at close range until they fire.
-- **Cover:** rubble, craters and ruin floors cut the chance of being hit, as does rubble between a
-  soldier and the shooter.
+- **Cover:** sandbags, barricades and crumbled low walls stop most fire from their far side but can be
+  fired over; rubble, craters and ruin floors help less. Troops pick cover facing the threat and crouch
+  behind it. Low cover wears away under fire.
+- **Coherency:** a squad's men must stay within reach of each other, as in Epik.
 - **Suppression:** every shot near a man adds suppression, which fades when the firing stops. Heavily
   suppressed soldiers go prone (pinned): they won't move and fire less.
 - **Morale:** falls under fire and when squad-mates die, especially the leader. A soldier at very low

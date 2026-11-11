@@ -100,6 +100,10 @@ func _draw() -> void:
 			elif t == T.FLOOR and _is_fallen(c):
 				_seed(c.x, c.y, 31)
 				_draw_foundation(c)  # a breach worn into a walkable gap
+	for y in range(area.position.y, area.end.y):
+		for x in range(area.position.x, area.end.x):
+			if map.get_t(Vector2i(x, y)) == T.LOW:
+				_draw_low(Vector2i(x, y))
 	# shadows, then wrecks, then the walls themselves from back to front
 	for y in range(area.position.y, area.end.y):
 		for x in range(area.position.x, area.end.x):
@@ -450,6 +454,9 @@ func _draw_rubble(c: Vector2i) -> void:
 	draw_colored_polygon(_blob(o + Vector2(8, 8), 9.5, 1.0, 0.45, c.x * 977 + c.y), Color(0.33, 0.31, 0.27, 0.6))
 	if from_wall:
 		_draw_foundation(c)
+	elif map.fallen[c.y * BattleMap.W + c.x] == 2:
+		_draw_low_remains(c)
+		return
 	for k in (rng.randi_range(3, 5) if from_wall else rng.randi_range(7, 12)):
 		var p := o + Vector2(rng.randf_range(0, C), rng.randf_range(0, C))
 		var sh := rng.randf_range(0.3, 0.55)
@@ -564,6 +571,197 @@ func _tex_poly(pts: PackedVector2Array, a: int, b: int, alpha: float) -> void:
 	for q in pts:
 		uvs2.append(q / 300.0 + off * 0.7)
 	_poly(pts, Color(1, 1, 1, alpha * 0.8), uvs2, ground_fine)
+
+
+# ---------------------------------------------------------------- low cover
+
+func _low_kind(c: Vector2i) -> int:
+	return map.low_kind[c.y * BattleMap.W + c.x]
+
+
+func _low_linked(c: Vector2i, kind: int) -> bool:
+	return map.get_t(c) == T.LOW and _low_kind(c) == kind or (kind == BattleMap.LowKind.STONE and map.get_t(c) == T.WALL)
+
+
+## Which way a line of low cover runs through c: true = left to right.
+func _low_horizontal(c: Vector2i) -> bool:
+	var k := _low_kind(c)
+	var h := int(_low_linked(c + Vector2i(-1, 0), k)) + int(_low_linked(c + Vector2i(1, 0), k))
+	var v := int(_low_linked(c + Vector2i(0, -1), k)) + int(_low_linked(c + Vector2i(0, 1), k))
+	return h >= v
+
+
+func _draw_low(c: Vector2i) -> void:
+	match _low_kind(c):
+		BattleMap.LowKind.SANDBAGS:
+			_draw_sandbags(c)
+		BattleMap.LowKind.BARRICADE:
+			_draw_barricade(c)
+		_:
+			_draw_low_wall(c)
+
+
+## A bag's outline: a rounded, slightly squashed box lying along `along`.
+func _bag_shape(p: Vector2, along: Vector2, half_len: float, half_w: float, seed_v: int) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var across := along.orthogonal()
+	for k in 16:
+		var a := k * TAU / 16.0
+		var cx := cos(a)
+		var cy := sin(a)
+		var x := signf(cx) * pow(absf(cx), 0.55) * half_len * (1.0 + (_h(seed_v, k, 113) - 0.5) * 0.08)
+		var y := signf(cy) * pow(absf(cy), 0.7) * half_w
+		pts.append(p + along * x + across * y)
+	return pts
+
+
+## Sandbags: a wall a full cell thick, two staggered rows of fat burlap bags with
+## a third layer on top, seams and tied ends, some burst open when damaged.
+func _draw_sandbags(c: Vector2i) -> void:
+	var o := Vector2(c) * C
+	var stage := map.wall_stage(c)
+	var horiz := _low_horizontal(c)
+	var along := Vector2(1, 0) if horiz else Vector2(0, 1)
+	var across := along.orthogonal()
+	var mid := o + Vector2(8, 8)
+	var base := Color(0.47, 0.42, 0.31)
+	draw_rect(Rect2(o + Vector2(2.5, 3.5), Vector2(C, C)), Color(0, 0, 0, 0.3))
+	var layers := [[-3.4, 0.0, 0.0], [3.4, 0.0, 3.0], [0.0, -2.2, 1.5]]  # across offset, lift, stagger
+	var n := 0
+	for li in layers.size():
+		var L: Array = layers[li]
+		for k in 3:
+			n += 1
+			var t: float = k * 6.0 - 6.0 + L[2]
+			var p: Vector2 = mid + along * t + across * L[0] + Vector2(0, L[1])
+			if stage > 0 and _h(c.x * 7 + k, c.y * 5 + li, 111) < 0.18 * stage:
+				# burst open: a flattened sack with sand spilling out
+				_poly(_blob(p + Vector2(0, 1.5), 3.6, 0.55, 0.6, c.x * 7 + k + li), base.darkened(0.35))
+				_poly(_blob(p + across * 2.5 + Vector2(0, 2.5), 2.8, 0.6, 0.6, c.x * 9 + k + li), Color(0.56, 0.49, 0.36, 0.85))
+				continue
+			var col := base.lightened((_h(c.x * 3 + k, c.y + li, 112) - 0.5) * 0.18)
+			if li == 2:
+				col = col.lightened(0.06)  # the top layer catches more light
+			var bag := _bag_shape(p, along, 3.4, 2.5, c.x * 31 + c.y * 7 + n)
+			var sh := PackedVector2Array()
+			for q in bag:
+				sh.append(q + Vector2(0.8, 1.0))
+			_poly(sh, Color(0, 0, 0, 0.38))
+			_poly(bag, col)
+			_tex_poly(bag, c.x + k, c.y + li, 0.9)
+			# stitched seam along the bag, tied-off ends, a lit upper edge
+			draw_line(p - along * 2.6, p + along * 2.6, col.darkened(0.25), 0.35)
+			draw_line(p - along * 3.1 - across * 1.2, p - along * 3.1 + across * 1.2, col.darkened(0.35), 0.5)
+			draw_line(p - along * 2.6 - across * 2.1 + Vector2(0, -0.2), p + along * 2.6 - across * 2.1, col.lightened(0.25), 0.5)
+	if stage > 0:
+		var outline := PackedVector2Array([o, o + Vector2(C, 0), o + Vector2(C, C), o + Vector2(0, C)])
+		_soot(outline, mid, stage, c.x * 3 + c.y)
+
+
+## A barricade: a rusted steel hedgehog with salvaged planks and sheet metal lashed to it.
+func _draw_barricade(c: Vector2i) -> void:
+	var o := Vector2(c) * C
+	var stage := map.wall_stage(c)
+	var horiz := _low_horizontal(c)
+	var along := Vector2(1, 0) if horiz else Vector2(0, 1)
+	var across := Vector2(0, 1) if horiz else Vector2(1, 0)
+	var mid := o + Vector2(8, 8)
+	draw_rect(Rect2(o + Vector2(2, 3), Vector2(C, C)), Color(0, 0, 0, 0.25))
+	_seed(c.x, c.y, 120)
+	# planks or sheet metal along the line
+	var sheet := _h(c.x, c.y, 121) < 0.5
+	for k in 3:
+		if stage > 0 and _h(c.x, c.y + k, 122) < 0.25 * stage:
+			continue  # blown off
+		var a := mid - along * 8.5 + across * (k - 1) * 2.4
+		var b := mid + along * 8.5 + across * (k - 1) * 2.4 + across * rng.randf_range(-0.8, 0.8)
+		var col := Color(0.4, 0.37, 0.33) if sheet else Color(0.36, 0.26, 0.17).lightened(rng.randf_range(-0.1, 0.1))
+		draw_line(a + Vector2(0.6, 0.8), b + Vector2(0.6, 0.8), Color(0, 0, 0, 0.35), 2.4)
+		draw_line(a, b, col, 2.2)
+		draw_line(a - across * 0.8, b - across * 0.8, col.lightened(0.2), 0.5)
+		if sheet:
+			for r in 4:
+				var q := a.lerp(b, (r + 0.5) / 4.0)
+				draw_line(q - across * 1.0, q + across * 1.0, col.darkened(0.3), 0.4)  # corrugations
+	# the steel hedgehog: three crossed beams
+	var hog := mid + along * rng.randf_range(-3, 3)
+	for k in 3:
+		var ang := along.angle() + k * PI / 3.0 + 0.3
+		var d := Vector2.from_angle(ang) * 6.0
+		draw_line(hog - d + Vector2(0.8, 1), hog + d + Vector2(0.8, 1), Color(0, 0, 0, 0.4), 2.0)
+		draw_line(hog - d, hog + d, Color(0.3, 0.2, 0.15), 1.8)
+		draw_line(hog - d, hog + d * 0.2, Color(0.5, 0.32, 0.2), 0.6)  # rust highlight
+	draw_circle(hog, 1.0, Color(0.18, 0.15, 0.13))
+	if stage > 0:
+		var outline := PackedVector2Array([o, o + Vector2(C, 0), o + Vector2(C, C), o + Vector2(0, C)])
+		_soot(outline, mid, stage, c.x * 5 + c.y)
+
+
+## A wall crumbled to waist height: the same concrete as the walls, but low,
+## its top broken into an uneven line, with fallen pieces at its foot.
+func _draw_low_wall(c: Vector2i) -> void:
+	var o := Vector2(c) * C
+	var stage := map.wall_stage(c)
+	var base := _wall_base(c).darkened(0.05)
+	var lh := 2.5  # how far its top is raised
+	var below_low := map.get_t(c + Vector2i(0, 1)) == T.LOW or map.get_t(c + Vector2i(0, 1)) == T.WALL
+	draw_rect(Rect2(o + Vector2(2, 2), Vector2(C, C)), Color(0, 0, 0, 0.25))
+	var top := o.y - lh
+	# a jagged top outline on all four sides
+	var pts := PackedVector2Array()
+	var corners := [Vector2(o.x, top), Vector2(o.x + C, top), Vector2(o.x + C, top + C), Vector2(o.x, top + C)]
+	var inward := [Vector2(0, 1), Vector2(-1, 0), Vector2(0, -1), Vector2(1, 0)]
+	for e in 4:
+		var a: Vector2 = corners[e]
+		var b: Vector2 = corners[(e + 1) % 4]
+		var linked := false
+		var nb := [c + Vector2i(0, -1), c + Vector2i(1, 0), c + Vector2i(0, 1), c + Vector2i(-1, 0)][e] as Vector2i
+		linked = map.get_t(nb) == T.LOW or map.get_t(nb) == T.WALL
+		pts.append(a)
+		if not linked:
+			for k in range(1, 6):
+				var t := k / 6.0
+				pts.append(a.lerp(b, t) + inward[e] * (0.5 + _h(c.x * 5 + e, c.y + k, 130) * 2.5) * pow(sin(PI * t), 2.0))
+	if not below_low:
+		var face := PackedVector2Array([Vector2(o.x, top + C), Vector2(o.x + C, top + C), Vector2(o.x + C, o.y + C), Vector2(o.x, o.y + C)])
+		_poly(face, base.darkened(0.45))
+		_tex_poly(face, c.x, c.y + 500, 0.8)
+	_poly(pts, base)
+	_tex_poly(pts, c.x / 4, c.y / 4, 1.0)
+	draw_line(Vector2(o.x, top), Vector2(o.x + C, top), base.lightened(0.2), 0.6)
+	_seed(c.x, c.y, 131)
+	for k in 10:
+		var p := o + Vector2(rng.randf_range(1, 15), rng.randf_range(1, 15) - lh)
+		draw_circle(p, rng.randf_range(0.2, 0.5), base.darkened(0.3) if rng.randf() < 0.6 else base.lightened(0.15))
+	for k in 2:
+		_rebar(o + Vector2(rng.randf_range(3, 13), rng.randf_range(3, 13) - lh), o + Vector2(rng.randf_range(3, 13), rng.randf_range(-2, 2) - lh))
+	var foot := o + Vector2(rng.randf_range(2, 14), C + rng.randf_range(0, 3))
+	_chunk(foot, rng.randf_range(2.4, 3.6), base.darkened(0.2), c.x, c.y + 77)
+	if stage > 0:
+		_soot(pts, o + Vector2(8, 8 - lh), stage, c.x * 7 + c.y)
+
+
+## What's left once low cover is destroyed.
+func _draw_low_remains(c: Vector2i) -> void:
+	var o := Vector2(c) * C
+	_seed(c.x, c.y, 140)
+	match _low_kind(c):
+		BattleMap.LowKind.SANDBAGS:
+			for k in 5:
+				var p := o + Vector2(rng.randf_range(2, 14), rng.randf_range(2, 14))
+				_poly(_blob(p, rng.randf_range(2.5, 4.0), 0.5, 0.6, c.x * 3 + k), Color(0.38, 0.34, 0.25))
+			for k in 3:
+				_poly(_blob(o + Vector2(rng.randf_range(2, 14), rng.randf_range(2, 14)), rng.randf_range(3, 5), 0.7, 0.5, c.y * 5 + k), Color(0.52, 0.46, 0.34, 0.8))
+		BattleMap.LowKind.BARRICADE:
+			for k in 4:
+				var p := o + Vector2(rng.randf_range(1, 15), rng.randf_range(1, 15))
+				var d := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(3, 7)
+				draw_line(p - d, p + d, Color(0.32, 0.22, 0.15) if k % 2 == 0 else Color(0.38, 0.35, 0.31), 1.8)
+			_rebar(o + Vector2(4, 8), o + Vector2(12, 5))
+		_:
+			for k in 5:
+				_chunk(o + Vector2(rng.randf_range(2, 14), rng.randf_range(2, 14)), rng.randf_range(2.2, 3.8), _wall_base(c).darkened(0.2), c.x * 7 + k, c.y)
+	_soot(PackedVector2Array([o, o + Vector2(C, 0), o + Vector2(C, C), o + Vector2(0, C)]), o + Vector2(8, 8), 1, c.x * 11 + c.y)
 
 
 func _wall_base(c: Vector2i) -> Color:

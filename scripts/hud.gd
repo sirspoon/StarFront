@@ -71,14 +71,18 @@ func setup(m: Node) -> void:
 	help.text = "CONTROLS  (F1 hides)\n" \
 			+ "Left click / drag: select squads\n" \
 			+ "Right click ground: move   (Shift: run)\n" \
+			+ "Right drag: line up along it, in cover\n" \
+			+ "Ctrl + right click: face that way\n" \
+			+ "Alt + click: pick out single soldiers\n" \
 			+ "Right click enemy: focus fire on it\n" \
 			+ "Right click your carrier: climb aboard   U: unload\n" \
 			+ "Right click a wall (tank / lance team): shell it\n" \
 			+ "H: halt   1-9: pick squad   Space: pause\n" \
 			+ "WASD / arrows / middle-drag: scroll   Wheel: zoom\n\n" \
-			+ "Hold the Ashen Chapel. Soldiers seek cover\n" \
-			+ "near where you send them. Fire pins men down\n" \
-			+ "and wears down morale until they run."
+			+ "Hold the Ashen Chapel. Sandbags, barricades and\n" \
+			+ "low walls stop most fire from their far side.\n" \
+			+ "Men must stay in contact with their squad.\n" \
+			+ "Fire pins men down and breaks their morale."
 	help_panel.add_child(help)
 	main.log_message("Battle plans ready.")
 

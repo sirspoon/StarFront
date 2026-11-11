@@ -42,6 +42,7 @@ var flash := 0.0
 var walk := 0.0
 var seen_by := [true, true]
 var is_vehicle := false
+var in_cover := false      # crouched behind cover facing the threat
 var strength := 1         # how much this unit counts towards its side's strength
 var board_vehicle = null  # carrier this soldier is walking to
 var carrier = null        # carrier this soldier is riding in
@@ -110,6 +111,9 @@ func tick(dt: float, now: float) -> void:
 	if board_vehicle != null and state == State.READY:
 		_try_board()
 	flash = maxf(0.0, flash - dt)
+	# when idle, watch the way the squad was told to look
+	if not moving and burst_left == 0 and flash <= 0.0 and squad.facing != Vector2.ZERO:
+		facing = lerp_angle(facing, squad.facing.angle(), minf(1.0, dt * 3.0))
 	var under_fire := now - last_hit_time < 3.0
 	suppression = maxf(0.0, suppression - dt * (4.0 if under_fire else 12.0))
 	if not under_fire:
@@ -273,6 +277,8 @@ func pick_target(w: Dictionary, from: Vector2) -> Soldier:
 		if d > w.range:
 			continue
 		var score := d + (250.0 if e.state == State.ROUTING else 0.0)
+		if squad.facing != Vector2.ZERO and absf(wrapf((e.position - from).angle() - squad.facing.angle(), -PI, PI)) > 1.3:
+			score += 140.0  # prefer targets in the arc the squad is watching
 		if e.is_vehicle:
 			score += -400.0 if anti_tank else 150.0
 		cands.append([score, e])
@@ -309,11 +315,13 @@ func _draw() -> void:
 		_draw_corpse()
 		return
 	if squad.selected:
-		draw_arc(Vector2.ZERO, radius + 5.0, 0, TAU, 28, Color(0.45, 1.0, 0.45, 0.85), 1.5)
+		var picked := squad.sub.has(self)
+		draw_arc(Vector2.ZERO, radius + 5.0, 0, TAU, 28, Color(1.0, 0.85, 0.3, 0.95) if picked else Color(0.45, 1.0, 0.45, 0.85), 2.0 if picked else 1.5)
 	draw_set_transform(Vector2(3, 4), 0, Vector2(1, 0.8))
 	draw_circle(Vector2.ZERO, radius + 1.0, Color(0, 0, 0, 0.35))
 	var prone := state == State.PINNED
-	draw_set_transform(Vector2.ZERO, facing, Vector2(1.25, 0.8) if prone else Vector2.ONE)
+	var crouch := in_cover and not moving and flash <= 0.0 and not prone
+	draw_set_transform(Vector2.ZERO, facing, Vector2(1.25, 0.8) if prone else (Vector2(0.86, 0.86) if crouch else Vector2.ONE))
 	if moving and not prone:
 		var s := sin(walk) * radius * 0.45
 		var leg: Color = colors.armour

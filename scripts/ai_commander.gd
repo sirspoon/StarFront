@@ -73,6 +73,7 @@ func _think(sq: Squad) -> void:
 	var enemy: Soldier = main.nearest_seen_enemy(team, c)
 	if enemy != null:
 		var d := c.distance_to(enemy.position)
+		sq.facing = (enemy.position - c).normalized()  # watch the enemy
 		if d < rng * 0.8:
 			if busy and sq.running:
 				sq.order_move(main.map, c, false)  # stop running and get into cover here

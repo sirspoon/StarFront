@@ -48,6 +48,17 @@ func _draw() -> void:
 			draw_circle(hull.get_center(), 11, _hc(0.85))
 	for y in range(area.position.y, area.end.y):
 		for x in range(area.position.x, area.end.x):
+			var c := Vector2i(x, y)
+			if map.get_t(c) == T.LOW:
+				# waist-high: a rounded ridge for bags and barricades, a flat top for low walls
+				var o := Vector2(c) * C
+				if _low_kind(c) == BattleMap.LowKind.STONE:
+					draw_rect(Rect2(o - Vector2(0, 2.5), Vector2(C, C)), _hc(0.62))
+				else:
+					draw_rect(Rect2(o + Vector2(1, 1), Vector2(C - 2, C - 2)), _hc(0.5))
+					draw_rect(Rect2(o + Vector2(3, 3), Vector2(C - 6, C - 6)), _hc(0.58))
+	for y in range(area.position.y, area.end.y):
+		for x in range(area.position.x, area.end.x):
 			if map.get_t(Vector2i(x, y)) == T.WALL:
 				_wall(Vector2i(x, y))
 

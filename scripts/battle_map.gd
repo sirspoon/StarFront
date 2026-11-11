@@ -9,11 +9,19 @@ const CELL := 16
 const W := 160
 const H := 100
 
-enum T { OPEN, RUBBLE, CRATER, FLOOR, WALL, WRECK }
+enum T { OPEN, RUBBLE, CRATER, FLOOR, WALL, WRECK, LOW }
 
-const COVER := [0.0, 0.35, 0.45, 0.15, 0.0, 0.0]
-const SPEED := [1.0, 0.7, 0.75, 1.0, 1.0, 1.0]
-const TERRAIN_NAMES := ["Open ground", "Rubble", "Crater", "Ruin floor", "Wall", "Wreck"]
+const COVER := [0.0, 0.35, 0.45, 0.15, 0.0, 0.0, 0.3]
+const SPEED := [1.0, 0.7, 0.75, 1.0, 1.0, 1.0, 0.35]
+const TERRAIN_NAMES := ["Open ground", "Rubble", "Crater", "Ruin floor", "Wall", "Wreck", "Low cover"]
+
+## Low cover: chest-high things troops crouch behind and fire over. It doesn't block
+## sight, infantry can clamber over it slowly, vehicles go round. It soaks up more
+## punishment than a full wall before it is destroyed.
+enum LowKind { NONE, SANDBAGS, STONE, BARRICADE }
+const LOW_COVER := [0.0, 0.7, 0.65, 0.5]       # cover it gives from fire on its far side
+const LOW_HP := [0.0, 260.0, 220.0, 180.0]
+const LOW_NAMES := ["", "Sandbags", "Low wall", "Barricade"]
 
 var grid := PackedByteArray()
 var astar := AStarGrid2D.new()
@@ -29,7 +37,8 @@ var wrecks: Array = []    # [rect: Rect2i, horizontal: bool]
 var scorches: Array = []  # [center: Vector2, radius: float]
 var wall_hp := PackedFloat32Array()   # strength of each wall cell (100 = intact)
 var wall_max := PackedFloat32Array()
-var fallen := PackedByteArray()        # 1 where a wall has collapsed into rubble
+var fallen := PackedByteArray()        # 1 where a wall has collapsed into rubble, 2 where low cover was destroyed
+var low_kind := PackedByteArray()      # LowKind of each LOW cell (kept after it is destroyed, for its remains)
 var puddles: Array = []   # [center: Vector2, radius: float, squash: float]
 var roads: Array = []     # Rect2 in world pixels
 
@@ -87,7 +96,47 @@ func cell_cover(c: Vector2i) -> float:
 		var t := get_t(c + d)
 		if t == T.WALL or t == T.WRECK or t == T.RUBBLE:
 			cov += 0.12
+		elif t == T.LOW:
+			cov += 0.25
 	return cov
+
+
+func low_cover_at(c: Vector2i) -> float:
+	return LOW_COVER[low_kind[c.y * W + c.x]] if get_t(c) == T.LOW else 0.0
+
+
+## How good cell c is for a soldier facing dir: low cover between him and the
+## threat is best (he can shoot over it); walls and rubble help less. Falls back
+## to all-round cover when there is no direction.
+func cell_cover_dir(c: Vector2i, dir: Vector2) -> float:
+	if dir == Vector2.ZERO:
+		return cell_cover(c)
+	var t := get_t(c)
+	var cov: float = COVER[t]
+	var best := 0.0
+	var a := dir.angle()
+	for off in [0.0, -0.75, 0.75]:
+		var n := cell_of(center_of(c) + Vector2.from_angle(a + off) * CELL)
+		var nt := get_t(n)
+		var v := 0.0
+		if nt == T.LOW:
+			v = low_cover_at(n) + 0.25
+		elif nt == T.RUBBLE:
+			v = 0.4
+		elif nt == T.WALL or nt == T.WRECK:
+			v = 0.3  # safe, but he can't shoot through it
+		best = maxf(best, v * (1.0 if off == 0.0 else 0.8))
+	return cov + best
+
+
+## The low-cover cell shielding a target from a shooter, or (-1, -1).
+func cover_cell(target_pos: Vector2, shooter_pos: Vector2) -> Vector2i:
+	var dir := (shooter_pos - target_pos).normalized()
+	for d in [7.0, 13.0, 20.0]:
+		var c := cell_of(target_pos + dir * d)
+		if get_t(c) == T.LOW:
+			return c
+	return Vector2i(-1, -1)
 
 
 ## Cover a target gets against a shooter at shooter_pos (0 = none, 1 = total).
@@ -99,6 +148,9 @@ func cover_vs(target_pos: Vector2, shooter_pos: Vector2) -> float:
 		cov = maxf(cov, 0.4)
 	elif ft == T.WALL or ft == T.WRECK:
 		cov = maxf(cov, 0.55)
+	var lc := cover_cell(target_pos, shooter_pos)
+	if lc.x >= 0:
+		cov = maxf(cov, low_cover_at(lc))
 	return cov
 
 
@@ -189,7 +241,7 @@ func add_wreck(pos: Vector2) -> void:
 
 ## Wall strength left in cell c, from 0 to 1 (1 for anything that isn't a wall).
 func wall_health(c: Vector2i) -> float:
-	if not in_bounds(c) or get_t(c) != T.WALL:
+	if not in_bounds(c) or (get_t(c) != T.WALL and get_t(c) != T.LOW):
 		return 1.0
 	var i := c.y * W + c.x
 	return wall_hp[i] / wall_max[i]
@@ -213,7 +265,7 @@ func damage_walls(at: Vector2, radius: float, dmg: float) -> Array:
 	for dx in range(-n, n + 1):
 		for dy in range(-n, n + 1):
 			var c := c0 + Vector2i(dx, dy)
-			if not in_bounds(c) or get_t(c) != T.WALL:
+			if not in_bounds(c) or (get_t(c) != T.WALL and get_t(c) != T.LOW):
 				continue
 			var d := center_of(c).distance_to(at)
 			if d > reach:
@@ -222,8 +274,8 @@ func damage_walls(at: Vector2, radius: float, dmg: float) -> Array:
 			var i := c.y * W + c.x
 			wall_hp[i] -= dmg * clampf(1.0 - d / (reach * 1.15), 0.25, 1.0)
 			if wall_hp[i] <= 0.0:
+				fallen[i] = 2 if get_t(c) == T.LOW else 1
 				set_t(c, T.RUBBLE)
-				fallen[i] = 1
 				fell.append(c)
 				changed.append(c)
 			elif wall_stage(c) != stage:
@@ -243,6 +295,25 @@ func wall_near(at: Vector2, reach: float) -> bool:
 			var c := c0 + Vector2i(dx, dy)
 			if get_t(c) == T.WALL and in_bounds(c) and center_of(c).distance_to(at) <= reach:
 				return true
+	return false
+
+
+## Small arms chewing at low cover (sandbags split, barricades splinter).
+## Returns true if it was destroyed.
+func chip_low(c: Vector2i, dmg: float) -> bool:
+	if get_t(c) != T.LOW:
+		return false
+	var i := c.y * W + c.x
+	var stage := wall_stage(c)
+	wall_hp[i] -= dmg
+	if wall_hp[i] <= 0.0:
+		fallen[i] = 2
+		set_t(c, T.RUBBLE)
+		_refresh_cells([c])
+		cells_changed.emit([c])
+		return true
+	if wall_stage(c) != stage:
+		cells_changed.emit([c])
 	return false
 
 
@@ -282,8 +353,9 @@ func _refresh_vastar(c: Vector2i) -> void:
 	var clear := c.x > 0 and c.y > 0 and c.x < W - 1 and c.y < H - 1
 	for dx in range(-1, 2):
 		for dy in range(-1, 2):
-			if clear and blocks(get_t(c + Vector2i(dx, dy))):
-				clear = false
+			var nt := get_t(c + Vector2i(dx, dy))
+			if clear and (blocks(nt) or nt == T.LOW):
+				clear = false  # vehicles drive round low cover
 	vastar.set_point_solid(c, not clear)
 	if clear:
 		var t := get_t(c)
@@ -297,6 +369,7 @@ func generate(seed_value: int) -> void:
 	rng.seed = seed_value
 	grid.resize(W * H)
 	grid.fill(T.OPEN)
+	roads = [Rect2(0, H * 0.8 * CELL, W * CELL, 5 * CELL), Rect2(W * 0.3 * CELL, 0, 5 * CELL, H * CELL)]
 	_make_chapel()
 	var tries := 0
 	while buildings.size() < 22 and tries < 600:
@@ -314,6 +387,12 @@ func generate(seed_value: int) -> void:
 		_make_wreck()
 	for i in 40:
 		_make_rubble_patch()
+	low_kind.resize(W * H)
+	low_kind.fill(0)
+	_crumble_walls()
+	for i in 16:
+		_make_sandbags(i < 7)
+	_make_barricades()
 	for i in 30:
 		scorches.append([Vector2(rng.randf_range(0, W * CELL), rng.randf_range(0, H * CELL)),
 				rng.randf_range(20, 60)])
@@ -330,6 +409,8 @@ func _init_walls() -> void:
 	for y in H:
 		for x in W:
 			var hp := CHAPEL_WALL_HP if chapel.grow(1).has_point(Vector2i(x, y)) else WALL_HP
+			if grid[y * W + x] == T.LOW:
+				hp = LOW_HP[low_kind[y * W + x]]
 			wall_hp[y * W + x] = hp
 			wall_max[y * W + x] = hp
 	# gaps in the ruins' outer walls are collapsed wall too (the chapel's doorways aren't)
@@ -339,7 +420,7 @@ func _init_walls() -> void:
 			for c in _side_cells(b, side) + [b.position, Vector2i(b.end.x - 1, b.position.y),
 					Vector2i(b.position.x, b.end.y - 1), b.end - Vector2i.ONE]:
 				var t := get_t(c)
-				if t == T.WALL or (is_chapel and t == T.FLOOR):
+				if t == T.WALL or t == T.LOW or (is_chapel and t == T.FLOOR):
 					continue
 				if t == T.OPEN:
 					set_t(c, T.RUBBLE)
@@ -347,7 +428,6 @@ func _init_walls() -> void:
 
 
 func _make_decor() -> void:
-	roads = [Rect2(0, H * 0.8 * CELL, W * CELL, 5 * CELL), Rect2(W * 0.3 * CELL, 0, 5 * CELL, H * CELL)]
 	for i in 26:
 		var c := Vector2(rng.randf_range(0, W * CELL), rng.randf_range(0, H * CELL))
 		if get_t(cell_of(c)) == T.OPEN:
@@ -486,6 +566,103 @@ func _make_wreck() -> void:
 	scorches.append([centre, 70.0])
 	if rng.randf() < 0.7:
 		fire_points.append(centre + Vector2(rng.randf_range(-10, 10), rng.randf_range(-10, 10)))
+
+
+func _set_low(c: Vector2i, kind: int) -> void:
+	set_t(c, T.LOW)
+	low_kind[c.y * W + c.x] = kind
+
+
+## Some stretches of the ruins' outer walls have crumbled to waist height.
+func _crumble_walls() -> void:
+	for b in buildings:
+		for side in 4:
+			var cells := _side_cells(b, side)
+			if cells.size() < 5 or rng.randf() > (0.3 if b == chapel else 0.55):
+				continue
+			var start := rng.randi_range(1, cells.size() - 4)
+			for k in rng.randi_range(2, 4):
+				var c: Vector2i = cells[mini(start + k, cells.size() - 2)]
+				if get_t(c) == T.WALL:
+					_set_low(c, LowKind.STONE)
+			for c in cells:
+				if get_t(c) == T.WALL and rng.randf() < 0.06:
+					_set_low(c, LowKind.STONE)
+
+
+func _open_run(cells: Array) -> bool:
+	for c in cells:
+		if not in_bounds(c) or get_t(c) != T.OPEN or c.x < 16 or c.x > W - 17:
+			return false
+	return true
+
+
+## A sandbagged firing position: a straight line, an L or a horseshoe.
+func _make_sandbags(near_chapel: bool) -> void:
+	for attempt in 30:
+		var o := Vector2i(rng.randi_range(18, W - 19), rng.randi_range(3, H - 4))
+		if near_chapel:
+			o = chapel.get_center() + Vector2i(rng.randi_range(-26, 26), rng.randi_range(-16, 16))
+			if chapel.grow(3).has_point(o):
+				continue
+		var cells: Array = []
+		var shape := rng.randi() % 3
+		var horiz := rng.randf() < 0.5
+		var length := rng.randi_range(3, 6)
+		var along := Vector2i(1, 0) if horiz else Vector2i(0, 1)
+		var side := Vector2i(0, 1) if horiz else Vector2i(1, 0)
+		if rng.randf() < 0.5:
+			side = -side
+		for k in length:
+			cells.append(o + along * k)
+		if shape >= 1:
+			cells.append(o + side)
+			if length > 1:
+				cells.append(o + side * 2)
+		if shape == 2:
+			cells.append(o + along * (length - 1) + side)
+			cells.append(o + along * (length - 1) + side * 2)
+		if not _open_run(cells):
+			continue
+		for c in cells:
+			_set_low(c, LowKind.SANDBAGS)
+		return
+
+
+## Barricades of steel and planks thrown across the roads, and a few in the open.
+func _make_barricades() -> void:
+	for rd in roads:
+		var r: Rect2 = rd
+		var horiz := r.size.x > r.size.y
+		for n in 3:
+			for attempt in 20:
+				var cells: Array = []
+				if horiz:
+					var x := rng.randi_range(18, W - 19)
+					for y in range(int(r.position.y / CELL), int(r.end.y / CELL)):
+						cells.append(Vector2i(x, y))
+				else:
+					var y := rng.randi_range(4, H - 5)
+					for x in range(int(r.position.x / CELL), int(r.end.x / CELL)):
+						cells.append(Vector2i(x, y))
+				cells.remove_at(rng.randi_range(0, cells.size() - 1))  # a gap to squeeze through
+				if not _open_run(cells):
+					continue
+				for c in cells:
+					_set_low(c, LowKind.BARRICADE)
+				break
+	for i in 6:
+		for attempt in 20:
+			var o := Vector2i(rng.randi_range(18, W - 19), rng.randi_range(3, H - 4))
+			var along := Vector2i(1, 0) if rng.randf() < 0.5 else Vector2i(0, 1)
+			var cells: Array = []
+			for k in rng.randi_range(3, 5):
+				cells.append(o + along * k)
+			if not _open_run(cells):
+				continue
+			for c in cells:
+				_set_low(c, LowKind.BARRICADE)
+			break
 
 
 func _make_rubble_patch() -> void:

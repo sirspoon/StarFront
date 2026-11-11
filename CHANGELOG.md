@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.09 (2026-11-11)
+Cover and squad control.
+- New low cover: sandbag emplacements (lines, L-shapes and horseshoes), steel-and-plank barricades
+  across the roads and in the open, and stretches of the ruins' walls crumbled to waist height.
+  It stops most fire from its far side (sandbags best, then low walls, then barricades) but troops
+  can see and shoot over it. Infantry can clamber over it slowly; vehicles go round.
+- Low cover is tougher than a full wall: it takes more shelling to destroy, and shots that miss a
+  man behind it chew into it (sandbags burst, planks splinter) until it gives way. What's left is
+  drawn as burst bags, broken planks or chunks of concrete.
+- Troops use cover: when they move they pick spots behind cover facing the threat, idle men caught
+  in the open hop into nearby cover, and men in cover crouch.
+- Right-drag to line a squad up along the line you draw: each man snaps to cover near his spot and
+  they face away from where they came from. A preview shows where each man will go (green = in cover).
+  Several selected squads share the line out between them.
+- Ctrl + right-click sets the direction a squad watches; they prefer targets in that arc.
+- Alt + click picks out individual soldiers so you can move just them.
+- Squad coherency, as in Epik: every man must stay within reach of a squad-mate. Orders to picked-out
+  men are limited to keep that, and stragglers make their way back. Selected squads show their links
+  (red when a man is out of contact).
+- Balance: Legion rifles a little more accurate, Sworn carbines a little less, Sworn armour a little
+  thinner (computer v computer was about 70% Sworn wins; now about even).
+
 ## v0.08 (2026-11-11)
 Normal-mapped lighting.
 - Every map tile now has a normal map, worked out from a height pass (raised walls with sloping
