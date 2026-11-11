@@ -10,6 +10,8 @@ var tex: Texture2D
 var pool: Array[PointLight2D] = []
 var active: Array = []  # {light, t, dur, e0, s0, from, to, moving}
 var next := 0
+var enabled_fx := true
+var shadows_ok := true
 
 
 func setup(light_tex: Texture2D) -> void:
@@ -48,7 +50,7 @@ func streak(a: Vector2, b: Vector2, color: Color, energy: float, radius: float, 
 
 
 func _start(a: Vector2, b: Vector2, color: Color, energy: float, radius: float, dur: float, shadows: bool, moving: bool) -> void:
-	if tex == null:
+	if tex == null or not enabled_fx:
 		return
 	var l := _take()
 	l.position = a
@@ -56,7 +58,7 @@ func _start(a: Vector2, b: Vector2, color: Color, energy: float, radius: float, 
 	energy *= 1.3  # normal-mapped surfaces take a little less light, so push it up
 	l.energy = energy
 	l.texture_scale = radius / 128.0
-	l.shadow_enabled = shadows
+	l.shadow_enabled = shadows and shadows_ok
 	l.enabled = true
 	active.append({"light": l, "t": 0.0, "dur": dur, "e0": energy, "from": a, "to": b, "moving": moving})
 

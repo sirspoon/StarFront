@@ -39,6 +39,8 @@ var paused := false
 var autotest := false
 var dragging := false
 var rdragging := false
+var previous_stage := ""  # where the last visit got to (web only), shown if it didn't finish
+var ran_ok := false
 var touch_mode := false       # phone / tablet controls
 var touches := {}             # finger index -> screen position
 var t_start := Vector2.ZERO   # where the current one-finger touch began
@@ -78,6 +80,8 @@ func _ready() -> void:
 		elif a.begins_with("--shot-zoom="):
 			shot_zoom = float(a.trim_prefix("--shot-zoom="))
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	previous_stage = Settings.last_stage()
+	Settings.stage("starting (%s)" % Settings.summary())
 	touch_mode = "--touch" in args or DisplayServer.is_touchscreen_available() \
 			or OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("mobile")
 	if touch_mode:
@@ -160,7 +164,9 @@ func _build_world(seed_value: int) -> void:
 	add_child(cm)
 	# a faint, cold light from the north-west that shows the relief everywhere
 	# (no shadows: from overhead they'd stretch right across the map)
+	var lights_on := Settings.on("lights", true)
 	var moon := DirectionalLight2D.new()
+	moon.enabled = lights_on
 	moon.color = Color(0.62, 0.68, 0.85)
 	moon.energy = 0.5
 	moon.height = 0.3
@@ -189,6 +195,8 @@ func _build_world(seed_value: int) -> void:
 	light_fx = LightFX.new()
 	light_fx.z_index = 6
 	add_child(light_fx)
+	light_fx.enabled_fx = Settings.on("lights", true)
+	light_fx.shadows_ok = Settings.on("shadows", not Settings.is_phone())
 	light_fx.setup(_light_tex if _light_tex != null else _soft_dot(256))
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--test-light="):  # test aid: a strong light to check the normal maps
@@ -256,7 +264,7 @@ func add_fire(p: Vector2) -> void:
 	light.texture_scale = 1.6
 	light.position = p
 	light.height = 36.0  # flames stand above the ground, so they light surfaces at an angle
-	light.shadow_enabled = true
+	light.shadow_enabled = Settings.on("shadows", not Settings.is_phone())
 	light.shadow_filter = Light2D.SHADOW_FILTER_PCF5
 	light.shadow_color = Color(0, 0, 0, 0.7)
 	add_child(light)
@@ -332,6 +340,7 @@ func start_battle(player_faction: String) -> void:
 		ais.append(AICommander.new(self, 0))
 	hud.build_squad_cards()
 	started = true
+	Settings.stage("battle started (%s)" % Settings.summary())
 	# start looking at your own force
 	var c := Vector2.ZERO
 	var n := 0
@@ -420,6 +429,9 @@ func _process(dt: float) -> void:
 	if not started or over or paused:
 		return
 	time += dt
+	if not ran_ok and time > 15.0:
+		ran_ok = true
+		Settings.stage("ran fine")
 	for s in soldiers:
 		s.tick(dt, time)
 	_separate(dt)

@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.12 (2026-11-11)
+Finding what crashes phones.
+- Graphics switches in the web address: `?safe` (everything heavy off), or one at a time with
+  `?shadows=0/1`, `?normals=0`, `?lights=0`, `?detail=low/medium`. The menu shows what's in use.
+- Wall shadows from fires and explosions are off by default on phones (`?shadows=1` turns them on).
+- The game remembers in the browser how far it got; if the last visit stopped early, the menu says
+  where, so a crash on a phone can be tracked down.
+
 ## v0.11 (2026-11-11)
 Phone fixes.
 - The map is now prepared four tiles at a time instead of all forty at once. Doing them all together

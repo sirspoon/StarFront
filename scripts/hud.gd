@@ -341,6 +341,21 @@ func show_menu() -> void:
 			+ "that both sides have sworn to take. Choose who you command."
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(intro)
+	var prev: String = main.previous_stage
+	if prev != "" and prev != "ran fine":
+		var warn := Label.new()
+		warn.text = "Last visit stopped while: %s\nIf it keeps crashing, try adding ?safe to the address." % prev
+		warn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		warn.custom_minimum_size = Vector2(620, 0)
+		warn.add_theme_color_override("font_color", Color(1.0, 0.6, 0.45))
+		warn.add_theme_font_size_override("font_size", 13)
+		v.add_child(warn)
+	var info := Label.new()
+	info.text = "Graphics: " + Settings.summary()
+	info.add_theme_font_size_override("font_size", 11)
+	info.add_theme_color_override("font_color", Color(0.6, 0.57, 0.5))
+	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(info)
 	for key in ["legion", "sworn"]:
 		var f: Dictionary = GameData.FACTIONS[key]
 		var b := Button.new()

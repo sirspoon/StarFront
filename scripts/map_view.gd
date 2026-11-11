@@ -7,6 +7,7 @@ extends Node2D
 ## rubble and craters in relief. Without a screen (headless
 ## tests) nothing is painted.
 
+var use_normals := true
 var SCALE := 2.0  # map pixels drawn per world pixel (detail level)
 const BATCH := 4  # tiles prepared at once: keeps the burst of graphics memory small enough for phones
 const CHUNK := Vector2i(20, 20)  # tile size in cells
@@ -35,32 +36,20 @@ func setup(m: BattleMap) -> void:
 	for cx in ceili(float(BattleMap.W) / CHUNK.x):
 		for cy in ceili(float(BattleMap.H) / CHUNK.y):
 			all.append(Vector2i(cx, cy))
-	for y in BattleMap.H:
-		_build_occluders(y)
-	SCALE = detail_scale()
+	if Settings.on("shadows", not Settings.is_phone()):
+		for y in BattleMap.H:
+			_build_occluders(y)
+	SCALE = Settings.detail()
+	use_normals = Settings.on("normals", true)
 	for i in range(0, all.size(), BATCH):
+		Settings.stage("preparing map tiles %d-%d of %d (%s)" % [i + 1, mini(i + BATCH, all.size()), all.size(), Settings.summary()])
 		await _bake(all.slice(i, i + BATCH))
+	Settings.stage("map ready (%s)" % Settings.summary())
 	ready_drawn = true
 
 
 ## One occluder per run of wall cells in a row, so fires and explosions throw
 ## shadows past walls and light spills through gaps and doorways.
-## Map detail. Full (2x) by default; on the web it can be lowered by adding
-## ?detail=medium or ?detail=low to the page address, for phones that struggle.
-static func detail_scale() -> float:
-	var q := ""
-	if OS.has_feature("web"):
-		var v = JavaScriptBridge.eval("window.location.search", true)
-		q = str(v) if v != null else ""
-	for a in OS.get_cmdline_user_args():
-		q += " " + a
-	if q.contains("detail=low"):
-		return 1.0
-	if q.contains("detail=medium"):
-		return 1.5
-	return 2.0
-
-
 func _build_occluders(y: int) -> void:
 	for o in occluders.get(y, []):
 		o.queue_free()
@@ -140,12 +129,16 @@ func _bake(keys: Array) -> void:
 		var size := Vector2i(Vector2(rect.size * BattleMap.CELL) * SCALE)
 		var vp := _viewport(size)
 		vp.add_child(_painter(MapPainter.new(), rect))
-		var hvp := _viewport(size)
-		hvp.add_child(_painter(HeightPainter.new(), rect))
+		var hvp: SubViewport = null
+		if use_normals:
+			hvp = _viewport(size)
+			hvp.add_child(_painter(HeightPainter.new(), rect))
 		jobs.append([k, vp, rect, hvp, null])
 	await RenderingServer.frame_post_draw
 	# second pass: turn each tile's height and colour into a normal map
 	for j in jobs:
+		if not use_normals:
+			break
 		var vp: SubViewport = j[1]
 		var hvp: SubViewport = j[3]
 		var nvp := _viewport(vp.size)
@@ -159,16 +152,18 @@ func _bake(keys: Array) -> void:
 		rect_node.material = mat
 		nvp.add_child(rect_node)
 		j[4] = nvp
-	await RenderingServer.frame_post_draw
+	if use_normals:
+		await RenderingServer.frame_post_draw
 	for j in jobs:
 		var vp: SubViewport = j[1]
 		var img := vp.get_texture().get_image()
 		img.generate_mipmaps()
-		var nimg: Image = j[4].get_texture().get_image()
-		nimg.generate_mipmaps()
 		var tex := CanvasTexture.new()
 		tex.diffuse_texture = ImageTexture.create_from_image(img)
-		tex.normal_texture = ImageTexture.create_from_image(nimg)
+		if use_normals:
+			var nimg: Image = j[4].get_texture().get_image()
+			nimg.generate_mipmaps()
+			tex.normal_texture = ImageTexture.create_from_image(nimg)
 		tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		var k: Vector2i = j[0]
 		var spr: Sprite2D = sprites.get(k)
@@ -185,8 +180,9 @@ func _bake(keys: Array) -> void:
 		if "--debug-normals" in OS.get_cmdline_user_args():
 			spr.texture = tex.normal_texture  # test aid: show the normal maps themselves
 		vp.queue_free()
-		j[3].queue_free()
-		j[4].queue_free()
+		if use_normals:
+			j[3].queue_free()
+			j[4].queue_free()
 
 
 func _viewport(size: Vector2i) -> SubViewport:
@@ -218,8 +214,9 @@ func _on_cells_changed(cells: Array) -> void:
 	var rows := {}
 	for c in cells:
 		rows[c.y] = true
-	for y in rows:
-		_build_occluders(y)
+	if Settings.on("shadows", not Settings.is_phone()):
+		for y in rows:
+			_build_occluders(y)
 	for c in cells:
 		# walls are drawn raised and cast shadows, so neighbouring tiles may need it too
 		for d in [Vector2i(0, 0), Vector2i(-2, -2), Vector2i(2, -2), Vector2i(-2, 2), Vector2i(2, 2)]:
