@@ -32,3 +32,6 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   `--shot-wall` for the last wall to fall. `--demo-damage` shells the chapel's west wall at the start
   (to see every damage stage); `--log-walls` prints where walls fall. Rendering under xvfb is software,
   so a full battle there takes a minute or two.
+- Lighting checks: `--test-light=x,y` adds a strong light at a map position; `--debug-normals` shows
+  the normal maps instead of the map colours. Normal maps come from `HeightPainter` +
+  `scripts/normal_from_height.gdshader` (Godot reads green as "facing up the screen", hence `flip_y`).

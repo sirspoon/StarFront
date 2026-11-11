@@ -55,6 +55,8 @@ drawn in code, so the game can be played and tuned before real sprites are made.
 - `scripts/game_data.gd`: factions, soldier types and weapons (the balance numbers).
 - `scripts/battle_map.gd`: map generation, terrain, path-finding, line of sight, cover and wall damage.
 - `scripts/map_view.gd`, `scripts/map_painter.gd`: draw the map in detailed tiles, repainting them as walls fall.
+- `scripts/height_painter.gd`, `scripts/normal_from_height.gdshader`: the normal maps that give the map relief under lights.
+- `scripts/light_fx.gd`: lights from muzzle flashes, bolts, rockets and explosions.
 - `scripts/soldier.gd`, `scripts/squad.gd`: soldiers, squads, morale and orders.
 - `scripts/vehicle.gd`: carriers and tanks (driving, turrets, armour, passengers).
 - `scripts/ai_commander.gd`: the computer opponent.

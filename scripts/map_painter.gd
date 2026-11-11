@@ -595,6 +595,37 @@ func _edge(c: Vector2i, a: Vector2, b: Vector2, inward: Vector2, torn: bool, sal
 	return out
 
 
+## The shape of a wall cell as drawn: the outline of its raised top (torn where
+## the wall next to it fell), its four edges, and the front face hanging below it
+## (empty when another wall stands in front). Shared by the colour and height passes.
+func _wall_geom(c: Vector2i) -> Dictionary:
+	var stage := map.wall_stage(c)
+	var h := WALL_H * (0.5 if stage == 2 else 1.0)
+	var o := Vector2(c) * C
+	var top_y := o.y - h
+	var tl := Vector2(o.x, top_y)
+	var tr := Vector2(o.x + C, top_y)
+	var br := Vector2(o.x + C, top_y + C)
+	var bl := Vector2(o.x, top_y + C)
+	var e_top := _edge(c, tl, tr, Vector2(0, 1), _is_fallen(c + Vector2i(0, -1)), 0)
+	var e_right := _edge(c, tr, br, Vector2(-1, 0), _is_fallen(c + Vector2i(1, 0)), 1)
+	var e_bottom := _edge(c, br, bl, Vector2(0, -1), _is_fallen(c + Vector2i(0, 1)), 2)
+	var e_left := _edge(c, bl, tl, Vector2(1, 0), _is_fallen(c + Vector2i(-1, 0)), 3)
+	var poly := PackedVector2Array()
+	for e in [e_top, e_right, e_bottom, e_left]:
+		poly.append_array(e)
+	var face := PackedVector2Array()
+	var chain := PackedVector2Array()
+	if map.get_t(c + Vector2i(0, 1)) != T.WALL:
+		chain = PackedVector2Array(e_bottom)
+		chain.append(bl)
+		for q in chain:
+			face.append(q)
+		for i in range(chain.size() - 1, -1, -1):
+			face.append(chain[i] + Vector2(0, h))
+	return {"poly": poly, "face": face, "chain": chain, "h": h, "edges": [e_top, e_right, e_bottom, e_left]}
+
+
 func _draw_wall(c: Vector2i) -> void:
 	var stage := map.wall_stage(c)
 	var h := WALL_H * (0.5 if stage == 2 else 1.0)
@@ -609,29 +640,19 @@ func _draw_wall(c: Vector2i) -> void:
 	var fd := _is_fallen(c + Vector2i(0, 1))
 	var fl := _is_fallen(c + Vector2i(-1, 0))
 	var top_y := o.y - h
+	var bl := Vector2(o.x, top_y + C)
 	var tl := Vector2(o.x, top_y)
 	var tr := Vector2(o.x + C, top_y)
 	var br := Vector2(o.x + C, top_y + C)
-	var bl := Vector2(o.x, top_y + C)
-	# the outline of the slab's top, torn where the wall next to it fell
-	var e_top := _edge(c, tl, tr, Vector2(0, 1), fu, 0)
-	var e_right := _edge(c, tr, br, Vector2(-1, 0), fr, 1)
-	var e_bottom := _edge(c, br, bl, Vector2(0, -1), fd, 2)
-	var e_left := _edge(c, bl, tl, Vector2(1, 0), fl, 3)
-	var poly := PackedVector2Array()
-	poly.append_array(e_top)
-	poly.append_array(e_right)
-	poly.append_array(e_bottom)
-	poly.append_array(e_left)
+	var geom := _wall_geom(c)
+	var poly: PackedVector2Array = geom.poly
+	var e_top: PackedVector2Array = geom.edges[0]
+	var e_right: PackedVector2Array = geom.edges[1]
+	var e_bottom: PackedVector2Array = geom.edges[2]
+	var e_left: PackedVector2Array = geom.edges[3]
 	# the front face, hanging below the bottom edge of the top
 	if not below:
-		var chain := PackedVector2Array(e_bottom)
-		chain.append(bl)
-		var face := PackedVector2Array()
-		for q in chain:
-			face.append(q)
-		for i in range(chain.size() - 1, -1, -1):
-			face.append(chain[i] + Vector2(0, h))
+		var face: PackedVector2Array = geom.face
 		var fcol := base.darkened(0.42)
 		_poly(face, fcol)
 		_tex_poly(face, c.x, c.y + 1000, 0.9)

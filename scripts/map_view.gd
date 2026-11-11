@@ -2,7 +2,9 @@ class_name MapView
 extends Node2D
 ## Shows the battlefield. The map is cut into tiles; each is painted by a MapPainter
 ## into a texture at twice the map's resolution once at the start, and painted again
-## whenever a wall in or near it is damaged or falls. Without a screen (headless
+## whenever a wall in or near it is damaged or falls. Each tile also gets a normal
+## map (from a HeightPainter pass plus the colour detail) so lights pick out walls,
+## rubble and craters in relief. Without a screen (headless
 ## tests) nothing is painted.
 
 const SCALE := 2.0
@@ -18,6 +20,7 @@ var baking := false
 var ground_big: Texture2D
 var ground_fine: Texture2D
 var ground_grit: Texture2D
+var normal_shader: Shader = preload("res://scripts/normal_from_height.gdshader")
 
 
 func setup(m: BattleMap) -> void:
@@ -53,8 +56,10 @@ func _build_occluders(y: int) -> void:
 			x += 1
 		var poly := OccluderPolygon2D.new()
 		var c := float(BattleMap.CELL)
-		poly.polygon = PackedVector2Array([Vector2(x0 * c, y * c), Vector2(x * c, y * c),
-				Vector2(x * c, (y + 1) * c), Vector2(x0 * c, (y + 1) * c)])
+		# matches the raised top of the wall as drawn, so lights in front still reach its face
+		var lift := MapPainter.WALL_H
+		poly.polygon = PackedVector2Array([Vector2(x0 * c, y * c - lift), Vector2(x * c, y * c - lift),
+				Vector2(x * c, (y + 1) * c - lift), Vector2(x0 * c, (y + 1) * c - lift)])
 		var occ := LightOccluder2D.new()
 		occ.occluder = poly
 		add_child(occ)
@@ -113,30 +118,39 @@ func _bake(keys: Array) -> void:
 	var jobs: Array = []
 	for k in keys:
 		var rect := _tile_cells(k)
-		var vp := SubViewport.new()
-		vp.size = Vector2i(Vector2(rect.size * BattleMap.CELL) * SCALE)
-		vp.transparent_bg = false
-		vp.disable_3d = true
-		vp.render_target_update_mode = SubViewport.UPDATE_ONCE
-		vp.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-		vp.canvas_item_default_texture_repeat = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_REPEAT_ENABLED
-		var p := MapPainter.new()
-		p.map = map
-		p.cells = rect
-		p.ground_big = ground_big
-		p.ground_fine = ground_fine
-		p.ground_grit = ground_grit
-		p.scale = Vector2(SCALE, SCALE)
-		p.position = -Vector2(rect.position * BattleMap.CELL) * SCALE
-		vp.add_child(p)
-		add_child(vp)
-		jobs.append([k, vp, rect])
+		var size := Vector2i(Vector2(rect.size * BattleMap.CELL) * SCALE)
+		var vp := _viewport(size)
+		vp.add_child(_painter(MapPainter.new(), rect))
+		var hvp := _viewport(size)
+		hvp.add_child(_painter(HeightPainter.new(), rect))
+		jobs.append([k, vp, rect, hvp, null])
+	await RenderingServer.frame_post_draw
+	# second pass: turn each tile's height and colour into a normal map
+	for j in jobs:
+		var vp: SubViewport = j[1]
+		var hvp: SubViewport = j[3]
+		var nvp := _viewport(vp.size)
+		var mat := ShaderMaterial.new()
+		mat.shader = normal_shader
+		mat.set_shader_parameter("height_tex", hvp.get_texture())
+		mat.set_shader_parameter("albedo_tex", vp.get_texture())
+		mat.set_shader_parameter("texel", Vector2(1.0 / vp.size.x, 1.0 / vp.size.y))
+		var rect_node := ColorRect.new()
+		rect_node.size = Vector2(vp.size)
+		rect_node.material = mat
+		nvp.add_child(rect_node)
+		j[4] = nvp
 	await RenderingServer.frame_post_draw
 	for j in jobs:
 		var vp: SubViewport = j[1]
 		var img := vp.get_texture().get_image()
 		img.generate_mipmaps()
-		var tex := ImageTexture.create_from_image(img)
+		var nimg: Image = j[4].get_texture().get_image()
+		nimg.generate_mipmaps()
+		var tex := CanvasTexture.new()
+		tex.diffuse_texture = ImageTexture.create_from_image(img)
+		tex.normal_texture = ImageTexture.create_from_image(nimg)
+		tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		var k: Vector2i = j[0]
 		var spr: Sprite2D = sprites.get(k)
 		if spr == null:
@@ -149,7 +163,34 @@ func _bake(keys: Array) -> void:
 			add_child(spr)
 			sprites[k] = spr
 		spr.texture = tex
+		if "--debug-normals" in OS.get_cmdline_user_args():
+			spr.texture = tex.normal_texture  # test aid: show the normal maps themselves
 		vp.queue_free()
+		j[3].queue_free()
+		j[4].queue_free()
+
+
+func _viewport(size: Vector2i) -> SubViewport:
+	var vp := SubViewport.new()
+	vp.size = size
+	vp.transparent_bg = false
+	vp.disable_3d = true
+	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	vp.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	vp.canvas_item_default_texture_repeat = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_REPEAT_ENABLED
+	add_child(vp)
+	return vp
+
+
+func _painter(p: MapPainter, rect: Rect2i) -> MapPainter:
+	p.map = map
+	p.cells = rect
+	p.ground_big = ground_big
+	p.ground_fine = ground_fine
+	p.ground_grit = ground_grit
+	p.scale = Vector2(SCALE, SCALE)
+	p.position = -Vector2(rect.position * BattleMap.CELL) * SCALE
+	return p
 
 
 func _on_cells_changed(cells: Array) -> void:

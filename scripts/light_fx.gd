@@ -38,11 +38,13 @@ func _take() -> PointLight2D:
 ## A light that flares at pos and fades over dur seconds.
 func flash(pos: Vector2, color: Color, energy: float, radius: float, dur: float, shadows := false) -> void:
 	_start(pos, pos, color, energy, radius, dur, shadows, false)
+	active[-1].light.height = clampf(radius * 0.25, 14.0, 60.0)  # bigger flashes come from higher up
 
 
 ## A light that travels from a to b over dur seconds (a bolt, tracer or rocket).
 func streak(a: Vector2, b: Vector2, color: Color, energy: float, radius: float, dur: float) -> void:
 	_start(a, b, color, energy, radius, dur, false, true)
+	active[-1].light.height = 10.0  # bolts skim low over the ground
 
 
 func _start(a: Vector2, b: Vector2, color: Color, energy: float, radius: float, dur: float, shadows: bool, moving: bool) -> void:
@@ -51,6 +53,7 @@ func _start(a: Vector2, b: Vector2, color: Color, energy: float, radius: float, 
 	var l := _take()
 	l.position = a
 	l.color = color
+	energy *= 1.3  # normal-mapped surfaces take a little less light, so push it up
 	l.energy = energy
 	l.texture_scale = radius / 128.0
 	l.shadow_enabled = shadows

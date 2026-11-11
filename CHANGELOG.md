@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.08 (2026-11-11)
+Normal-mapped lighting.
+- Every map tile now has a normal map, worked out from a height pass (raised walls with sloping
+  front faces, rubble mounds, sunken craters, wreck hulls) plus the fine detail in the tile's colours
+  (stones, cracks, slab edges). Lights now pick out the relief: the side of a rubble heap facing a
+  fire glows while the far side stays dark, wall faces light up only from in front, and stones and
+  crater rims catch the light.
+- Lights now have a height (fires stand above the ground, bolts skim low, big explosions come from
+  higher up), so they strike surfaces at an angle.
+- A faint cold moonlight from the north-west shows the relief across the whole map.
+- Wall shadows now match the raised tops of the walls, so a light in front of a wall reaches its face.
+
 ## v0.07 (2026-11-11)
 Lighting, soot and smoke.
 - The battlefield is darker, and combat lights it up: muzzle flashes, laser bolts and tracers that

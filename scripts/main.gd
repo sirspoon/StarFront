@@ -96,8 +96,16 @@ func _demo_damage() -> void:
 
 func _build_world(seed_value: int) -> void:
 	var cm := CanvasModulate.new()
-	cm.color = Color(0.68, 0.65, 0.64)  # dim, so fires and weapons light the scene
+	cm.color = Color(0.55, 0.53, 0.53)  # dim, so fires and weapons light the scene
 	add_child(cm)
+	# a faint, cold light from the north-west that shows the relief everywhere
+	# (no shadows: from overhead they'd stretch right across the map)
+	var moon := DirectionalLight2D.new()
+	moon.color = Color(0.62, 0.68, 0.85)
+	moon.energy = 0.5
+	moon.height = 0.3
+	moon.rotation = deg_to_rad(35.0)
+	add_child(moon)
 	map = BattleMap.new()
 	add_child(map)
 	map.generate(seed_value)
@@ -122,6 +130,17 @@ func _build_world(seed_value: int) -> void:
 	light_fx.z_index = 6
 	add_child(light_fx)
 	light_fx.setup(_light_tex if _light_tex != null else _soft_dot(256))
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--test-light="):  # test aid: a strong light to check the normal maps
+			var xy := a.trim_prefix("--test-light=").split(",")
+			var tl := PointLight2D.new()
+			tl.texture = _soft_dot(256)
+			tl.texture_scale = 1.6
+			tl.energy = 2.2
+			tl.color = Color(1.0, 0.7, 0.4)
+			tl.height = 30.0
+			tl.position = Vector2(float(xy[0]), float(xy[1]))
+			add_child(tl)
 	camera = Camera2D.new()
 	camera.zoom = Vector2(1.2, 1.2)
 	camera.position = Vector2(30 * BattleMap.CELL, map.world_size().y * 0.5)
@@ -172,14 +191,15 @@ func add_fire(p: Vector2) -> void:
 	var light := PointLight2D.new()
 	light.texture = light_tex
 	light.color = Color(1.0, 0.55, 0.25)
-	light.energy = 1.1
+	light.energy = 1.6
 	light.texture_scale = 1.6
 	light.position = p
+	light.height = 36.0  # flames stand above the ground, so they light surfaces at an angle
 	light.shadow_enabled = true
 	light.shadow_filter = Light2D.SHADOW_FILTER_PCF5
 	light.shadow_color = Color(0, 0, 0, 0.7)
 	add_child(light)
-	fire_lights.append([light, 1.1, randf() * TAU])
+	fire_lights.append([light, 1.6, randf() * TAU])
 
 	var fire := CPUParticles2D.new()
 	fire.texture = dot
