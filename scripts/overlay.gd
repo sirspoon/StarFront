@@ -42,6 +42,12 @@ func _draw() -> void:
 		_draw_links(sq)
 		if sq.facing != Vector2.ZERO and not sq.alive().is_empty():
 			_arrow(sq.center(), sq.center() + sq.facing * 46.0, Color(0.6, 0.8, 1.0, 0.75))
+	if main.t_mode == "face":
+		var fa: Vector2 = main.face_anchor
+		var fb: Vector2 = main.pointer_world
+		draw_arc(fa, 16.0 / main.camera.zoom.x, 0, TAU, 28, Color(0.6, 0.8, 1.0, 0.9), 2.5 / main.camera.zoom.x)
+		if fa.distance_to(fb) > 4.0:
+			_arrow(fa, fa + (fb - fa).normalized() * maxf(40.0, fa.distance_to(fb)), Color(0.6, 0.8, 1.0, 0.95))
 	if main.t_mode == "held":
 		var hp: Vector2 = main._screen_to_world(main.t_start)
 		draw_arc(hp, 16.0 / main.camera.zoom.x, 0, TAU, 28, Color(0.55, 1.0, 0.6, 0.9), 2.5 / main.camera.zoom.x)
@@ -139,6 +145,8 @@ func _draw_route(sq: Squad) -> void:
 			draw_circle(o.a, 3.0, col)
 			draw_circle(o.b, 3.0, col)
 		var last := i == r.size() - 1
+		if last and o.face != Vector2.ZERO:
+			_arrow(p, p + o.face * 30.0, Color(0.6, 0.8, 1.0, 0.85))
 		draw_circle(p, 7.0 if last else 6.0, Color(0, 0, 0, 0.55))
 		draw_arc(p, 7.0 if last else 6.0, 0, TAU, 20, col, 1.5)
 		draw_string(ThemeDB.fallback_font, p + Vector2(-3.5, 4), str(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, col)

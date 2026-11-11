@@ -56,6 +56,8 @@ var tap_screen := Vector2.ZERO
 var t_second := false       # this touch began just after a tap close by (double tap / tap-drag)
 var t_press_ms := 0         # when the current one-finger touch began (for tap-hold)
 const HOLD_MS := 500
+var face_squads: Array = []  # squads being turned by a hold-drag
+var face_anchor := Vector2.ZERO
 var pending_select = null   # a carrier tapped once while infantry were selected (a double tap boards it)
 var plan_fresh := true      # the next order replaces the selected squads' orders (else it's added to the route)
 var tap_pos := Vector2.ZERO
@@ -160,6 +162,19 @@ func _test_orders() -> void:
 		if sq.center().distance_to(w1) < 60.0:
 			seen_w1 = true
 	print("route: passed waypoint 1 %s, now %d px from the final line's centre, orders left %d" % [seen_w1, sq.center().distance_to(w2 + Vector2(100, 0)), sq.route().size()])
+	# facing: at the end of a new route, then straight away with no route
+	var w3 := sq.center() + Vector2(120, 0)
+	sq.enqueue(map, {"kind": "move", "a": w3, "b": w3, "face": Vector2.ZERO, "run": false}, true)
+	sq.set_final_facing(Vector2(0, 1))
+	for k in 20:
+		await get_tree().create_timer(1.0).timeout
+	var looking := 0
+	for m in sq.alive():
+		if absf(wrapf(m.facing - PI / 2, -PI, PI)) < 0.3:
+			looking += 1
+	print("facing at end of route: squad faces %s, %d of %d men looking that way" % [sq.facing.snapped(Vector2(0.01, 0.01)), looking, sq.alive().size()])
+	sq.set_final_facing(Vector2(-1, 0))
+	print("facing with no route: squad now faces %s" % sq.facing)
 
 
 ## Test aid: one tap on your carrier selects it; a double tap makes the selected infantry board.
@@ -505,8 +520,14 @@ func _process(dt: float) -> void:
 			and Time.get_ticks_msec() - t_press_ms >= HOLD_MS:
 		# held still: release for a waypoint, or drag to spread out along the drag
 		tap_pending = false
-		var own := _soldier_at(_screen_to_world(t_start), player_team, 16.0)
-		if own != null:
+		var hw := _screen_to_world(t_start)
+		var own := _soldier_at(hw, player_team, 16.0)
+		face_squads = _face_targets(hw, own)
+		if not face_squads.is_empty():
+			t_mode = "face"  # drag to turn them (or set the facing at the end of their route)
+			face_anchor = hw
+			pointer_world = hw
+		elif own != null:
 			t_mode = "done"
 			_hold(t_start)  # holding on one of your own units just selects it
 		else:
@@ -1311,6 +1332,13 @@ func _touch_input(e: InputEvent) -> void:
 					_plan("line", rdrag_start, wp, true)
 				elif t_mode == "held":
 					_hold(t_start)
+				elif t_mode == "face":
+					var dir := wp - face_anchor
+					if dir.length() > 14.0 / camera.zoom.x:
+						for sq in face_squads:
+							sq.set_final_facing(dir)
+						effects.marker(wp, Color(0.6, 0.8, 1.0))
+					face_squads = []
 				elif t_mode == "" and t_second:
 					_double_tap(wp)
 				elif t_mode == "":
@@ -1348,6 +1376,9 @@ func _touch_input(e: InputEvent) -> void:
 				rdrag_start = _screen_to_world(t_start)
 			else:
 				t_mode = "pan"
+		if t_mode == "face":
+			pointer_world = _screen_to_world(sd.position)
+			return
 		if t_mode == "pan":
 			camera.position -= sd.relative / camera.zoom
 			_clamp_camera()
@@ -1435,6 +1466,27 @@ func _hold(screen: Vector2) -> void:
 		select_squad(own.squad, false)
 		return
 	_plan("move", wp, wp, false)
+
+
+## Squads a hold at world point p would turn: the selected squad held on directly,
+## or the selected squads whose final waypoint is under the finger.
+func _face_targets(p: Vector2, own: Soldier) -> Array:
+	if not started or over:
+		return []
+	if own != null and own.squad.selected:
+		return _player_squads().filter(func(q): return q.selected)
+	var reach := 22.0 / camera.zoom.x
+	var out: Array = []
+	for sq in _player_squads():
+		if not sq.selected:
+			continue
+		var f = sq.final_order()
+		if f == null:
+			continue
+		var fp: Vector2 = (f.a + f.b) * 0.5 if f.kind == "line" else f.b
+		if fp.distance_to(p) <= reach:
+			out.append(sq)
+	return out
 
 
 func _deselect_all() -> void:

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.22 (2026-11-11)
+- Hold on your selected squad, then drag: they turn to face that way. If they have a route planned,
+  that's the way they'll face when they get to the end of it.
+- Hold on the last waypoint of a selected squad's route, then drag: sets the way they'll face there.
+- A blue arrow shows the direction while dragging, and the route shows the final facing.
+- Hold-drag away from the squad still moves them and spreads them along the drag.
+
 ## v0.21 (2026-11-11)
 - Fixed the game freezing for a moment when a big explosion hits a wall. Instead of repainting
   whole 20x20-cell map tiles (and copying them back from the graphics chip), only small 5x5-cell

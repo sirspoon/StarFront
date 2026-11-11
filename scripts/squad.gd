@@ -177,6 +177,26 @@ func _exec(map: BattleMap, o: Dictionary) -> void:
 		order_line(map, o.a, o.b, o.face, o.run, true)
 	else:
 		order_move(map, o.b, o.run, true)
+		if o.face != Vector2.ZERO:
+			facing = o.face  # look the way the player set for this spot
+
+
+## The last planned order (where the squad ends up), or null.
+func final_order():
+	var r := route()
+	return null if r.is_empty() else r[r.size() - 1]
+
+
+## Point the squad: now if it has no route, otherwise at the end of its route.
+func set_final_facing(dir: Vector2) -> void:
+	dir = dir.normalized()
+	var f = final_order()
+	if f == null:
+		facing = dir
+		return
+	f.face = dir
+	if f == current:
+		facing = dir  # already on the last leg: turn as they arrive
 
 
 ## Still on the way to the current order's destination?
