@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.04 (2026-11-11)
+Ruins that look ruined.
+- Where a wall has collapsed, the wall left standing next to it now breaks off raggedly: each course
+  of stones stops at a different point, with shadowed broken ends, loose stones hanging off and
+  fallen ones lying in the gap.
+- Collapsed walls leave their outline behind: a dark footing in line with the rest of the wall, its
+  lowest stones broken off unevenly, a few still standing, and masonry thrown out to either side.
+- The gaps the ruins start the battle with are drawn the same way, so every building shows the full
+  outline of its old walls. The chapel's doorways stay clean.
+
 ## v0.03 (2026-11-11)
 Sharper battlefield and walls that can be destroyed.
 - The map is now painted at twice the detail, in tiles: textured ground with stones, cracks, dead

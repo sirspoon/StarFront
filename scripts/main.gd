@@ -83,7 +83,13 @@ func _demo_damage() -> void:
 		var y := (ch.position.y + 2 + i * 4) * BattleMap.CELL + 8
 		for k in i * 2 + 1:  # one, three and five hits
 			_blast(Vector2(x, y), w, null, true)
-	print("demo damage: %d wall cells down" % walls_destroyed)
+	# and punch a hole in the middle of an ordinary building's north wall
+	var b: Rect2i = map.buildings[1]
+	var bx := (b.position.x + b.size.x / 2) * BattleMap.CELL + 8
+	var by := b.position.y * BattleMap.CELL + 8
+	for k in 2:
+		_blast(Vector2(bx, by), GameData.WEAPONS["siege_cannon"], null, true)
+	print("demo damage: %d wall cells down; building hole at %d,%d" % [walls_destroyed, bx, by])
 
 
 func _build_world(seed_value: int) -> void:
@@ -350,6 +356,8 @@ func _take_shot() -> void:
 			var xy := a.trim_prefix("--shot-at=").split(",")
 			camera.position = Vector2(float(xy[0]), float(xy[1]))
 	camera.zoom = Vector2(shot_zoom, shot_zoom)
+	if "--shot-nohud" in OS.get_cmdline_user_args():
+		hud.visible = false
 	paused = true
 	for i in 3:
 		await RenderingServer.frame_post_draw

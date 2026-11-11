@@ -321,6 +321,18 @@ func _init_walls() -> void:
 			var hp := CHAPEL_WALL_HP if chapel.grow(1).has_point(Vector2i(x, y)) else WALL_HP
 			wall_hp[y * W + x] = hp
 			wall_max[y * W + x] = hp
+	# gaps in the ruins' outer walls are collapsed wall too (the chapel's doorways aren't)
+	for b in buildings:
+		var is_chapel := b == chapel
+		for side in 4:
+			for c in _side_cells(b, side) + [b.position, Vector2i(b.end.x - 1, b.position.y),
+					Vector2i(b.position.x, b.end.y - 1), b.end - Vector2i.ONE]:
+				var t := get_t(c)
+				if t == T.WALL or (is_chapel and t == T.FLOOR):
+					continue
+				if t == T.OPEN:
+					set_t(c, T.RUBBLE)
+				fallen[c.y * W + c.x] = 1
 
 
 func _make_decor() -> void:
