@@ -19,6 +19,25 @@ func leader() -> Soldier:
 	return null
 
 
+func vehicle():
+	return members[0] if members.size() > 0 and members[0].is_vehicle else null
+
+
+## The carrier this squad is riding in, if every surviving man is aboard.
+func carrier():
+	var c = null
+	for m in members:
+		if m.is_alive():
+			return null
+		if m.state == Soldier.State.EMBARKED:
+			c = m.carrier
+	return c
+
+
+func present() -> Array:
+	return members.filter(func(m): return m.is_present())
+
+
 func alive() -> Array:
 	return members.filter(func(m): return m.is_alive())
 
@@ -30,7 +49,8 @@ func effective() -> Array:
 func center() -> Vector2:
 	var al := alive()
 	if al.is_empty():
-		return members[0].position
+		var c = carrier()
+		return c.position if c != null else members[0].position
 	var c := Vector2.ZERO
 	for m in al:
 		c += m.position
@@ -46,6 +66,9 @@ func leader_bonus(s: Soldier) -> float:
 
 
 func avg_morale() -> float:
+	var v = vehicle()
+	if v != null:
+		return float(maxi(v.hp, 0)) / v.max_hp
 	var al := alive()
 	if al.is_empty():
 		return 0.0
@@ -56,9 +79,18 @@ func avg_morale() -> float:
 
 
 func status() -> String:
+	var v = vehicle()
+	if v != null:
+		if not v.is_alive():
+			return "Destroyed"
+		if v.shaken > 0.0:
+			return "Shaken"
+		if v.moving:
+			return "Moving"
+		return "Firing" if v.is_firing() else "Ready"
 	var al := alive()
 	if al.is_empty():
-		return "Lost"
+		return "Aboard" if carrier() != null else "Lost"
 	var rout := 0
 	var pinned := 0
 	var mov := false
@@ -83,6 +115,12 @@ func status() -> String:
 
 func order_move(map: BattleMap, pos: Vector2, run: bool) -> void:
 	running = run
+	var v = vehicle()
+	if v != null:
+		v.go_to(pos, run)
+		return
+	for m in members:
+		m.board_vehicle = null
 	var ms: Array = members.filter(func(m): return m.is_alive() and m.state != Soldier.State.ROUTING)
 	if ms.is_empty():
 		return
@@ -100,7 +138,16 @@ func order_move(map: BattleMap, pos: Vector2, run: bool) -> void:
 func halt() -> void:
 	focus = null
 	for m in members:
+		m.board_vehicle = null
 		m.halt()
+
+
+func order_board(v) -> void:
+	focus = null
+	for m in members:
+		if m.is_alive() and m.state != Soldier.State.ROUTING:
+			m.board_vehicle = v
+			m.halt()
 
 
 ## Spots around pos for n soldiers, preferring cover and keeping them spread out.

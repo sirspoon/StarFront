@@ -3,7 +3,7 @@ extends Node2D
 ## One trooper. Walks its path, fires at enemies it can see, and reacts to
 ## incoming fire through suppression (short term) and morale (long term).
 
-enum State { READY, PINNED, ROUTING, DEAD, FLED }
+enum State { READY, PINNED, ROUTING, DEAD, FLED, EMBARKED }
 
 var main: Node
 var map: BattleMap
@@ -41,6 +41,10 @@ var last_fire_time := -99.0
 var flash := 0.0
 var walk := 0.0
 var seen_by := [true, true]
+var is_vehicle := false
+var strength := 1         # how much this unit counts towards its side's strength
+var board_vehicle = null  # carrier this soldier is walking to
+var carrier = null        # carrier this soldier is riding in
 
 
 func setup(m: Node, sq: Squad, t: int, kind_id: String) -> void:
@@ -73,6 +77,11 @@ func is_effective() -> bool:
 	return state == State.READY or state == State.PINNED
 
 
+## Still in the fight: on the field and steady, or riding in a carrier.
+func is_present() -> bool:
+	return is_effective() or state == State.EMBARKED
+
+
 func muzzle_pos() -> Vector2:
 	return position + Vector2.from_angle(facing) * (radius + 9.0)
 
@@ -93,8 +102,13 @@ func halt() -> void:
 # ---------------------------------------------------------------- simulation
 
 func tick(dt: float, now: float) -> void:
+	if state == State.EMBARKED:
+		position = carrier.position
+		return
 	if not is_alive():
 		return
+	if board_vehicle != null and state == State.READY:
+		_try_board()
 	flash = maxf(0.0, flash - dt)
 	var under_fire := now - last_hit_time < 3.0
 	suppression = maxf(0.0, suppression - dt * (4.0 if under_fire else 12.0))
@@ -114,6 +128,19 @@ func tick(dt: float, now: float) -> void:
 		_fight(dt, now)
 	if visible:
 		queue_redraw()
+
+
+func _try_board() -> void:
+	var v = board_vehicle
+	if not is_instance_valid(v) or not v.is_alive() or v.free_space() <= 0:
+		board_vehicle = null
+		return
+	if position.distance_to(v.position) < v.radius + radius + 8.0:
+		v.take_aboard(self)
+	elif path_i >= path.size() or path[path.size() - 1].distance_to(v.position) > 30.0:
+		path = map.find_path(position, v.position)
+		path_i = 0
+		running = true
 
 
 func _update_state(under_fire: bool) -> void:
@@ -178,13 +205,13 @@ func _fight(dt: float, now: float) -> void:
 				facing = (burst_target.position - position).angle()
 				flash = 0.06
 				last_fire_time = now
-				main.resolve_shot(self, burst_target)
+				main.resolve_shot(self, burst_target, weapon, muzzle_pos())
 			burst_left -= 1
 			burst_timer = weapon.gap
 		return
 	if cooldown > 0.0 or (running and moving):
 		return
-	var t := _pick_target()
+	var t := pick_target(weapon, position)
 	if t == null:
 		cooldown = randf_range(0.3, 0.6)
 		return
@@ -197,28 +224,37 @@ func _fight(dt: float, now: float) -> void:
 	cooldown = cd
 
 
-func _can_hit(e: Soldier) -> bool:
-	return e.is_alive() and e.seen_by[team] \
-			and position.distance_to(e.position) <= weapon.range \
-			and map.los_clear(position, e.position)
+## Whether weapon w could ever damage this unit (infantry: always; vehicles override).
+func hurt_by(_w: Dictionary) -> bool:
+	return true
 
 
-func _pick_target() -> Soldier:
+func _can_hit(e: Soldier, w: Dictionary, from: Vector2) -> bool:
+	return e.is_alive() and e.seen_by[team] and e.hurt_by(w) \
+			and from.distance_to(e.position) <= w.range and map.los_clear(from, e.position)
+
+
+## Best enemy for weapon w fired from `from`: the squad's ordered target if possible,
+## otherwise the closest, with anti-tank weapons preferring vehicles.
+func pick_target(w: Dictionary, from: Vector2) -> Soldier:
 	var focus: Soldier = squad.focus
-	if focus != null and is_instance_valid(focus) and _can_hit(focus):
+	if focus != null and is_instance_valid(focus) and _can_hit(focus, w, from):
 		return focus
+	var anti_tank: bool = w.get("pen", 0) >= 6
 	var cands: Array = []
 	for e in main.soldiers:
-		if e.team == team or not e.is_alive() or not e.seen_by[team]:
+		if e.team == team or not e.is_alive() or not e.seen_by[team] or not e.hurt_by(w):
 			continue
-		var d := position.distance_to(e.position)
-		if d > weapon.range:
+		var d := from.distance_to(e.position)
+		if d > w.range:
 			continue
 		var score := d + (250.0 if e.state == State.ROUTING else 0.0)
+		if e.is_vehicle:
+			score += -400.0 if anti_tank else 150.0
 		cands.append([score, e])
 	cands.sort_custom(func(a, b): return a[0] < b[0])
 	for c in cands:
-		if map.los_clear(position, c[1].position):
+		if map.los_clear(from, c[1].position):
 			return c[1]
 	return null
 
@@ -290,7 +326,11 @@ func _draw_conscript() -> void:
 	draw_circle(Vector2.ZERO, r, coat)
 	draw_arc(Vector2.ZERO, r, 0, TAU, 16, coat.darkened(0.45), 1.0)
 	var heavy := kind == "gunner"
-	draw_line(Vector2(0, 3), Vector2(r + (10.0 if heavy else 9.0), 3), Color(0.1, 0.09, 0.08), 3.5 if heavy else 2.0)
+	if kind == "lancer":
+		draw_line(Vector2(-r - 2.0, -3), Vector2(r + 6.0, -3), Color(0.2, 0.22, 0.16), 4.5)  # launcher tube
+		draw_circle(Vector2(r + 7.0, -3), 2.6, Color(0.45, 0.35, 0.2))  # warhead
+	else:
+		draw_line(Vector2(0, 3), Vector2(r + (10.0 if heavy else 9.0), 3), Color(0.1, 0.09, 0.08), 3.5 if heavy else 2.0)
 	if heavy:
 		draw_rect(Rect2(1, 4, 4, 4), Color(0.3, 0.27, 0.15))  # ammo box
 	draw_circle(Vector2(r * 0.6, 3.5), 1.8, coat.darkened(0.2))
@@ -317,6 +357,8 @@ func _draw_sworn() -> void:
 	var gun_w := 5.0 if kind == "cannoneer" else 3.5
 	draw_rect(Rect2(1, 1.5, r + 8.0, gun_w), Color(0.13, 0.12, 0.12))
 	draw_rect(Rect2(r + 6.0, 1.0, 3.0, gun_w + 1.0), trim.darkened(0.2))
+	if kind == "breacher":
+		draw_circle(Vector2(r + 9.0, 3.2), 2.2, Color(0.6, 0.85, 1.0))  # fusion glow
 	for s in [-1.0, 1.0]:
 		var p := Vector2(-1, s * r * 0.72)
 		draw_circle(p, r * 0.45, coat.lightened(0.08))

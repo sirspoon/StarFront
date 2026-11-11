@@ -14,9 +14,10 @@ drawn in code, so the game can be played and tuned before real sprites are made.
 1. Download Godot 4 (standard version, not .NET) from https://godotengine.org/download.
 2. In the Project Manager choose **Import**, pick this folder's `project.godot`, then **Run** (F5).
 
-## The prototype (v0.01)
+## The prototype (v0.02)
 - One procedurally generated ruined city map, different every battle, with the Ashen Chapel at its centre.
-- Two factions: the **Dominion Legion** (many brittle conscripts) and **The Sworn** (a few armoured warrior-monks).
+- Two factions: the **Dominion Legion** (many brittle conscripts) and **The Sworn** (a few armoured warrior-monks),
+  each with a troop carrier and a tank.
 - Win by holding the chapel unchallenged for 3 minutes, by breaking the enemy, or by holding it when the 10 minutes run out.
 
 ### Controls
@@ -24,7 +25,9 @@ drawn in code, so the game can be played and tuned before real sprites are made.
 |---|---|
 | Left click / drag | Select squads (Shift adds) |
 | Right click ground | Move there (soldiers pick cover nearby). Shift + right click runs |
-| Right click a visible enemy | Concentrate fire on that soldier |
+| Right click a visible enemy | Concentrate fire on that soldier or vehicle |
+| Right click your own carrier (infantry selected) | Climb aboard |
+| U | Unload the selected carriers |
 | H | Halt selected squads |
 | 1-9 | Select a squad and jump to it |
 | Space | Pause |
@@ -40,11 +43,15 @@ drawn in code, so the game can be played and tuned before real sprites are made.
   suppressed soldiers go prone (pinned): they won't move and fire less.
 - **Morale:** falls under fire and when squad-mates die, especially the leader. A soldier at very low
   morale routs and flees to his own map edge. A nearby leader helps the squad recover.
+- **Vehicles:** armour is thickest at the front and thinnest at the rear. A weapon's penetration
+  is compared with the armour of the side it hits, so rifles can't hurt a tank. Use anti-tank
+  teams, and go for the flanks. Tank shells explode, hurting everyone near the blast.
 
 ## Project layout
 - `scripts/game_data.gd`: factions, soldier types and weapons (the balance numbers).
 - `scripts/battle_map.gd`: map generation, terrain, path-finding, line of sight, cover, and drawing the map.
 - `scripts/soldier.gd`, `scripts/squad.gd`: soldiers, squads, morale and orders.
+- `scripts/vehicle.gd`: carriers and tanks (driving, turrets, armour, passengers).
 - `scripts/ai_commander.gd`: the computer opponent.
 - `scripts/main.gd`: battle setup, the main loop, shooting, input and camera.
 - `scripts/hud.gd`, `scripts/overlay.gd`, `scripts/effects.gd`: interface and effects.

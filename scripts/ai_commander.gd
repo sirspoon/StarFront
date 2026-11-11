@@ -24,7 +24,46 @@ func tick(dt: float) -> void:
 			_think(sq)
 
 
+func _goal(sq: Squad) -> Vector2:
+	if not goals.has(sq):
+		var r: Rect2 = main.map.objective_rect
+		goals[sq] = r.position + Vector2(randf(), randf()) * r.size
+	return goals[sq]
+
+
+## Carriers drive their squad up and drop it off near the chapel or when the enemy
+## gets close; tanks advance and stop to shoot when they find targets.
+func _think_vehicle(v: Vehicle) -> void:
+	if not v.is_alive():
+		return
+	var c := v.position
+	var goal := _goal(v.squad)
+	var enemy: Soldier = main.nearest_seen_enemy(team, c)
+	var d: float = INF if enemy == null else c.distance_to(enemy.position)
+	if v.passengers.size() > 0:
+		if d < 330.0 or c.distance_to(goal) < 280.0 or v.hp < v.max_hp * 0.5:
+			v.halt()
+			v.unload()
+		elif not v.moving:
+			v.go_to(c.move_toward(goal, 400.0), true)
+		return
+	if d < v.main_range() * 0.85:
+		if v.moving:
+			v.halt()
+		return
+	if v.moving:
+		return
+	if d < v.main_range() * 1.5:
+		v.go_to(c.move_toward(enemy.position, 150.0), false)
+	elif c.distance_to(goal) > 200.0:
+		v.go_to(c.move_toward(goal, 240.0), false)
+
+
 func _think(sq: Squad) -> void:
+	var v = sq.vehicle()
+	if v != null:
+		_think_vehicle(v)
+		return
 	var ready := sq.effective()
 	if ready.is_empty():
 		return
@@ -43,10 +82,7 @@ func _think(sq: Squad) -> void:
 			return
 	if busy:
 		return
-	if not goals.has(sq):
-		var r: Rect2 = main.map.objective_rect
-		goals[sq] = r.position + Vector2(randf(), randf()) * r.size
-	var goal: Vector2 = goals[sq]
+	var goal := _goal(sq)
 	if c.distance_to(goal) < 50.0:
 		return
 	sq.order_move(main.map, c.move_toward(goal, 260.0), enemy == null and c.distance_to(goal) > 450.0)

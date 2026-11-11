@@ -39,6 +39,19 @@ Small orders of warrior-monks in heavy powered armour, each bound to a lifelong 
 - Emblem: a **broken chain inside a circle**.
 - Feel: few, slow, relentless, almost impossible to break.
 
+### Vehicles
+All tracked, heavy and old: riveted plates, patched armour, smoke and soot.
+- **Drudge Carrier (Legion):** a boxy olive troop carrier with roof hatches, a rear ramp, a pintle
+  stubber and the sunburst on its nose. Carries a full conscript squad.
+- **Vigil Tank (Legion):** a slab-sided battle tank with an octagonal turret, a long siege cannon
+  with a muzzle brake, glowing exhausts at the back.
+- **Pilgrim Carrier (Sworn):** deep red with bone trim, a pointed bone-coloured prow, an oath scroll
+  fixed to the deck and a rotor cannon on the roof. Carries one talon.
+- **Verdict Tank (Sworn):** low and broad, with a domed turret, red sensor lenses and a fusion
+  cannon ringed with glowing blue coils.
+- Vehicle sprites: 8 or 16 directions for the hull, a separate turret sprite that rotates freely,
+  track animation, a burnt-out wreck version.
+
 ### Later factions (ideas)
 - **The Hollowed:** a machine cult that rebuilds the dead as cyborg troops. Grey flesh, brass
   machinery, green lenses.

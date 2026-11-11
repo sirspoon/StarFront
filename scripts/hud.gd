@@ -72,6 +72,7 @@ func setup(m: Node) -> void:
 			+ "Left click / drag: select squads\n" \
 			+ "Right click ground: move   (Shift: run)\n" \
 			+ "Right click enemy: focus fire on it\n" \
+			+ "Right click your carrier: climb aboard   U: unload\n" \
 			+ "H: halt   1-9: pick squad   Space: pause\n" \
 			+ "WASD / arrows / middle-drag: scroll   Wheel: zoom\n\n" \
 			+ "Hold the Ashen Chapel. Soldiers seek cover\n" \
@@ -180,7 +181,7 @@ func _refresh() -> void:
 	for sq in main.squads:
 		var st: String = sq.status()
 		if last_status.get(sq, "") != st:
-			if main.started and st in ["Pinned", "Routing", "Lost"]:
+			if main.started and st in ["Pinned", "Routing", "Lost"] and sq.vehicle() == null:
 				var mine: bool = sq.team == main.player_team
 				var col := "#e8c070" if mine else "#9fd0ff"
 				# only report enemy squads the player can actually see
@@ -192,7 +193,14 @@ func _refresh() -> void:
 		if rows.has(sq):
 			var r: Dictionary = rows[sq]
 			r.bar.value = sq.avg_morale()
-			r.label.text = "%d/%d  %s" % [sq.alive().size(), sq.start_size, st]
+			var v = sq.vehicle()
+			if v != null:
+				r.label.text = "Hull %d/%d  %s" % [maxi(v.hp, 0), v.max_hp, st]
+				if v.passengers.size() > 0:
+					r.label.text += "  +%d" % v.passengers.size()
+				r.bar.tooltip_text = "Hull"
+			else:
+				r.label.text = "%d/%d  %s" % [sq.present().size(), sq.start_size, st]
 			r.button.modulate = Color(0.6, 1.0, 0.6) if sq.selected else Color.WHITE
 
 

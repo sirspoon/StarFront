@@ -8,9 +8,11 @@ const SIGHT := 560.0          # how far soldiers can spot an enemy in the open
 const SIGHT_HIDDEN := 260.0   # ...one in cover who hasn't fired lately
 const HOLD_TO_WIN := 180.0    # seconds of holding the chapel unchallenged to win early
 const OverlayScript := preload("res://scripts/overlay.gd")
+const DecalsScript := preload("res://scripts/decals.gd")
 
 var map: BattleMap
 var effects: Effects
+var decals: Node2D
 var units_layer: Node2D
 var overlay: Node2D
 var camera: Camera2D
@@ -72,8 +74,12 @@ func _build_world(seed_value: int) -> void:
 	cm.color = Color(0.84, 0.8, 0.78)
 	add_child(cm)
 	map = BattleMap.new()
+	map.z_index = -10
 	add_child(map)
 	map.generate(seed_value)
+	decals = DecalsScript.new()
+	decals.z_index = -5
+	add_child(decals)
 	units_layer = Node2D.new()
 	add_child(units_layer)
 	effects = Effects.new()
@@ -117,58 +123,69 @@ func _ramp(colors: Array) -> Gradient:
 
 
 func _add_fires() -> void:
-	var dot := _soft_dot(64)
-	var light_tex := _soft_dot(256)
 	for p in map.fire_points:
-		var light := PointLight2D.new()
-		light.texture = light_tex
-		light.color = Color(1.0, 0.55, 0.25)
-		light.energy = 1.1
-		light.texture_scale = 1.6
-		light.position = p
-		add_child(light)
-		fire_lights.append([light, 1.1, randf() * TAU])
+		add_fire(p)
 
-		var fire := CPUParticles2D.new()
-		fire.texture = dot
-		fire.position = p
-		fire.amount = 40
-		fire.lifetime = 0.7
-		fire.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
-		fire.emission_sphere_radius = 10.0
-		fire.direction = Vector2(0, -1)
-		fire.spread = 30.0
-		fire.gravity = Vector2(0, -60)
-		fire.initial_velocity_min = 10.0
-		fire.initial_velocity_max = 30.0
-		fire.scale_amount_min = 0.15
-		fire.scale_amount_max = 0.35
-		fire.color_ramp = _ramp([Color(1, 0.95, 0.6, 0.9), Color(1, 0.5, 0.15, 0.8), Color(0.5, 0.1, 0.05, 0)])
-		fire.z_index = 4
-		add_child(fire)
 
-		var smoke := CPUParticles2D.new()
-		smoke.texture = dot
-		smoke.position = p
-		smoke.amount = 36
-		smoke.lifetime = 5.0
-		smoke.preprocess = 5.0
-		smoke.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
-		smoke.emission_sphere_radius = 8.0
-		smoke.direction = Vector2(0.4, -1)
-		smoke.spread = 20.0
-		smoke.gravity = Vector2(10, -8)
-		smoke.initial_velocity_min = 12.0
-		smoke.initial_velocity_max = 22.0
-		smoke.scale_amount_min = 0.5
-		smoke.scale_amount_max = 0.9
-		var curve := Curve.new()
-		curve.add_point(Vector2(0, 0.3))
-		curve.add_point(Vector2(1, 1.6))
-		smoke.scale_amount_curve = curve
-		smoke.color_ramp = _ramp([Color(0.15, 0.13, 0.12, 0.0), Color(0.15, 0.13, 0.12, 0.55), Color(0.3, 0.29, 0.28, 0)])
-		smoke.z_index = 5
-		add_child(smoke)
+var _dot_tex: GradientTexture2D
+var _light_tex: GradientTexture2D
+
+
+func add_fire(p: Vector2) -> void:
+	if _dot_tex == null:
+		_dot_tex = _soft_dot(64)
+		_light_tex = _soft_dot(256)
+	var dot := _dot_tex
+	var light_tex := _light_tex
+	var light := PointLight2D.new()
+	light.texture = light_tex
+	light.color = Color(1.0, 0.55, 0.25)
+	light.energy = 1.1
+	light.texture_scale = 1.6
+	light.position = p
+	add_child(light)
+	fire_lights.append([light, 1.1, randf() * TAU])
+
+	var fire := CPUParticles2D.new()
+	fire.texture = dot
+	fire.position = p
+	fire.amount = 40
+	fire.lifetime = 0.7
+	fire.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	fire.emission_sphere_radius = 10.0
+	fire.direction = Vector2(0, -1)
+	fire.spread = 30.0
+	fire.gravity = Vector2(0, -60)
+	fire.initial_velocity_min = 10.0
+	fire.initial_velocity_max = 30.0
+	fire.scale_amount_min = 0.15
+	fire.scale_amount_max = 0.35
+	fire.color_ramp = _ramp([Color(1, 0.95, 0.6, 0.9), Color(1, 0.5, 0.15, 0.8), Color(0.5, 0.1, 0.05, 0)])
+	fire.z_index = 4
+	add_child(fire)
+
+	var smoke := CPUParticles2D.new()
+	smoke.texture = dot
+	smoke.position = p
+	smoke.amount = 36
+	smoke.lifetime = 5.0
+	smoke.preprocess = 5.0
+	smoke.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	smoke.emission_sphere_radius = 8.0
+	smoke.direction = Vector2(0.4, -1)
+	smoke.spread = 20.0
+	smoke.gravity = Vector2(10, -8)
+	smoke.initial_velocity_min = 12.0
+	smoke.initial_velocity_max = 22.0
+	smoke.scale_amount_min = 0.5
+	smoke.scale_amount_max = 0.9
+	var curve := Curve.new()
+	curve.add_point(Vector2(0, 0.3))
+	curve.add_point(Vector2(1, 1.6))
+	smoke.scale_amount_curve = curve
+	smoke.color_ramp = _ramp([Color(0.15, 0.13, 0.12, 0.0), Color(0.15, 0.13, 0.12, 0.55), Color(0.3, 0.29, 0.28, 0)])
+	smoke.z_index = 5
+	add_child(smoke)
 
 
 func _add_ash() -> void:
@@ -213,12 +230,15 @@ func _spawn_team(team: int) -> void:
 	var counts := {}
 	for i in defs.size():
 		var def: Dictionary = defs[i]
+		var cy := int((i + 1.0) * BattleMap.H / (defs.size() + 1.0))
+		if def.has("vehicle"):
+			_spawn_vehicle(team, def.vehicle, cy, counts)
+			continue
 		var sq := Squad.new()
 		sq.team = team
 		sq.faction = factions[team]
 		counts[def.name] = counts.get(def.name, 0) + 1
 		sq.name = "%s %s" % [def.name, GameData.NUMERALS[counts[def.name] - 1]]
-		var cy := int((i + 1.0) * BattleMap.H / (defs.size() + 1.0))
 		var cx := 6 if team == 0 else BattleMap.W - 7
 		var slots := sq.pick_slots(map, map.center_of(Vector2i(cx, cy)), def.members.size())
 		for j in def.members.size():
@@ -232,6 +252,32 @@ func _spawn_team(team: int) -> void:
 		sq.start_size = sq.members.size()
 		start_counts[team] += sq.start_size
 		squads.append(sq)
+		if def.has("carrier"):
+			var v := _spawn_vehicle(team, def.carrier, cy, counts)
+			for s in sq.members:
+				v.take_aboard(s)
+
+
+func _spawn_vehicle(team: int, kind_id: String, cy: int, counts: Dictionary) -> Vehicle:
+	var vd: Dictionary = GameData.VEHICLES[kind_id]
+	var sq := Squad.new()
+	sq.team = team
+	sq.faction = factions[team]
+	counts[vd.name] = counts.get(vd.name, 0) + 1
+	sq.name = "%s %s" % [vd.name, GameData.NUMERALS[counts[vd.name] - 1]]
+	var v := Vehicle.new()
+	v.setup_vehicle(self, sq, team, kind_id)
+	var cx := 11 if team == 0 else BattleMap.W - 12
+	v.position = map.center_of(map.nearest_vehicle_cell(Vector2i(cx, cy)))
+	v.facing = 0.0 if team == 0 else PI
+	v.turret_angle = v.facing
+	units_layer.add_child(v)
+	soldiers.append(v)
+	sq.members.append(v)
+	sq.start_size = 1
+	start_counts[team] += v.strength
+	squads.append(sq)
+	return v
 
 
 # ---------------------------------------------------------------- main loop
@@ -264,10 +310,18 @@ func _take_shot() -> void:
 	shot_path = ""
 	var c := Vector2.ZERO
 	var n := 0
+	var vehicles_only := "--shot-vehicles" in OS.get_cmdline_user_args()
+	var team_only := -1
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--shot-team="):
+			team_only = int(a.trim_prefix("--shot-team="))
 	for s in soldiers:
-		if s.is_alive():
+		if s.is_alive() and (s.is_vehicle or not vehicles_only) and (team_only < 0 or s.team == team_only) \
+				and (not "--shot-tank" in OS.get_cmdline_user_args() or (s.is_vehicle and s.role == "tank")):
 			c += s.position
 			n += 1
+			if vehicles_only:
+				break
 	camera.position = c / maxi(n, 1)
 	camera.zoom = Vector2(shot_zoom, shot_zoom)
 	paused = true
@@ -295,17 +349,22 @@ func _separate(dt: float) -> void:
 				continue
 			var l := sqrt(l2)
 			var push := d / l * (min_d - l) * 0.5 * k
-			if map.walkable(map.cell_of(a.position - push)):
-				a.position -= push
-			if map.walkable(map.cell_of(b.position + push)):
-				b.position += push
+			var wa := 0.0 if a.is_vehicle and not b.is_vehicle else (2.0 if b.is_vehicle else 1.0)
+			var wb := 0.0 if b.is_vehicle and not a.is_vehicle else (2.0 if a.is_vehicle else 1.0)
+			if a.is_vehicle and b.is_vehicle:
+				wa = 1.0
+				wb = 1.0
+			if map.walkable(map.cell_of(a.position - push * wa)):
+				a.position -= push * wa
+			if map.walkable(map.cell_of(b.position + push * wb)):
+				b.position += push * wb
 
 
 func _update_spotting() -> void:
 	for s in soldiers:
 		if not s.is_alive():
 			continue
-		var hidden := map.cell_cover(map.cell_of(s.position)) > 0.2 and time - s.last_fire_time > 4.0 and not s.moving
+		var hidden := not s.is_vehicle and map.cell_cover(map.cell_of(s.position)) > 0.2 and time - s.last_fire_time > 4.0 and not s.moving
 		var sight := SIGHT_HIDDEN if hidden else SIGHT
 		for team in 2:
 			if team == s.team:
@@ -338,12 +397,14 @@ func nearest_seen_enemy(team: int, from: Vector2) -> Soldier:
 	return best
 
 
-func resolve_shot(shooter: Soldier, target: Soldier) -> void:
+func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vector2) -> void:
 	shots[shooter.team] += 1
-	var w := shooter.weapon
 	var d := shooter.position.distance_to(target.position)
 	var p: float = w.acc * lerpf(1.0, 0.45, clampf(d / w.range, 0.0, 1.0))
-	p *= 1.0 - map.cover_vs(target.position, shooter.position)
+	if target.is_vehicle:
+		p = minf(0.95, p * 1.6)  # big target, and it can't hide in a crater
+	else:
+		p *= 1.0 - map.cover_vs(target.position, shooter.position)
 	if shooter.moving:
 		p *= 0.5
 	if shooter.state == Soldier.State.PINNED:
@@ -356,10 +417,22 @@ func resolve_shot(shooter: Soldier, target: Soldier) -> void:
 		hits[shooter.team] += 1
 	var end := target.position
 	if not hit:
-		end += Vector2.from_angle(randf() * TAU) * randf_range(8.0, 24.0)
+		end += Vector2.from_angle(randf() * TAU) * randf_range(8.0, 24.0) * (2.0 if w.get("blast", 0.0) > 0.0 else 1.0)
 	var show := shooter.visible or target.visible
 	if show:
-		effects.tracer(shooter.muzzle_pos(), end, w.tracer, w.width)
+		effects.tracer(muzzle, end, w.tracer, w.width)
+	if target.is_vehicle and hit:
+		var got_in: bool = target.receive_hit(w, shooter.position, shooter)
+		if show:
+			if got_in:
+				effects.explosion(target.position + Vector2(randf_range(-8, 8), randf_range(-8, 8)), 14.0)
+			else:
+				effects.spark(target.position + (shooter.position - target.position).normalized() * target.radius)
+	if w.get("blast", 0.0) > 0.0:
+		_blast(end, w, shooter, show)
+		return
+	if target.is_vehicle:
+		return
 	var supp: float = w.supp * (1.0 if hit else 0.6)
 	target.add_suppression(supp, time)
 	for o in soldiers:
@@ -377,6 +450,43 @@ func resolve_shot(shooter: Soldier, target: Soldier) -> void:
 			target.take_hit(w.dmg, shooter)
 	elif show:
 		effects.puff(end, Color(0.55, 0.5, 0.42), 4.0)
+
+
+## High explosive: hurts and pins every soldier near the impact, friend or foe.
+func _blast(at: Vector2, w: Dictionary, shooter: Soldier, show: bool) -> void:
+	var r: float = w.blast
+	if show:
+		effects.explosion(at, r)
+	decals.add_scorch(at, r * 0.7)
+	for o in soldiers.duplicate():
+		if not o.is_alive() or o.is_vehicle:
+			continue
+		var d: float = o.position.distance_to(at)
+		if d > r * 2.5:
+			continue
+		o.add_suppression(w.supp * (1.0 - d / (r * 2.5)), time)
+		if d < r:
+			var chance: float = 0.85 * (1.0 - d / r) * (1.0 - map.cover_vs(o.position, at) * 0.6)
+			if randf() < chance and randf() >= o.armor * (1.0 - w.ap):
+				o.take_hit(w.dmg, shooter)
+
+
+func on_vehicle_destroyed(v: Vehicle, killer: Soldier) -> void:
+	if autotest:
+		print("  vehicle lost: %s at %ds, killed by %s" % [v.squad.name, int(time), killer.kind if killer != null else "?"])
+	effects.explosion(v.position, 40.0)
+	decals.add_scorch(v.position, 40.0)
+	add_fire(v.position + Vector2(randf_range(-6, 6), randf_range(-6, 6)))
+	for o in soldiers:
+		if o.is_alive() and not o.is_vehicle and o.team == v.team and o.position.distance_to(v.position) < 200.0:
+			o.morale -= 10.0 * o.nerve
+	if killer != null:
+		for o in killer.squad.members:
+			if o.is_alive():
+				o.morale = minf(o.max_morale, o.morale + 10.0)
+	if v.team == player_team or v.visible:
+		var col := "#e8c070" if v.team == player_team else "#9fd0ff"
+		log_message("[color=%s]%s has been destroyed![/color]" % [col, v.squad.name])
 
 
 func on_death(s: Soldier, killer: Soldier) -> void:
@@ -405,7 +515,7 @@ func on_fled(s: Soldier) -> void:
 func _update_objective(dt: float) -> void:
 	var count := [0, 0]
 	for s in soldiers:
-		if s.is_effective() and map.objective_rect.has_point(s.position):
+		if s.is_effective() and not s.is_vehicle and map.objective_rect.has_point(s.position):
 			count[s.team] += 1
 	var holder := objective_owner
 	if count[0] > 0 and count[1] == 0:
@@ -427,8 +537,8 @@ func _update_objective(dt: float) -> void:
 func _check_end() -> void:
 	var eff := [0, 0]
 	for s in soldiers:
-		if s.is_effective():
-			eff[s.team] += 1
+		if s.is_present():
+			eff[s.team] += s.strength
 	var broken := [false, false]
 	for t in 2:
 		broken[t] = eff[t] <= int(start_counts[t] * 0.2)
@@ -452,17 +562,20 @@ func _end(winner: int, reason: String) -> void:
 	var left := [0, 0]
 	var dead := [0, 0]
 	var fled := [0, 0]
+	var vlost := [0, 0]
 	for s in soldiers:
 		if s.is_alive():
 			left[s.team] += 1
 		elif s.state == Soldier.State.DEAD:
 			dead[s.team] += 1
+			if s.is_vehicle:
+				vlost[s.team] += 1
 		else:
 			fled[s.team] += 1
 	if autotest:
-		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s %s" % [
+		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s %s" % [
 				factions[winner] if winner >= 0 else "draw", int(time), shots, hits,
-				left[0], left[1], dead[0], dead[1], fled[0], fled[1], reason])
+				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], reason])
 		get_tree().quit()
 		return
 	var head := "DRAW"
@@ -543,6 +656,11 @@ func _unhandled_input(e: InputEvent) -> void:
 			paused = not paused
 		elif k == KEY_F1:
 			hud.toggle_help()
+		elif k == KEY_U:
+			for sq in _player_squads():
+				var v = sq.vehicle()
+				if sq.selected and v != null:
+					v.unload()
 		elif k == KEY_H:
 			for sq in _player_squads():
 				if sq.selected:
@@ -575,6 +693,16 @@ func _order(wp: Vector2, run: bool) -> void:
 	var sel: Array = _player_squads().filter(func(sq): return sq.selected and not sq.alive().is_empty())
 	if sel.is_empty():
 		return
+	var own := _soldier_at(wp, player_team)
+	if own != null and own.is_vehicle and own.free_space() > 0:
+		var boarding := false
+		for sq in sel:
+			if sq.vehicle() == null and sq.carrier() == null:
+				sq.order_board(own)
+				boarding = true
+		if boarding:
+			effects.marker(own.position, Color(0.5, 0.8, 1.0))
+			return
 	var enemy := _soldier_at(wp, 1 - player_team)
 	if enemy != null:
 		for sq in sel:
@@ -588,7 +716,11 @@ func _order(wp: Vector2, run: bool) -> void:
 	for sq in sel:
 		var off: Vector2 = (sq.center() - group_c).limit_length(120.0) if sel.size() > 1 else Vector2.ZERO
 		sq.focus = null
-		sq.order_move(map, wp + off, run)
+		var c = sq.carrier()
+		if c != null:
+			c.squad.order_move(map, wp + off, run)  # troops aboard: drive their carrier
+		else:
+			sq.order_move(map, wp + off, run)
 	effects.marker(wp, Color(1.0, 0.8, 0.3) if run else Color(0.5, 1.0, 0.5))
 
 

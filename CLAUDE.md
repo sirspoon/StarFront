@@ -24,4 +24,5 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `GODOT=path/to/godot tools/autotest.sh [first_seed] [count]` plays computer-vs-computer battles
   (~10 s each) and prints the winner, shots, hits, dead and fled per side, and any script errors.
 - Screenshots: `xvfb-run -a -s "-screen 0 1600x900x24" godot --rendering-driver opengl3 --fixed-fps 20 -- --autotest --seed=3 --shot=out.png --shot-time=40 --shot-zoom=2`
-  (centres on the fighting at the given battle time).
+  (centres on the fighting at the given battle time). Add `--shot-vehicles` to centre on a vehicle,
+  `--shot-tank` for a tank, `--shot-team=0|1` to pick a side.

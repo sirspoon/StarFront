@@ -15,6 +15,7 @@ const TERRAIN_NAMES := ["Open ground", "Rubble", "Crater", "Ruin floor", "Wall",
 
 var grid := PackedByteArray()
 var astar := AStarGrid2D.new()
+var vastar := AStarGrid2D.new()  # for vehicles: keeps a cell of clearance from walls
 var rng := RandomNumberGenerator.new()
 var map_seed := 0
 var objective_rect := Rect2()
@@ -135,6 +136,47 @@ func find_path(from: Vector2, to: Vector2) -> PackedVector2Array:
 	if p.size() > 0 and walkable(cell_of(to)):
 		p[p.size() - 1] = to
 	return p
+
+
+func vehicle_can_be_at(c: Vector2i) -> bool:
+	return in_bounds(c) and not vastar.is_point_solid(c)
+
+
+func nearest_vehicle_cell(c: Vector2i) -> Vector2i:
+	if vehicle_can_be_at(c):
+		return c
+	for r in range(1, 10):
+		for dx in range(-r, r + 1):
+			for dy in range(-r, r + 1):
+				if absi(dx) != r and absi(dy) != r:
+					continue
+				if vehicle_can_be_at(c + Vector2i(dx, dy)):
+					return c + Vector2i(dx, dy)
+	return c
+
+
+func find_vehicle_path(from: Vector2, to: Vector2) -> PackedVector2Array:
+	var a := nearest_vehicle_cell(cell_of(from))
+	var b := nearest_vehicle_cell(cell_of(to))
+	var p := vastar.get_point_path(a, b)
+	if p.size() > 1:
+		p.remove_at(0)
+	return p
+
+
+## A destroyed vehicle becomes a wreck that blocks movement and sight like the others.
+func add_wreck(pos: Vector2) -> void:
+	var c := cell_of(pos)
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var n := c + Vector2i(dx, dy)
+			if in_bounds(n) and get_t(n) != T.WALL:
+				set_t(n, T.WRECK)
+				astar.set_point_solid(n, true)
+	for dx in range(-2, 3):
+		for dy in range(-2, 3):
+			if in_bounds(c + Vector2i(dx, dy)):
+				vastar.set_point_solid(c + Vector2i(dx, dy), true)
 
 
 # ---------------------------------------------------------------- generation
@@ -329,6 +371,26 @@ func _build_astar() -> void:
 				astar.set_point_solid(c, true)
 			else:
 				astar.set_point_weight_scale(c, 1.0 / SPEED[t])
+	vastar.region = astar.region
+	vastar.cell_size = astar.cell_size
+	vastar.offset = astar.offset
+	vastar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
+	vastar.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+	vastar.default_estimate_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+	vastar.update()
+	for x in W:
+		for y in H:
+			var c := Vector2i(x, y)
+			var clear := x > 0 and y > 0 and x < W - 1 and y < H - 1
+			for dx in range(-1, 2):
+				for dy in range(-1, 2):
+					if clear and blocks(get_t(c + Vector2i(dx, dy))):
+						clear = false
+			if not clear:
+				vastar.set_point_solid(c, true)
+			else:
+				var t := get_t(c)
+				vastar.set_point_weight_scale(c, 1.0 if t == T.OPEN or t == T.FLOOR else 1.8)
 
 
 # ---------------------------------------------------------------- drawing
