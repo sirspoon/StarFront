@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.20 (2026-11-11)
+- Hold, then drag to move a squad and spread it along the drag (a ring shows when the hold has
+  registered). Holding and letting go without dragging still adds a waypoint. Tap-then-drag scrolls.
+- Tapping your carrier selects it. Double-tap it with infantry selected to make them climb aboard.
+
 ## v0.19 (2026-11-11)
 Touch controls reworked.
 - Drag always scrolls the map, even with a squad selected.

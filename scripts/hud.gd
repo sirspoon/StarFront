@@ -101,12 +101,12 @@ func setup(m: Node) -> void:
 		help.text = "TOUCH CONTROLS  (? hides)\n" \
 				+ "Tap a soldier or vehicle: select it\n" \
 				+ "Double-tap ground: move there\n" \
-				+ "Tap, then drag: move there, spread along the drag\n" \
-				+ "Tap and hold ground: add a waypoint (hold again for more;\n" \
-				+ "   finish with a double-tap or tap-drag)\n" \
+				+ "Hold, then drag: move there, spread along the drag\n" \
+				+ "Hold and let go: add a waypoint (again for more;\n" \
+				+ "   finish with a double-tap or hold-drag)\n" \
 				+ "Drag: scroll   Pinch: zoom   Tap empty ground: deselect\n" \
 				+ "First order after selecting replaces old orders\n" \
-				+ "Tap an enemy: focus fire   Tap your carrier: board\n" \
+				+ "Tap an enemy: focus fire   Double-tap your carrier: board\n" \
 				+ "Double-tap a wall (tank / lance team): shell it\n" \
 				+ "Face, then tap: look that way   Pause: orders still work\n\n" \
 				+ "Hold the Ashen Chapel. Sandbags, barricades and\n" \

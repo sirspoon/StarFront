@@ -42,6 +42,9 @@ func _draw() -> void:
 		_draw_links(sq)
 		if sq.facing != Vector2.ZERO and not sq.alive().is_empty():
 			_arrow(sq.center(), sq.center() + sq.facing * 46.0, Color(0.6, 0.8, 1.0, 0.75))
+	if main.t_mode == "held":
+		var hp: Vector2 = main._screen_to_world(main.t_start)
+		draw_arc(hp, 16.0 / main.camera.zoom.x, 0, TAU, 28, Color(0.55, 1.0, 0.6, 0.9), 2.5 / main.camera.zoom.x)
 	if main.rdragging:
 		_draw_line_preview()
 	if main.dragging:

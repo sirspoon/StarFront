@@ -42,6 +42,7 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   `--shot-wall` for the last wall to fall. `--demo-damage` shells the chapel's west wall at the start
   (to see every damage stage); `--log-walls` prints where walls fall. Rendering under xvfb is software,
   so a full battle there takes a minute or two.
+- `--test-carrier` checks one tap on a carrier selects it and a double tap boards the selected infantry.
 - `--test-orders` (with `--autotest`, headless is fine) runs a line order and a picked-soldier move and
   prints where the men ended up and whether the squad stayed in contact. `--shot-select` selects the
   player's squads for a screenshot (shows links and facing arrows).

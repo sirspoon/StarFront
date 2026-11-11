@@ -56,6 +56,7 @@ var tap_screen := Vector2.ZERO
 var t_second := false       # this touch began just after a tap close by (double tap / tap-drag)
 var t_press_ms := 0         # when the current one-finger touch began (for tap-hold)
 const HOLD_MS := 500
+var pending_select = null   # a carrier tapped once while infantry were selected (a double tap boards it)
 var plan_fresh := true      # the next order replaces the selected squads' orders (else it's added to the route)
 var tap_pos := Vector2.ZERO
 var face_mode := false
@@ -108,6 +109,8 @@ func _ready() -> void:
 			_demo_damage()
 		if "--test-orders" in args:
 			_test_orders()
+		if "--test-carrier" in args:
+			_test_carrier()
 	else:
 		hud.show_menu()
 
@@ -151,6 +154,28 @@ func _test_orders() -> void:
 		if sq.center().distance_to(w1) < 60.0:
 			seen_w1 = true
 	print("route: passed waypoint 1 %s, now %d px from the final line's centre, orders left %d" % [seen_w1, sq.center().distance_to(w2 + Vector2(100, 0)), sq.route().size()])
+
+
+## Test aid: one tap on your carrier selects it; a double tap makes the selected infantry board.
+func _test_carrier() -> void:
+	ais = ais.filter(func(ai): return ai.team != 0)
+	var car: Vehicle = soldiers.filter(func(x): return x.is_vehicle and x.team == player_team and x.capacity > 0)[0]
+	car.unload()
+	await get_tree().create_timer(1.0).timeout
+	var inf: Squad = _player_squads().filter(func(q): return q.vehicle() == null and q.carrier() == null and q.members.size() >= 5)[0]
+	started = true
+	select_squad(inf, false)
+	_tap(car.position, Vector2(100, 100))
+	var t0 := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 800:
+		await get_tree().process_frame
+	print("single tap on carrier: carrier selected=%s, infantry still selected=%s" % [car.squad.selected, inf.selected])
+	select_squad(inf, false)
+	_tap(car.position, Vector2(100, 100))
+	_double_tap(car.position)
+	var boarding := inf.members.filter(func(m): return m.board_vehicle == car).size()
+	await get_tree().create_timer(1.0).timeout
+	print("double tap on carrier: %d men ordered to board, carrier selected=%s, infantry selected=%s" % [boarding, car.squad.selected, inf.selected])
 
 
 ## Test aid: shell the chapel's west wall so screenshots show every damage stage.
@@ -444,12 +469,24 @@ func _process(dt: float) -> void:
 	# wait for both the time and a few frames, so a slow device still sees the second tap
 	if touch_mode and touches.size() == 1 and t_mode == "" and not t_second \
 			and Time.get_ticks_msec() - t_press_ms >= HOLD_MS:
-		t_mode = "done"
+		# held still: release for a waypoint, or drag to spread out along the drag
 		tap_pending = false
-		_hold(t_start)
+		var own := _soldier_at(_screen_to_world(t_start), player_team, 16.0)
+		if own != null:
+			t_mode = "done"
+			_hold(t_start)  # holding on one of your own units just selects it
+		else:
+			t_mode = "held"
 	if tap_pending and Time.get_ticks_msec() - tap_time >= DOUBLE_TAP_MS and Engine.get_process_frames() - tap_frame > 10:
 		tap_pending = false
-		_deselect_all()
+		if pending_select != null:
+			var ps: Squad = pending_select
+			pending_select = null
+			for sq in squads:
+				sq.sub.clear()
+			select_squad(ps, false)
+		else:
+			_deselect_all()
 	for sm in smokes.duplicate():
 		sm[1] -= dt
 		if sm[1] <= 0.0:
@@ -1238,6 +1275,8 @@ func _touch_input(e: InputEvent) -> void:
 				if t_mode == "line":
 					rdragging = false
 					_plan("line", rdrag_start, wp, true)
+				elif t_mode == "held":
+					_hold(t_start)
 				elif t_mode == "" and t_second:
 					_double_tap(wp)
 				elif t_mode == "":
@@ -1267,8 +1306,10 @@ func _touch_input(e: InputEvent) -> void:
 			_clamp_camera()
 			return
 		if t_mode == "" and sd.position.distance_to(t_start) > 18.0:
-			if t_second and started and not over and _has_selection():
-				t_mode = "line"  # tap, then drag: spread out along the drag
+			t_mode = "pan"
+		elif t_mode == "held" and sd.position.distance_to(t_start) > 18.0:
+			if started and not over and _has_selection():
+				t_mode = "line"  # hold, then drag: spread out along the drag
 				rdragging = true
 				rdrag_start = _screen_to_world(t_start)
 			else:
@@ -1301,7 +1342,12 @@ func _tap(wp: Vector2, screen := Vector2.ZERO) -> void:
 			return
 		var infantry_selected := _player_squads().any(func(q): return q.selected and q.vehicle() == null)
 		if s.is_vehicle and s.free_space() > 0 and infantry_selected and not s.squad.selected:
-			_order(wp, false)  # climb aboard
+			# maybe the first half of a double tap (board it): select it only if no second tap comes
+			pending_select = s.squad
+			tap_pending = true
+			tap_screen = screen
+			tap_time = Time.get_ticks_msec()
+			tap_frame = Engine.get_process_frames()
 			return
 		for sq in squads:
 			sq.sub.clear()
@@ -1327,7 +1373,13 @@ func _tap(wp: Vector2, screen := Vector2.ZERO) -> void:
 
 
 func _double_tap(wp: Vector2) -> void:
+	var board_target = pending_select
+	pending_select = null
 	if not started or over or not _has_selection():
+		return
+	var carrier := _soldier_at(wp, player_team, 16.0)
+	if carrier != null and carrier.is_vehicle and board_target != null and carrier.squad == board_target:
+		_order(wp, false)  # double-tap your carrier: the selected infantry climb aboard
 		return
 	var on_enemy := _soldier_at(wp, 1 - player_team, 16.0) != null
 	var on_wall := map.get_t(map.cell_of(wp)) == BattleMap.T.WALL
