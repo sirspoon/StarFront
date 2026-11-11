@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.18 (2026-11-11)
+- On phones the first tap switches the browser to full screen (no address bar) and locks it to
+  landscape. Browsers only allow full screen after a tap, so it can't happen on load.
+- The web version can be installed: Chrome's "Add to Home screen" gives a StarFront icon that always
+  opens full screen, in landscape.
+
 ## v0.17 (2026-11-11)
 - Double-tap the ground with a squad selected to move it there (dragging still works too). A lone
   tap on empty ground still clears the selection, just after a moment's wait for a second tap.
