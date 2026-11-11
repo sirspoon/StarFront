@@ -7,6 +7,7 @@ extends RefCounted
 ##   normals=0           no normal maps (flat lighting)
 ##   lights=0            no combat lights or moonlight
 ##   bake=0              no detailed map at all: a plain flat one (no off-screen drawing)
+##   batch=N             map tiles drawn per frame (default 4, 1 on phones)
 ##   safe                all of the above off
 
 static var _query := ""
@@ -67,7 +68,15 @@ static func last_stage() -> String:
 	return str(v) if v != null else ""
 
 
+static func batch() -> int:
+	var q := _q()
+	for n in [1, 2, 4, 8]:
+		if q.contains("batch=%d" % n):
+			return n
+	return 1 if is_phone() else 4
+
+
 static func summary() -> String:
 	var oo := func(b: bool) -> String: return "on" if b else "off"
-	return "detail %sx, shadows %s, normal maps %s, lights %s, map drawing %s" % [detail(), oo.call(on("shadows", not is_phone())),
-			oo.call(on("normals", true)), oo.call(on("lights", true)), oo.call(on("bake", true))]
+	return "detail %sx, shadows %s, normal maps %s, lights %s, map drawing %s, %d tile(s)/frame" % [detail(), oo.call(on("shadows", not is_phone())),
+			oo.call(on("normals", true)), oo.call(on("lights", true)), oo.call(on("bake", true)), batch()]

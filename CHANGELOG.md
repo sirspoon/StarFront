@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.14 (2026-11-11)
+- Phones draw the detailed map one tile per frame with a short pause between (desktop still does
+  four), since `?safe` showed the crash happens while drawing map tiles. `?batch=1/2/4/8` overrides it.
+
 ## v0.13 (2026-11-11)
 More phone crash hunting.
 - Turned off 2D anti-aliasing in the project: the renderer used on the web doesn't support it, and it

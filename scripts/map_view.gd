@@ -10,7 +10,7 @@ extends Node2D
 var use_normals := true
 var _where := ""  # for the crash breadcrumbs
 var SCALE := 2.0  # map pixels drawn per world pixel (detail level)
-const BATCH := 4  # tiles prepared at once: keeps the burst of graphics memory small enough for phones
+var BATCH := 4  # tiles prepared at once (1 on phones: each tile is a lot of drawing for one frame)
 const CHUNK := Vector2i(20, 20)  # tile size in cells
 
 var map: BattleMap
@@ -51,9 +51,13 @@ func setup(m: BattleMap) -> void:
 			_build_occluders(y)
 	SCALE = Settings.detail()
 	use_normals = Settings.on("normals", true)
+	BATCH = Settings.batch()
 	for i in range(0, all.size(), BATCH):
 		_where = "map tiles %d-%d of %d (%s)" % [i + 1, mini(i + BATCH, all.size()), all.size(), Settings.summary()]
 		await _bake(all.slice(i, i + BATCH))
+		if BATCH == 1:
+			for f in 3:
+				await get_tree().process_frame  # let the phone's graphics catch up between tiles
 	Settings.stage("map ready (%s)" % Settings.summary())
 	ready_drawn = true
 
