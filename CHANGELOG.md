@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.11 (2026-11-11)
+Phone fixes.
+- The map is now prepared four tiles at a time instead of all forty at once. Doing them all together
+  needed a big burst of graphics memory that made a phone's browser give up ("WebGL context lost").
+- Map detail can be chosen from the web address: add `?detail=medium` or `?detail=low` for phones
+  that still struggle (full detail is the default).
+- Fire, smoke, dust and ash are drawn by the game itself: Godot's built-in particles lost their red
+  in web browsers, so ash showed up cyan and flames green.
+
 ## v0.10 (2026-11-11)
 Play it on a phone.
 - A web version, built and published to GitHub Pages automatically on every push, playable in a

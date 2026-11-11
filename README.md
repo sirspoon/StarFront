@@ -13,6 +13,7 @@ drawn in code, so the game can be played and tuned before real sprites are made.
 ## Play it
 **On a phone or tablet:** open https://sirspoon.github.io/StarFront/ (rebuilt automatically after every push).
 Turn the phone sideways. Touch controls are described under "?" in the game.
+If it struggles, add `?detail=medium` or `?detail=low` to the address for a lighter map.
 
 **On a PC:**
 1. Download Godot 4 (standard version, not .NET) from https://godotengine.org/download.

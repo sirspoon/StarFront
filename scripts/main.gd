@@ -262,64 +262,60 @@ func add_fire(p: Vector2) -> void:
 	add_child(light)
 	fire_lights.append([light, 1.6, randf() * TAU])
 
-	var fire := CPUParticles2D.new()
+	var fire := SimpleParticles.new()
 	fire.texture = dot
 	fire.position = p
 	fire.amount = 40
 	fire.lifetime = 0.7
-	fire.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
-	fire.emission_sphere_radius = 10.0
+	fire.emission_radius = 10.0
 	fire.direction = Vector2(0, -1)
 	fire.spread = 30.0
 	fire.gravity = Vector2(0, -60)
-	fire.initial_velocity_min = 10.0
-	fire.initial_velocity_max = 30.0
-	fire.scale_amount_min = 0.15
-	fire.scale_amount_max = 0.35
+	fire.velocity_min = 10.0
+	fire.velocity_max = 30.0
+	fire.scale_min = 0.15
+	fire.scale_max = 0.35
 	fire.color_ramp = _ramp([Color(1, 0.95, 0.6, 0.9), Color(1, 0.5, 0.15, 0.8), Color(0.5, 0.1, 0.05, 0)])
 	fire.z_index = 4
 	add_child(fire)
 
-	var smoke := CPUParticles2D.new()
+	var smoke := SimpleParticles.new()
 	smoke.texture = dot
 	smoke.position = p
 	smoke.amount = 36
 	smoke.lifetime = 5.0
 	smoke.preprocess = 5.0
-	smoke.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
-	smoke.emission_sphere_radius = 8.0
+	smoke.emission_radius = 8.0
 	smoke.direction = Vector2(0.4, -1)
 	smoke.spread = 20.0
 	smoke.gravity = Vector2(10, -8)
-	smoke.initial_velocity_min = 12.0
-	smoke.initial_velocity_max = 22.0
-	smoke.scale_amount_min = 0.5
-	smoke.scale_amount_max = 0.9
+	smoke.velocity_min = 12.0
+	smoke.velocity_max = 22.0
+	smoke.scale_min = 0.5
+	smoke.scale_max = 0.9
 	var curve := Curve.new()
 	curve.add_point(Vector2(0, 0.3))
 	curve.add_point(Vector2(1, 1.6))
-	smoke.scale_amount_curve = curve
+	smoke.scale_curve = curve
 	smoke.color_ramp = _ramp([Color(0.15, 0.13, 0.12, 0.0), Color(0.15, 0.13, 0.12, 0.55), Color(0.3, 0.29, 0.28, 0)])
 	smoke.z_index = 5
 	add_child(smoke)
 
 
 func _add_ash() -> void:
-	var ash := CPUParticles2D.new()
+	var ash := SimpleParticles.new()
 	ash.texture = _soft_dot(16)
-	ash.amount = 160
+	ash.amount = 110
 	ash.lifetime = 9.0
 	ash.preprocess = 9.0
-	ash.local_coords = false
-	ash.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	ash.emission_rect_extents = Vector2(1100, 700)
+	ash.emission_rect = Vector2(1100, 700)
 	ash.direction = Vector2(1, 0.6)
 	ash.spread = 25.0
 	ash.gravity = Vector2(4, 6)
-	ash.initial_velocity_min = 6.0
-	ash.initial_velocity_max = 18.0
-	ash.scale_amount_min = 0.15
-	ash.scale_amount_max = 0.35
+	ash.velocity_min = 6.0
+	ash.velocity_max = 18.0
+	ash.scale_min = 0.15
+	ash.scale_max = 0.35
 	ash.color = Color(0.85, 0.82, 0.78, 0.55)
 	ash.z_index = 7
 	camera.add_child(ash)
@@ -415,7 +411,7 @@ func _process(dt: float) -> void:
 		sm[1] -= dt
 		if sm[1] <= 0.0:
 			smokes.erase(sm)
-			var node: CPUParticles2D = sm[0]
+			var node: SimpleParticles = sm[0]
 			node.emitting = false
 			get_tree().create_timer(6.5).timeout.connect(node.queue_free)
 	for fl in fire_lights:
@@ -644,30 +640,29 @@ func _shot_lights(muzzle: Vector2, end: Vector2, w: Dictionary) -> void:
 func add_smoke(pos: Vector2, duration: float, size: float) -> void:
 	if not map_view.enabled:
 		return
-	var sm := CPUParticles2D.new()
+	var sm := SimpleParticles.new()
 	sm.texture = _dot_tex if _dot_tex != null else _soft_dot(64)
 	sm.position = pos
 	sm.amount = int(14 + size * 8)
 	sm.lifetime = 6.0
-	sm.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
-	sm.emission_sphere_radius = 6.0 * size
+	sm.emission_radius = 6.0 * size
 	sm.direction = Vector2(0.4, -1)
 	sm.spread = 25.0
 	sm.gravity = Vector2(7, -6)
-	sm.initial_velocity_min = 6.0
-	sm.initial_velocity_max = 14.0
-	sm.scale_amount_min = 0.35 * size
-	sm.scale_amount_max = 0.7 * size
+	sm.velocity_min = 6.0
+	sm.velocity_max = 14.0
+	sm.scale_min = 0.35 * size
+	sm.scale_max = 0.7 * size
 	var curve := Curve.new()
 	curve.add_point(Vector2(0, 0.4))
 	curve.add_point(Vector2(1, 1.8))
-	sm.scale_amount_curve = curve
+	sm.scale_curve = curve
 	sm.color_ramp = _ramp([Color(0.2, 0.19, 0.18, 0.0), Color(0.2, 0.19, 0.18, 0.45), Color(0.34, 0.33, 0.31, 0.0)])
 	sm.z_index = 5
 	add_child(sm)
 	smokes.append([sm, duration])
 	while smokes.size() > 18:
-		var old: CPUParticles2D = smokes.pop_front()[0]
+		var old: SimpleParticles = smokes.pop_front()[0]
 		old.emitting = false
 		get_tree().create_timer(6.5).timeout.connect(old.queue_free)
 
@@ -675,23 +670,20 @@ func add_smoke(pos: Vector2, duration: float, size: float) -> void:
 func _dust_burst(pos: Vector2, size: float) -> void:
 	if not map_view.enabled:
 		return
-	var d := CPUParticles2D.new()
+	var d := SimpleParticles.new()
 	d.texture = _dot_tex if _dot_tex != null else _soft_dot(64)
 	d.position = pos
 	d.one_shot = true
-	d.explosiveness = 0.85
 	d.amount = 26
 	d.lifetime = 2.6
-	d.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
-	d.emission_sphere_radius = 8.0
+	d.emission_radius = 8.0
 	d.spread = 180.0
 	d.gravity = Vector2(4, -3)
-	d.initial_velocity_min = 15.0
-	d.initial_velocity_max = 45.0
-	d.damping_min = 20.0
-	d.damping_max = 30.0
-	d.scale_amount_min = 0.4 * size
-	d.scale_amount_max = 0.9 * size
+	d.velocity_min = 15.0
+	d.velocity_max = 45.0
+	d.damping = 25.0
+	d.scale_min = 0.4 * size
+	d.scale_max = 0.9 * size
 	d.color_ramp = _ramp([Color(0.5, 0.46, 0.4, 0.6), Color(0.45, 0.42, 0.38, 0.3), Color(0.4, 0.38, 0.35, 0.0)])
 	d.z_index = 5
 	d.emitting = true

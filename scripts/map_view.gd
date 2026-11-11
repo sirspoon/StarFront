@@ -7,7 +7,8 @@ extends Node2D
 ## rubble and craters in relief. Without a screen (headless
 ## tests) nothing is painted.
 
-const SCALE := 2.0
+var SCALE := 2.0  # map pixels drawn per world pixel (detail level)
+const BATCH := 4  # tiles prepared at once: keeps the burst of graphics memory small enough for phones
 const CHUNK := Vector2i(20, 20)  # tile size in cells
 
 var map: BattleMap
@@ -36,12 +37,30 @@ func setup(m: BattleMap) -> void:
 			all.append(Vector2i(cx, cy))
 	for y in BattleMap.H:
 		_build_occluders(y)
-	await _bake(all)
+	SCALE = detail_scale()
+	for i in range(0, all.size(), BATCH):
+		await _bake(all.slice(i, i + BATCH))
 	ready_drawn = true
 
 
 ## One occluder per run of wall cells in a row, so fires and explosions throw
 ## shadows past walls and light spills through gaps and doorways.
+## Map detail. Full (2x) by default; on the web it can be lowered by adding
+## ?detail=medium or ?detail=low to the page address, for phones that struggle.
+static func detail_scale() -> float:
+	var q := ""
+	if OS.has_feature("web"):
+		var v = JavaScriptBridge.eval("window.location.search", true)
+		q = str(v) if v != null else ""
+	for a in OS.get_cmdline_user_args():
+		q += " " + a
+	if q.contains("detail=low"):
+		return 1.0
+	if q.contains("detail=medium"):
+		return 1.5
+	return 2.0
+
+
 func _build_occluders(y: int) -> void:
 	for o in occluders.get(y, []):
 		o.queue_free()
@@ -213,7 +232,8 @@ func _process(_dt: float) -> void:
 	if baking or dirty.is_empty() or not ready_drawn:
 		return
 	baking = true
-	var keys := dirty.keys()
-	dirty.clear()
+	var keys := dirty.keys().slice(0, BATCH)
+	for k in keys:
+		dirty.erase(k)
 	await _bake(keys)
 	baking = false
