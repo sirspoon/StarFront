@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.27 (2026-11-11)
+Sound.
+- Sound effects, made from scratch by `tools/make_sounds.py` (no recordings): heavy explosions with
+  rumble and falling debris, the tank's siege cannon echoing round the ruins, crackling fusion zaps,
+  the Legion's lumen rifles popping, stubbers rattling, the Sworn's mass-reactive carbines firing
+  rapid bursts with the bolts bursting downrange, the rotor cannon spinning up, lance rockets
+  whooshing off, ricochet whines, rounds clanging off armour, and walls collapsing into rubble.
+- Tanks and carriers rumble and clatter, revving up when they move (the tank deeper than the carrier).
+- Sounds come from where things happen on the map: they pan and fade with distance from the camera.
+- The Sworn's mass-reactive carbines now fire 4-round bursts (same firepower overall).
+- `?sound=0` in the web address turns sound off.
+
 ## v0.26 (2026-11-11)
 More battle effects.
 - Ricochets: shots glancing off armour, walls and cover sometimes fly off as a bright streak.

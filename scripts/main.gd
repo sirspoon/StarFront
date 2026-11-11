@@ -14,6 +14,8 @@ var map: BattleMap
 var map_view: MapView
 var effects: Effects
 var light_fx: LightFX
+var sfx: Sfx
+var fire_sound_at := {}  # shooter+weapon -> time its burst sound last started
 var smokes: Array = []  # lingering smoke emitters [node, time left]
 var decals: Node2D
 var units_layer: Node2D
@@ -309,6 +311,9 @@ func _build_world(seed_value: int) -> void:
 	camera.position = Vector2(30 * BattleMap.CELL, map.world_size().y * 0.5)
 	add_child(camera)
 	_clamp_camera()
+	sfx = Sfx.new()
+	add_child(sfx)
+	sfx.setup(camera)
 	_add_ash()
 
 
@@ -702,6 +707,7 @@ func nearest_seen_enemy(team: int, from: Vector2) -> Soldier:
 
 func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vector2) -> void:
 	shots[shooter.team] += 1
+	_fire_sound(shooter, w, muzzle)
 	var d := shooter.position.distance_to(target.position)
 	var p: float = w.acc * lerpf(1.0, 0.45, clampf(d / w.range, 0.0, 1.0))
 	if target.is_vehicle:
@@ -752,8 +758,9 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 			else:
 				var sp := target.position + (shooter.position - target.position).normalized() * target.radius
 				effects.spark(sp)
+				sfx.play("clang", sp, 0.0, 0.12)
 				if randf() < 0.5:
-					effects.ricochet(sp, target.position - shooter.position)
+					_ricochet(sp, target.position - shooter.position)
 	if w.get("blast", 0.0) > 0.0:
 		_blast(end, w, shooter, show)
 		return
@@ -770,7 +777,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 			if show:
 				effects.spark(target.position)
 				if randf() < 0.4:
-					effects.ricochet(target.position, target.position - shooter.position)
+					_ricochet(target.position, target.position - shooter.position)
 			target.morale -= 1.0
 		else:
 			var away := (target.position - shooter.position).normalized()
@@ -786,7 +793,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 		if show:
 			effects.puff(end, Color(0.55, 0.5, 0.42), 4.0)
 			if hard and randf() < 0.25:
-				effects.ricochet(end, end - muzzle)
+				_ricochet(end, end - muzzle)
 		if randf() < (0.5 if float(w.get("pen", 0)) >= 2.0 else 0.2):
 			decals.add_burn(end, 1.2 + float(w.get("pen", 0)) * 0.25)
 
@@ -794,6 +801,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 ## A shot at a spot rather than a soldier: used to blow holes in walls.
 func resolve_point_shot(shooter: Soldier, p: Vector2, w: Dictionary, muzzle: Vector2) -> void:
 	shots[shooter.team] += 1
+	_fire_sound(shooter, w, muzzle)
 	var spread: float = lerpf(3.0, 26.0, clampf(muzzle.distance_to(p) / w.range, 0.0, 1.0)) * (1.2 - w.acc)
 	var end := p + Vector2.from_angle(randf() * TAU) * randf() * spread
 	end = map.first_obstacle(muzzle, end + (end - muzzle).normalized() * 8.0)
@@ -806,6 +814,21 @@ func resolve_point_shot(shooter: Soldier, p: Vector2, w: Dictionary, muzzle: Vec
 
 ## The muzzle flash lights up the shooter's surroundings and the bolt, tracer or
 ## rocket lights the ground as it flies.
+## One sound per burst: the weapon's burst sound already holds all its rounds.
+func _fire_sound(shooter: Soldier, w: Dictionary, muzzle: Vector2) -> void:
+	var key := "%d:%s" % [shooter.get_instance_id(), w.name]
+	var span: float = float(w.burst) * float(w.gap) + 0.05
+	if time - float(fire_sound_at.get(key, -99.0)) < span:
+		return
+	fire_sound_at[key] = time
+	sfx.play(Sfx.WEAPON_SOUND.get(w.name, "laser"), muzzle)
+
+
+func _ricochet(pos: Vector2, incoming: Vector2) -> void:
+	effects.ricochet(pos, incoming)
+	sfx.play("ricochet", pos, 0.0, 0.15)
+
+
 func _shot_lights(muzzle: Vector2, end: Vector2, w: Dictionary) -> void:
 	var col: Color = w.tracer
 	var size: float = w.width
@@ -881,6 +904,7 @@ func effects_visible_at(p: Vector2) -> bool:
 ## and knocks chunks out of nearby walls.
 func _blast(at: Vector2, w: Dictionary, shooter: Soldier, show: bool) -> void:
 	var r: float = w.blast
+	sfx.play("explosion_big" if r >= 40.0 else "explosion_small", at)
 	if show:
 		effects.explosion(at, r)
 		if r >= 30.0 or randf() < 0.5:
@@ -895,6 +919,7 @@ func _blast(at: Vector2, w: Dictionary, shooter: Soldier, show: bool) -> void:
 			add_smoke(at, 20.0 + randf() * 15.0, 1.0)  # the shattered wall smoulders
 		if not fell.is_empty():
 			_dust_burst(map.center_of(fell[0]), 1.4)
+			sfx.play("collapse", map.center_of(fell[0]))
 		for c in fell:
 			effects.debris(map.center_of(c))
 			last_wall_down = map.center_of(c)
@@ -917,6 +942,7 @@ func on_vehicle_destroyed(v: Vehicle, killer: Soldier) -> void:
 	if autotest:
 		print("  vehicle lost: %s at %ds, killed by %s" % [v.squad.name, int(time), killer.kind if killer != null else "?"])
 	effects.explosion(v.position, 40.0)
+	sfx.play("explosion_big", v.position, 4.0, 0.03)
 	light_fx.flash(v.position, Color(1.0, 0.55, 0.25), 3.2, 240.0, 1.3, true)
 	decals.add_scorch(v.position, 40.0)
 	add_fire(v.position + Vector2(randf_range(-6, 6), randf_range(-6, 6)))

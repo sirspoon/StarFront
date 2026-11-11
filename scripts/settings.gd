@@ -8,6 +8,7 @@ extends RefCounted
 ##   lights=0            no combat lights or moonlight
 ##   bake=0              no detailed map at all: a plain flat one (no off-screen drawing)
 ##   batch=N             map tiles drawn per frame (default 4, 1 on phones)
+##   sound=0             no sound effects
 ##   safe                all of the above off
 
 static var _query := ""

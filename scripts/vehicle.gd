@@ -20,6 +20,7 @@ var recoil := 0.0
 var shaken := 0.0
 var track_phase := 0.0
 var smoke_timer := 0.0
+var engine_sound: AudioStreamPlayer2D
 
 
 func setup_vehicle(m: Node, sq: Squad, t: int, kind_id: String) -> void:
@@ -53,6 +54,11 @@ func setup_vehicle(m: Node, sq: Squad, t: int, kind_id: String) -> void:
 				"cooldown": randf_range(0.5, 2.0), "burst_left": 0, "burst_timer": 0.0, "target": null,
 				"angle": 0.0, "flash": 0.0})
 	weapon = slots[0].weapon
+	engine_sound = m.sfx.make_engine()
+	if engine_sound != null:
+		add_child(engine_sound)
+		engine_sound.pitch_scale = 0.8 if role == "tank" else 1.0
+		engine_sound.autoplay = true  # starts when the vehicle is placed on the map
 
 
 func can_breach() -> bool:
@@ -125,6 +131,8 @@ func _destroy(from: Soldier) -> void:
 	state = State.DEAD
 	z_index = -1
 	moving = false
+	if engine_sound != null:
+		engine_sound.stop()
 	main.on_vehicle_destroyed(self, from)
 	# passengers scramble out; some don't make it
 	var out := passengers.duplicate()
@@ -182,6 +190,11 @@ func tick(dt: float, now: float) -> void:
 	if not is_alive():
 		return
 	shaken = maxf(0.0, shaken - dt)
+	if engine_sound != null:
+		# revs up and gets louder when moving; the tank is deeper than the carrier
+		var base := 0.8 if role == "tank" else 1.0
+		engine_sound.pitch_scale = move_toward(engine_sound.pitch_scale, base * (1.25 if moving else 0.85), dt * 0.6)
+		engine_sound.volume_db = move_toward(engine_sound.volume_db, -9.0 if moving else -17.0, dt * 12.0)
 	recoil = maxf(0.0, recoil - dt * 3.0)
 	_drive(dt)
 	_aim_and_fire(dt, now)

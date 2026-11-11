@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.26"
+const VERSION := "0.27"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -14,8 +14,8 @@ const WEAPONS := {
 		"acc": 0.56, "ap": 0.0, "dmg": 1, "pen": 0, "supp": 7.0, "tracer": Color(1.0, 0.5, 0.25), "width": 1.6},
 	"heavy_stubber": {"name": "Heavy stubber", "range": 430.0, "cooldown": 2.6, "burst": 6, "gap": 0.09,
 		"acc": 0.3, "ap": 0.15, "dmg": 1, "pen": 2, "vdmg": 1, "supp": 10.0, "tracer": Color(1.0, 0.85, 0.45), "width": 1.3},
-	"mass_carbine": {"name": "Mass-reactive carbine", "range": 360.0, "cooldown": 2.0, "burst": 2, "gap": 0.15,
-		"acc": 0.31, "ap": 0.35, "dmg": 2, "pen": 3, "vdmg": 1, "supp": 14.0, "tracer": Color(0.6, 0.85, 1.0), "width": 2.2},
+	"mass_carbine": {"name": "Mass-reactive carbine", "range": 360.0, "cooldown": 2.0, "burst": 4, "gap": 0.08,
+		"acc": 0.155, "ap": 0.35, "dmg": 2, "pen": 3, "vdmg": 1, "supp": 7.0, "tracer": Color(0.6, 0.85, 1.0), "width": 2.2},
 	"rotor_cannon": {"name": "Rotor cannon", "range": 440.0, "cooldown": 3.0, "burst": 5, "gap": 0.1,
 		"acc": 0.26, "ap": 0.5, "dmg": 2, "pen": 4, "vdmg": 2, "supp": 18.0, "tracer": Color(0.55, 0.8, 1.0), "width": 2.6},
 	"lance_launcher": {"name": "Lance launcher", "range": 400.0, "cooldown": 6.0, "burst": 1, "gap": 0.0,
