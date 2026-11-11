@@ -21,6 +21,16 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   `BattleMap.cells_changed` fires. Painting must stay deterministic per cell (hash-seeded), so a
   repaint only changes what was destroyed. Nothing is painted in headless runs.
 
+## Web version
+- `.github/workflows/web.yml` exports the web build (`export_presets.cfg`, preset "Web", no threads,
+  so it runs on GitHub Pages without special headers) and deploys it to Pages on every push to main.
+- Touch controls switch on with a touch screen (or `--touch`); on phones the UI is laid out for a
+  screen about 620 points tall. Emulated mouse events from touches are ignored in `main.gd`.
+- To test the web build here: download `Godot_v4.3-stable_export_templates.tpz` (resume with
+  `curl -C -` if the connection drops), put `templates/web_nothreads_release.zip` and `version.txt` in
+  `~/.local/share/godot/export_templates/4.3.stable/`, export, serve `build/web`, and drive it with
+  `tools/web_touch_test.js` (Playwright, emulated Pixel 7 sideways).
+
 ## Testing (in a cloud session)
 - Get Godot: download `Godot_v4.3-stable_linux.x86_64.zip` from the godotengine/godot GitHub releases.
 - Check scripts: `godot --headless --import`, then run the game headless.

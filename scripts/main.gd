@@ -39,6 +39,16 @@ var paused := false
 var autotest := false
 var dragging := false
 var rdragging := false
+var touch_mode := false       # phone / tablet controls
+var touches := {}             # finger index -> screen position
+var t_start := Vector2.ZERO   # where the current one-finger touch began
+var t_mode := ""              # "" (maybe a tap), "line", "pan", "pinch" or "done"
+var pinch_prev_dist := 0.0
+var pinch_prev_center := Vector2.ZERO
+var run_toggle := false
+var face_mode := false
+var pick_mode := false
+var pointer_world := Vector2.ZERO  # where the mouse or dragging finger is on the map
 var rdrag_start := Vector2.ZERO
 var drag_start := Vector2.ZERO
 var panning := false
@@ -68,6 +78,11 @@ func _ready() -> void:
 		elif a.begins_with("--shot-zoom="):
 			shot_zoom = float(a.trim_prefix("--shot-zoom="))
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	touch_mode = "--touch" in args or DisplayServer.is_touchscreen_available() \
+			or OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("mobile")
+	if touch_mode:
+		_fit_touch_screen()
+		get_tree().root.size_changed.connect(_fit_touch_screen)
 	_build_world(seed_value)
 	hud = HUD.new()
 	add_child(hud)
@@ -128,6 +143,17 @@ func _demo_damage() -> void:
 	print("demo damage: %d wall cells down; building hole at %d,%d" % [walls_destroyed, bx, by])
 
 
+## On a phone the screen has many tiny pixels: lay the game out for a screen about
+## 620 points tall so text and buttons are a usable size.
+func _fit_touch_screen() -> void:
+	var win := DisplayServer.window_get_size()
+	var h := 620.0
+	var root := get_tree().root
+	root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+	root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+	root.content_scale_size = Vector2i(int(h * win.x / maxf(win.y, 1.0)), int(h))
+
+
 func _build_world(seed_value: int) -> void:
 	var cm := CanvasModulate.new()
 	cm.color = Color(0.55, 0.53, 0.53)  # dim, so fires and weapons light the scene
@@ -179,6 +205,7 @@ func _build_world(seed_value: int) -> void:
 	camera.zoom = Vector2(1.2, 1.2)
 	camera.position = Vector2(30 * BattleMap.CELL, map.world_size().y * 0.5)
 	add_child(camera)
+	_clamp_camera()
 	_add_ash()
 
 
@@ -309,6 +336,15 @@ func start_battle(player_faction: String) -> void:
 		ais.append(AICommander.new(self, 0))
 	hud.build_squad_cards()
 	started = true
+	# start looking at your own force
+	var c := Vector2.ZERO
+	var n := 0
+	for s in soldiers:
+		if s.team == player_team:
+			c += s.position
+			n += 1
+	camera.position = Vector2(c.x / maxi(n, 1) + get_viewport_rect().size.x * 0.25 / camera.zoom.x, c.y / maxi(n, 1))
+	_clamp_camera()
 	var f: Dictionary = GameData.FACTIONS[factions[1]]
 	log_message("Scouts report %s advancing from the east. Take the chapel!" % f.name)
 
@@ -373,6 +409,8 @@ func _spawn_vehicle(team: int, kind_id: String, cy: int, counts: Dictionary) -> 
 
 func _process(dt: float) -> void:
 	_camera_keys(dt)
+	if not touch_mode:
+		pointer_world = get_global_mouse_position()
 	for sm in smokes.duplicate():
 		sm[1] -= dt
 		if sm[1] <= 0.0:
@@ -841,20 +879,25 @@ func _player_squads() -> Array[Squad]:
 	return out
 
 
-func _soldier_at(p: Vector2, team: int) -> Soldier:
+func _soldier_at(p: Vector2, team: int, extra := 8.0) -> Soldier:
 	var best: Soldier = null
 	var bd := INF
 	for s in soldiers:
 		if s.team != team or not s.is_alive() or not s.visible:
 			continue
 		var d := s.position.distance_to(p)
-		if d < s.radius + 8.0 and d < bd:
+		if d < s.radius + extra and d < bd:
 			bd = d
 			best = s
 	return best
 
 
 func _unhandled_input(e: InputEvent) -> void:
+	if e is InputEventScreenTouch or e is InputEventScreenDrag:
+		_touch_input(e)
+		return
+	if touch_mode and (e is InputEventMouseButton or e is InputEventMouseMotion) and e.device == InputEvent.DEVICE_ID_EMULATION:
+		return  # the same touch, already handled above
 	if e is InputEventMouseButton:
 		var mb := e as InputEventMouseButton
 		var wp := get_global_mouse_position()
@@ -1059,4 +1102,146 @@ func _camera_keys(dt: float) -> void:
 
 func _clamp_camera() -> void:
 	var ws := map.world_size()
-	camera.position = camera.position.clamp(Vector2.ZERO, ws)
+	var half := get_viewport_rect().size / camera.zoom * 0.5
+	for axis in 2:
+		if half[axis] * 2.0 >= ws[axis]:
+			camera.position[axis] = ws[axis] * 0.5
+		else:
+			camera.position[axis] = clampf(camera.position[axis], half[axis], ws[axis] - half[axis])
+
+
+# ---------------------------------------------------------------- touch
+
+func _screen_to_world(p: Vector2) -> Vector2:
+	return get_viewport().get_canvas_transform().affine_inverse() * p
+
+
+## One finger: tap to select / order, drag to line a selected squad up (or to
+## scroll when nothing is selected). Two fingers: scroll and pinch to zoom.
+func _touch_input(e: InputEvent) -> void:
+	if e is InputEventScreenTouch:
+		var st := e as InputEventScreenTouch
+		if st.pressed:
+			if touches.is_empty() and hud.is_over_ui(st.position):
+				return  # a button or panel: the interface handles it
+			touches[st.index] = st.position
+			if touches.size() == 1:
+				t_start = st.position
+				t_mode = ""
+			elif touches.size() == 2:
+				t_mode = "pinch"
+				rdragging = false
+				_pinch_begin()
+		else:
+			if not touches.has(st.index):
+				return
+			var single := touches.size() == 1
+			touches.erase(st.index)
+			if single:
+				var wp := _screen_to_world(st.position)
+				if t_mode == "line":
+					rdragging = false
+					_order_line(rdrag_start, wp, run_toggle)
+				elif t_mode == "":
+					_tap(wp)
+				t_mode = ""
+			elif touches.size() == 1:
+				t_mode = "done"  # the finger left after a pinch shouldn't count as a tap
+			if touches.size() == 2:
+				_pinch_begin()
+	elif e is InputEventScreenDrag:
+		var sd := e as InputEventScreenDrag
+		if not touches.has(sd.index):
+			return
+		touches[sd.index] = sd.position
+		if touches.size() >= 2:
+			var pts: Array = touches.values()
+			var centre: Vector2 = (pts[0] + pts[1]) * 0.5
+			var dist: float = pts[0].distance_to(pts[1])
+			camera.position -= (centre - pinch_prev_center) / camera.zoom
+			if pinch_prev_dist > 10.0:
+				var before := _screen_to_world(centre)
+				var z := clampf(camera.zoom.x * dist / pinch_prev_dist, 0.5, 3.0)
+				camera.zoom = Vector2(z, z)
+				camera.position += before - _screen_to_world(centre)  # zoom about the fingers
+			pinch_prev_center = centre
+			pinch_prev_dist = dist
+			_clamp_camera()
+			return
+		if t_mode == "" and sd.position.distance_to(t_start) > 18.0:
+			if started and not over and _player_squads().any(func(q): return q.selected and q.vehicle() == null and not q.alive().is_empty()):
+				t_mode = "line"
+				rdragging = true
+				rdrag_start = _screen_to_world(t_start)
+			else:
+				t_mode = "pan"
+		if t_mode == "pan":
+			camera.position -= sd.relative / camera.zoom
+			_clamp_camera()
+		pointer_world = _screen_to_world(sd.position)
+
+
+func _pinch_begin() -> void:
+	var pts: Array = touches.values()
+	pinch_prev_center = (pts[0] + pts[1]) * 0.5
+	pinch_prev_dist = pts[0].distance_to(pts[1])
+
+
+func _tap(wp: Vector2) -> void:
+	if not started or over:
+		return
+	if face_mode:
+		_order_face(wp)
+		face_mode = false
+		hud.sync_touch("Face", false)
+		return
+	var s := _soldier_at(wp, player_team, 16.0)
+	if s != null:
+		if pick_mode and not s.is_vehicle:
+			_pick_soldier(wp)
+			return
+		var infantry_selected := _player_squads().any(func(q): return q.selected and q.vehicle() == null)
+		if s.is_vehicle and s.free_space() > 0 and infantry_selected and not s.squad.selected:
+			_order(wp, false)  # climb aboard
+			return
+		if s.squad.selected:
+			for sq in squads:
+				sq.selected = false
+				sq.sub.clear()
+			return
+		for sq in squads:
+			sq.sub.clear()
+		select_squad(s.squad, false)
+		return
+	if _player_squads().any(func(q): return q.selected):
+		_order(wp, run_toggle)
+
+
+## The touch bar's buttons.
+func touch_button(key: String, on: bool) -> void:
+	match key:
+		"Run":
+			run_toggle = on
+		"Face":
+			face_mode = on
+		"Pick":
+			pick_mode = on
+			if not on:
+				for sq in squads:
+					sq.sub.clear()
+		"Halt":
+			for sq in _player_squads():
+				if sq.selected:
+					sq.halt()
+		"Unload":
+			for sq in _player_squads():
+				var v = sq.vehicle()
+				if sq.selected and v != null:
+					v.unload()
+		"Squads":
+			hud.set_squads_visible(on)
+		"Pause":
+			if started and not over:
+				paused = on
+		"?":
+			hud.toggle_help()

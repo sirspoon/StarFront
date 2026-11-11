@@ -79,7 +79,7 @@ func _arrow(a: Vector2, b: Vector2, col: Color) -> void:
 ## While right-dragging: where each selected soldier will stand, and which way they'll face.
 func _draw_line_preview() -> void:
 	var a: Vector2 = main.rdrag_start
-	var b := get_global_mouse_position()
+	var b: Vector2 = main.pointer_world
 	if a.distance_to(b) <= 24.0 or Input.is_key_pressed(KEY_CTRL):
 		if Input.is_key_pressed(KEY_CTRL):
 			for sq in main.squads:

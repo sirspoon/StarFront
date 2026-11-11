@@ -19,6 +19,11 @@ var end_label: Label
 var messages: Array[String] = []
 var last_status := {}
 var refresh_timer := 0.0
+var top_panel: PanelContainer
+var squad_panel: PanelContainer
+var touch_bar: HBoxContainer
+var touch_buttons := {}
+var loading_label: Label
 
 
 func setup(m: Node) -> void:
@@ -34,6 +39,7 @@ func setup(m: Node) -> void:
 	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(top)
+	top_panel = top
 	top_label = Label.new()
 	top.add_child(top_label)
 
@@ -42,8 +48,11 @@ func setup(m: Node) -> void:
 	sp.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	sp.position += Vector2(10, -10)
 	root.add_child(sp)
+	squad_panel = sp
 	squad_box = VBoxContainer.new()
 	sp.add_child(squad_box)
+	if main.touch_mode:
+		squad_box.add_theme_constant_override("separation", 1)
 
 	var lp := PanelContainer.new()
 	lp.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -84,7 +93,81 @@ func setup(m: Node) -> void:
 			+ "Men must stay in contact with their squad.\n" \
 			+ "Fire pins men down and breaks their morale."
 	help_panel.add_child(help)
+	if main.touch_mode:
+		help.text = "TOUCH CONTROLS  (? hides)\n" \
+				+ "Tap a soldier: select his squad (again: deselect)\n" \
+				+ "Tap ground: move there   (Run on: run)\n" \
+				+ "Drag with a squad selected: line up along it, in cover\n" \
+				+ "Drag with nothing selected, or two fingers: scroll\n" \
+				+ "Pinch: zoom\n" \
+				+ "Tap an enemy: focus fire   Tap your carrier: board\n" \
+				+ "Tap a wall (tank / lance team selected): shell it\n" \
+				+ "Face, then tap: look that way\n" \
+				+ "Pick, then tap soldiers: order single men\n\n" \
+				+ "Hold the Ashen Chapel. Sandbags, barricades and\n" \
+				+ "low walls stop most fire from their far side.\n" \
+				+ "Men must stay in contact with their squad."
+		help_panel.visible = false
+		_build_touch_bar()
+	loading_label = Label.new()
+	loading_label.text = "Preparing the battlefield..."
+	loading_label.add_theme_font_size_override("font_size", 18)
+	loading_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	loading_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	loading_label.position.y += 48
+	loading_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(loading_label)
 	main.log_message("Battle plans ready.")
+
+
+## The button bar for phones and tablets: toggles for Run, Face and Pick,
+## and one-tap orders.
+func _build_touch_bar() -> void:
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.position.y -= 6
+	root.add_child(panel)
+	touch_bar = HBoxContainer.new()
+	touch_bar.add_theme_constant_override("separation", 6)
+	panel.add_child(touch_bar)
+	for spec in [["Run", true], ["Face", true], ["Pick", true], ["Halt", false], ["Unload", false],
+			["Squads", true], ["Pause", true], ["?", false]]:
+		var b := Button.new()
+		b.text = spec[0]
+		b.toggle_mode = spec[1]
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(64, 44)
+		b.add_theme_font_size_override("font_size", 16)
+		touch_bar.add_child(b)
+		touch_buttons[spec[0]] = b
+		var key: String = spec[0]
+		if spec[1]:
+			b.toggled.connect(func(on): main.touch_button(key, on))
+		else:
+			b.pressed.connect(func(): main.touch_button(key, true))
+	touch_buttons["Squads"].set_pressed_no_signal(true)
+
+
+## Keeps the toggle buttons in step when the game changes a mode itself.
+func sync_touch(key: String, on: bool) -> void:
+	if touch_buttons.has(key):
+		touch_buttons[key].set_pressed_no_signal(on)
+
+
+func set_squads_visible(on: bool) -> void:
+	squad_panel.visible = on
+
+
+## True if a screen position is over a panel or button, so a touch there
+## isn't also taken as an order on the battlefield.
+func is_over_ui(pos: Vector2) -> bool:
+	for c in [top_panel, squad_panel, help_panel, touch_bar.get_parent() if touch_bar else null,
+			menu_panel, end_panel]:
+		if c != null and is_instance_valid(c) and c.is_visible_in_tree() and c.get_global_rect().has_point(pos):
+			return true
+	return false
 
 
 func _make_theme() -> Theme:
@@ -143,13 +226,16 @@ func build_squad_cards() -> void:
 		var row := HBoxContainer.new()
 		var b := Button.new()
 		b.text = sq.name
-		b.custom_minimum_size = Vector2(200, 0)
+		b.custom_minimum_size = Vector2(150 if main.touch_mode else 200, 26 if main.touch_mode else 0)
+		if main.touch_mode:
+			b.add_theme_font_size_override("font_size", 13)
+			b.add_theme_constant_override("outline_size", 0)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.focus_mode = Control.FOCUS_NONE
 		b.pressed.connect(func(): main.select_squad(sq, Input.is_key_pressed(KEY_SHIFT)))
 		row.add_child(b)
 		var bar := ProgressBar.new()
-		bar.custom_minimum_size = Vector2(80, 12)
+		bar.custom_minimum_size = Vector2(50 if main.touch_mode else 80, 12)
 		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		bar.show_percentage = false
 		bar.max_value = 1.0
@@ -157,7 +243,9 @@ func build_squad_cards() -> void:
 		bar.tooltip_text = "Morale"
 		row.add_child(bar)
 		var l := Label.new()
-		l.custom_minimum_size = Vector2(130, 0)
+		l.custom_minimum_size = Vector2(110 if main.touch_mode else 130, 0)
+		if main.touch_mode:
+			l.add_theme_font_size_override("font_size", 13)
 		row.add_child(l)
 		squad_box.add_child(row)
 		rows[sq] = {"button": b, "bar": bar, "label": l}
@@ -172,6 +260,8 @@ func _process(dt: float) -> void:
 
 
 func _refresh() -> void:
+	if loading_label.visible and (main.map_view.ready_drawn or not main.map_view.enabled):
+		loading_label.visible = false
 	var f0: Dictionary = GameData.FACTIONS[main.factions[0]]
 	var f1: Dictionary = GameData.FACTIONS[main.factions[1]]
 	var t := int(main.time)

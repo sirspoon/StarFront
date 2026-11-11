@@ -11,6 +11,10 @@ Built with [Godot 4](https://godotengine.org/) (4.3 or newer). The art is placeh
 drawn in code, so the game can be played and tuned before real sprites are made.
 
 ## Play it
+**On a phone or tablet:** open https://sirspoon.github.io/StarFront/ (rebuilt automatically after every push).
+Turn the phone sideways. Touch controls are described under "?" in the game.
+
+**On a PC:**
 1. Download Godot 4 (standard version, not .NET) from https://godotengine.org/download.
 2. In the Project Manager choose **Import**, pick this folder's `project.godot`, then **Run** (F5).
 

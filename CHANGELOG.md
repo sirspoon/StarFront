@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.10 (2026-11-11)
+Play it on a phone.
+- A web version, built and published to GitHub Pages automatically on every push, playable in a
+  phone's browser (full detail kept for now).
+- Touch controls, switched on automatically on touch screens: tap a soldier to select his squad
+  (tap again to deselect), tap the ground to move, drag to line a selected squad up in cover (the
+  preview shows where each man goes), drag with nothing selected or use two fingers to scroll,
+  pinch to zoom. Tap an enemy to focus fire, your carrier to board, a wall to shell it.
+- A button bar: Run, Face (then tap where to look), Pick (then tap single soldiers), Halt,
+  Unload, Squads (show or hide the squad cards), Pause and help.
+- On phones the interface is laid out for a smaller screen so text and buttons are a usable size.
+- The camera no longer shows the empty space past the edge of the map, and a battle starts
+  looking at your own troops. "Preparing the battlefield..." shows while the map is drawn.
+
 ## v0.09 (2026-11-11)
 Cover and squad control.
 - New low cover: sandbag emplacements (lines, L-shapes and horseshoes), steel-and-plank barricades
