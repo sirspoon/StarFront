@@ -1,0 +1,24 @@
+; Engine configuration file.
+; Open this folder in Godot 4.3 or newer (Project Manager > Import).
+
+config_version=5
+
+[application]
+
+config/name="StarFront"
+config/description="Real-time squad tactics in a ruined gothic future."
+config/version="0.01"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.3", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+anti_aliasing/quality/msaa_2d=2

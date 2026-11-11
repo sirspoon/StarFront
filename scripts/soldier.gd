@@ -1,0 +1,335 @@
+class_name Soldier
+extends Node2D
+## One trooper. Walks its path, fires at enemies it can see, and reacts to
+## incoming fire through suppression (short term) and morale (long term).
+
+enum State { READY, PINNED, ROUTING, DEAD, FLED }
+
+var main: Node
+var map: BattleMap
+var squad: Squad
+var team := 0
+var faction := ""
+var kind := ""
+var data: Dictionary
+var weapon: Dictionary
+var colors: Dictionary
+
+var hp := 1
+var max_hp := 1
+var armor := 0.0
+var speed := 40.0
+var radius := 7.0
+var nerve := 1.0
+var is_leader := false
+var morale := 60.0
+var max_morale := 60.0
+var suppression := 0.0
+var state := State.READY
+
+var path := PackedVector2Array()
+var path_i := 0
+var running := false
+var moving := false
+var facing := 0.0
+var cooldown := 0.0
+var burst_left := 0
+var burst_timer := 0.0
+var burst_target: Soldier = null
+var last_hit_time := -99.0
+var last_fire_time := -99.0
+var flash := 0.0
+var walk := 0.0
+var seen_by := [true, true]
+
+
+func setup(m: Node, sq: Squad, t: int, kind_id: String) -> void:
+	main = m
+	map = m.map
+	squad = sq
+	team = t
+	kind = kind_id
+	faction = sq.faction
+	data = GameData.SOLDIERS[kind_id]
+	colors = GameData.FACTIONS[faction]
+	weapon = GameData.WEAPONS[data.weapon]
+	hp = data.hp
+	max_hp = hp
+	armor = data.armor
+	speed = data.speed * randf_range(0.93, 1.07)
+	radius = data.radius
+	nerve = data.nerve
+	is_leader = data.get("leader", false)
+	max_morale = data.morale
+	morale = max_morale * randf_range(0.85, 1.0)
+	cooldown = randf_range(0.0, 1.5)
+
+
+func is_alive() -> bool:
+	return state <= State.ROUTING
+
+
+func is_effective() -> bool:
+	return state == State.READY or state == State.PINNED
+
+
+func muzzle_pos() -> Vector2:
+	return position + Vector2.from_angle(facing) * (radius + 9.0)
+
+
+func go_to(p: Vector2, run: bool) -> void:
+	if not is_alive() or state == State.ROUTING:
+		return
+	path = map.find_path(position, p)
+	path_i = 0
+	running = run
+
+
+func halt() -> void:
+	path = PackedVector2Array()
+	path_i = 0
+
+
+# ---------------------------------------------------------------- simulation
+
+func tick(dt: float, now: float) -> void:
+	if not is_alive():
+		return
+	flash = maxf(0.0, flash - dt)
+	var under_fire := now - last_hit_time < 3.0
+	suppression = maxf(0.0, suppression - dt * (4.0 if under_fire else 12.0))
+	if not under_fire:
+		morale = minf(max_morale, morale + dt * (1.2 + 2.0 * squad.leader_bonus(self)))
+	elif suppression > 50.0:
+		morale -= dt * (suppression - 50.0) * 0.04 * nerve
+	_update_state(under_fire)
+	match state:
+		State.ROUTING:
+			_follow_path(dt, true)
+		State.PINNED:
+			moving = false
+		State.READY:
+			_follow_path(dt, false)
+	if state != State.ROUTING and is_alive():
+		_fight(dt, now)
+	if visible:
+		queue_redraw()
+
+
+func _update_state(under_fire: bool) -> void:
+	if state == State.ROUTING:
+		if morale > 45.0 and not under_fire:
+			state = State.READY
+			halt()
+		return
+	if morale < 12.0:
+		_start_rout()
+		return
+	if state == State.PINNED:
+		if suppression < 30.0 and morale > 30.0:
+			state = State.READY
+	elif suppression > 70.0 or morale < 22.0:
+		state = State.PINNED
+
+
+func _start_rout() -> void:
+	state = State.ROUTING
+	burst_left = 0
+	running = true
+	var edge_x := 4.0 if team == 0 else BattleMap.W * BattleMap.CELL - 4.0
+	path = map.find_path(position, Vector2(edge_x, position.y))
+	path_i = 0
+
+
+func _follow_path(dt: float, fleeing: bool) -> void:
+	if path_i >= path.size():
+		moving = false
+		if fleeing:
+			state = State.FLED
+			visible = false
+			main.on_fled(self)
+		return
+	var target := path[path_i]
+	var to := target - position
+	var spd := speed * map.speed_mult(position)
+	if running:
+		spd *= 1.7
+	if suppression > 40.0:
+		spd *= 0.6
+	var step := spd * dt
+	var dist := to.length()
+	if dist <= step:
+		position = target
+		path_i += 1
+	else:
+		position += to / dist * step
+	if dist > 0.5 and burst_left == 0:
+		facing = lerp_angle(facing, to.angle(), minf(1.0, dt * 8.0))
+	moving = true
+	walk += dt * spd * 0.25
+
+
+func _fight(dt: float, now: float) -> void:
+	cooldown -= dt
+	if burst_left > 0:
+		burst_timer -= dt
+		if burst_timer <= 0.0:
+			if is_instance_valid(burst_target) and burst_target.is_alive():
+				facing = (burst_target.position - position).angle()
+				flash = 0.06
+				last_fire_time = now
+				main.resolve_shot(self, burst_target)
+			burst_left -= 1
+			burst_timer = weapon.gap
+		return
+	if cooldown > 0.0 or (running and moving):
+		return
+	var t := _pick_target()
+	if t == null:
+		cooldown = randf_range(0.3, 0.6)
+		return
+	burst_target = t
+	burst_left = weapon.burst
+	burst_timer = 0.0
+	var cd: float = weapon.cooldown * randf_range(0.85, 1.2)
+	if state == State.PINNED:
+		cd *= 2.5
+	cooldown = cd
+
+
+func _can_hit(e: Soldier) -> bool:
+	return e.is_alive() and e.seen_by[team] \
+			and position.distance_to(e.position) <= weapon.range \
+			and map.los_clear(position, e.position)
+
+
+func _pick_target() -> Soldier:
+	var focus: Soldier = squad.focus
+	if focus != null and is_instance_valid(focus) and _can_hit(focus):
+		return focus
+	var cands: Array = []
+	for e in main.soldiers:
+		if e.team == team or not e.is_alive() or not e.seen_by[team]:
+			continue
+		var d := position.distance_to(e.position)
+		if d > weapon.range:
+			continue
+		var score := d + (250.0 if e.state == State.ROUTING else 0.0)
+		cands.append([score, e])
+	cands.sort_custom(func(a, b): return a[0] < b[0])
+	for c in cands:
+		if map.los_clear(position, c[1].position):
+			return c[1]
+	return null
+
+
+func add_suppression(v: float, now: float) -> void:
+	suppression = minf(100.0, suppression + v * nerve)
+	morale -= v * 0.05 * nerve
+	last_hit_time = now
+
+
+func take_hit(dmg: int, from: Soldier) -> void:
+	hp -= dmg
+	if hp <= 0:
+		state = State.DEAD
+		z_index = -1
+		burst_left = 0
+		moving = false
+		main.on_death(self, from)
+		queue_redraw()
+	else:
+		morale -= 10.0 * nerve
+
+
+# ---------------------------------------------------------------- drawing
+
+func _draw() -> void:
+	if state == State.DEAD:
+		_draw_corpse()
+		return
+	if squad.selected:
+		draw_arc(Vector2.ZERO, radius + 5.0, 0, TAU, 28, Color(0.45, 1.0, 0.45, 0.85), 1.5)
+	draw_set_transform(Vector2(3, 4), 0, Vector2(1, 0.8))
+	draw_circle(Vector2.ZERO, radius + 1.0, Color(0, 0, 0, 0.35))
+	var prone := state == State.PINNED
+	draw_set_transform(Vector2.ZERO, facing, Vector2(1.25, 0.8) if prone else Vector2.ONE)
+	if moving and not prone:
+		var s := sin(walk) * radius * 0.45
+		var leg: Color = colors.armour
+		draw_circle(Vector2(s, -radius * 0.38), radius * 0.32, leg.darkened(0.3))
+		draw_circle(Vector2(-s, radius * 0.38), radius * 0.32, leg.darkened(0.3))
+	if faction == "sworn":
+		_draw_sworn()
+	else:
+		_draw_conscript()
+	if flash > 0.0:
+		var m := Vector2(radius + 10.0, 3.0)
+		var pts := PackedVector2Array()
+		for i in 8:
+			var rr := 6.0 if i % 2 == 0 else 2.5
+			pts.append(m + Vector2.from_angle(i * TAU / 8.0) * rr)
+		draw_colored_polygon(pts, Color(1.0, 0.9, 0.5, 0.95))
+	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+	if max_hp > 1 and (squad.selected or hp < max_hp):
+		for i in max_hp:
+			var c := Color(0.9, 0.85, 0.6) if i < hp else Color(0.2, 0.2, 0.2)
+			draw_rect(Rect2(Vector2(-max_hp * 2.5 + i * 5.0, radius + 4.0), Vector2(4, 2)), c)
+	if state == State.PINNED:
+		draw_circle(Vector2(0, -radius - 6.0), 2.5, Color(1.0, 0.8, 0.2))
+	elif state == State.ROUTING:
+		draw_circle(Vector2(0, -radius - 6.0), 2.5, Color(1, 1, 1))
+
+
+func _draw_conscript() -> void:
+	var coat: Color = colors.coat
+	var arm: Color = colors.armour
+	var trim: Color = colors.trim
+	var r := radius
+	draw_rect(Rect2(-r - 1.0, -3.0, 4.0, 6.0), arm.darkened(0.2))  # pack and bedroll
+	draw_circle(Vector2.ZERO, r, coat)
+	draw_arc(Vector2.ZERO, r, 0, TAU, 16, coat.darkened(0.45), 1.0)
+	var heavy := kind == "gunner"
+	draw_line(Vector2(0, 3), Vector2(r + (10.0 if heavy else 9.0), 3), Color(0.1, 0.09, 0.08), 3.5 if heavy else 2.0)
+	if heavy:
+		draw_rect(Rect2(1, 4, 4, 4), Color(0.3, 0.27, 0.15))  # ammo box
+	draw_circle(Vector2(r * 0.6, 3.5), 1.8, coat.darkened(0.2))
+	draw_circle(Vector2(0.5, 0), r * 0.58, arm)
+	draw_arc(Vector2(0.5, 0), r * 0.58, -1.3, 1.0, 8, arm.lightened(0.35), 1.0)
+	draw_circle(Vector2(r * 0.55, 0), 1.5, Color(0.12, 0.12, 0.12))  # rebreather
+	if is_leader:
+		draw_line(Vector2(-2.5, 0), Vector2(2.5, 0), trim, 2.0)  # crest
+
+
+func _draw_sworn() -> void:
+	var coat: Color = colors.coat
+	var arm: Color = colors.armour
+	var trim: Color = colors.trim
+	var r := radius
+	if is_leader:
+		var cape := PackedVector2Array([Vector2(-2, -r * 0.8), Vector2(-r * 1.7, -r * 0.6),
+				Vector2(-r * 1.9, 0), Vector2(-r * 1.7, r * 0.6), Vector2(-2, r * 0.8)])
+		draw_colored_polygon(cape, trim.darkened(0.35))
+	draw_rect(Rect2(-r - 3.0, -r * 0.6, 6.0, r * 1.2), arm.darkened(0.3))  # power pack
+	draw_circle(Vector2(-r - 1.0, -2.5), 1.3, Color(1.0, 0.55, 0.2))
+	draw_circle(Vector2(-r - 1.0, 2.5), 1.3, Color(1.0, 0.55, 0.2))
+	draw_circle(Vector2.ZERO, r * 0.85, coat)
+	var gun_w := 5.0 if kind == "cannoneer" else 3.5
+	draw_rect(Rect2(1, 1.5, r + 8.0, gun_w), Color(0.13, 0.12, 0.12))
+	draw_rect(Rect2(r + 6.0, 1.0, 3.0, gun_w + 1.0), trim.darkened(0.2))
+	for s in [-1.0, 1.0]:
+		var p := Vector2(-1, s * r * 0.72)
+		draw_circle(p, r * 0.45, coat.lightened(0.08))
+		draw_arc(p, r * 0.45, 0, TAU, 14, trim, 1.3)
+	draw_circle(Vector2(1, 0), r * 0.42, arm)
+	draw_line(Vector2(r * 0.32, -2.2), Vector2(r * 0.32, 2.2), Color(1.0, 0.25, 0.1), 1.8)  # eye lenses
+
+
+func _draw_corpse() -> void:
+	var blood: Color = colors.blood
+	draw_set_transform(Vector2(2, 1), facing, Vector2(1.4, 1.0))
+	draw_circle(Vector2.ZERO, radius * 1.1, Color(blood, 0.75))
+	draw_set_transform(Vector2.ZERO, facing + 2.2, Vector2(1.3, 0.75))
+	var coat: Color = colors.coat
+	draw_circle(Vector2.ZERO, radius * 0.85, coat.darkened(0.45))
+	draw_circle(Vector2(radius * 0.9, 1), radius * 0.4, Color(colors.armour).darkened(0.4))
