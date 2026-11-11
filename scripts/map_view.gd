@@ -12,6 +12,10 @@ var _where := ""  # for the crash breadcrumbs
 var SCALE := 2.0  # map pixels drawn per world pixel (detail level)
 var BATCH := 4  # tiles prepared at once (1 on phones: each tile is a lot of drawing for one frame)
 const CHUNK := Vector2i(20, 20)  # tile size in cells
+## When walls are damaged only small patches around the damage are repainted and laid
+## over the big tiles, so a shell landing doesn't stall the game repainting whole tiles.
+const PATCH := Vector2i(5, 5)
+var patches := {}  # Vector2i patch -> Sprite2D (drawn over the tiles)
 
 var map: BattleMap
 var enabled := true
@@ -136,15 +140,16 @@ func _make_ground_textures() -> void:
 	ground_grit = grit
 
 
-func _tile_cells(k: Vector2i) -> Rect2i:
-	var r := Rect2i(k * CHUNK, CHUNK)
+func _tile_cells(k: Vector2i, size := CHUNK) -> Rect2i:
+	var r := Rect2i(k * size, size)
 	return r.intersection(Rect2i(0, 0, BattleMap.W, BattleMap.H))
 
 
-func _bake(keys: Array) -> void:
+## Paint the given tiles (or, with as_patches, the given repair patches).
+func _bake(keys: Array, as_patches := false) -> void:
 	var jobs: Array = []
 	for k in keys:
-		var rect := _tile_cells(k)
+		var rect := _tile_cells(k, PATCH if as_patches else CHUNK)
 		var size := Vector2i(Vector2(rect.size * BattleMap.CELL) * SCALE)
 		var vp := _viewport(size)
 		vp.add_child(_painter(MapPainter.new(), rect))
@@ -176,6 +181,9 @@ func _bake(keys: Array) -> void:
 	if use_normals:
 		await RenderingServer.frame_post_draw
 		Settings.stage(_where + ": normal maps drawn")
+	if as_patches:
+		_show_patches(jobs)
+		return
 	Settings.stage(_where + ": reading tiles back")
 	for j in jobs:
 		var vp: SubViewport = j[1]
@@ -189,7 +197,8 @@ func _bake(keys: Array) -> void:
 			tex.normal_texture = ImageTexture.create_from_image(nimg)
 		tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		var k: Vector2i = j[0]
-		var spr: Sprite2D = sprites.get(k)
+		var store: Dictionary = patches if as_patches else sprites
+		var spr: Sprite2D = store.get(k)
 		if spr == null:
 			spr = Sprite2D.new()
 			spr.centered = false
@@ -198,7 +207,7 @@ func _bake(keys: Array) -> void:
 			var rect: Rect2i = j[2]
 			spr.position = Vector2(rect.position * BattleMap.CELL)
 			add_child(spr)
-			sprites[k] = spr
+			store[k] = spr
 		spr.texture = tex
 		if "--debug-normals" in OS.get_cmdline_user_args():
 			spr.texture = tex.normal_texture  # test aid: show the normal maps themselves
@@ -206,6 +215,38 @@ func _bake(keys: Array) -> void:
 		if use_normals:
 			j[3].queue_free()
 			j[4].queue_free()
+
+
+## Repair patches are shown straight from the viewports they were painted in. Reading
+## them back into images (as the big tiles are) makes the graphics chip finish all its
+## work first, which is what stalled the game when a shell hit a wall.
+var patch_vps := {}  # Vector2i patch -> [colour viewport, normal viewport or null]
+
+
+func _show_patches(jobs: Array) -> void:
+	for j in jobs:
+		var k: Vector2i = j[0]
+		var vp: SubViewport = j[1]
+		var tex := CanvasTexture.new()
+		tex.diffuse_texture = vp.get_texture()
+		if use_normals:
+			tex.normal_texture = j[4].get_texture()
+			j[3].queue_free()  # the height pass is no longer needed once the normal map is drawn
+		var spr: Sprite2D = patches.get(k)
+		if spr == null:
+			spr = Sprite2D.new()
+			spr.centered = false
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			spr.scale = Vector2(1.0 / SCALE, 1.0 / SCALE)
+			var rect: Rect2i = j[2]
+			spr.position = Vector2(rect.position * BattleMap.CELL)
+			add_child(spr)
+			patches[k] = spr
+		spr.texture = tex
+		for old in patch_vps.get(k, []):
+			if old != null:
+				old.queue_free()
+		patch_vps[k] = [vp, j[4] if use_normals else null]
 
 
 func _viewport(size: Vector2i) -> SubViewport:
@@ -245,10 +286,10 @@ func _on_cells_changed(cells: Array) -> void:
 		for y in rows:
 			_build_occluders(y)
 	for c in cells:
-		# walls are drawn raised and cast shadows, so neighbouring tiles may need it too
+		# walls are drawn raised and cast shadows, so neighbouring patches may need it too
 		for d in [Vector2i(0, 0), Vector2i(-2, -2), Vector2i(2, -2), Vector2i(-2, 2), Vector2i(2, 2)]:
-			var k := Vector2i((c.x + d.x) / CHUNK.x, (c.y + d.y) / CHUNK.y)
-			if (c + d).x >= 0 and (c + d).y >= 0 and k.x * CHUNK.x < BattleMap.W and k.y * CHUNK.y < BattleMap.H:
+			var k := Vector2i((c.x + d.x) / PATCH.x, (c.y + d.y) / PATCH.y)
+			if (c + d).x >= 0 and (c + d).y >= 0 and k.x * PATCH.x < BattleMap.W and k.y * PATCH.y < BattleMap.H:
 				dirty[k] = true
 
 
@@ -256,8 +297,8 @@ func _process(_dt: float) -> void:
 	if baking or dirty.is_empty() or not ready_drawn:
 		return
 	baking = true
-	var keys := dirty.keys().slice(0, BATCH)
+	var keys := dirty.keys().slice(0, 1)  # one small patch at a time, so the work is spread over frames
 	for k in keys:
 		dirty.erase(k)
-	await _bake(keys)
+	await _bake(keys, true)
 	baking = false

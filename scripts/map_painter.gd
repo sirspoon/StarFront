@@ -66,6 +66,13 @@ func _near(p: Vector2, reach: float) -> bool:
 # ---------------------------------------------------------------- main
 
 func _draw() -> void:
+	var _t0 := Time.get_ticks_usec()
+	_draw_all()
+	if "--perf" in OS.get_cmdline_user_args() and cells.size.x < 10:
+		print("PERF painted %s patch in %.1f ms (%s)" % [cells, (Time.get_ticks_usec() - _t0) / 1000.0, get_class()])
+
+
+func _draw_all() -> void:
 	var area := _cell_area()
 	_draw_ground()
 	_draw_roads()

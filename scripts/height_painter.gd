@@ -12,7 +12,7 @@ func _hc(v: float) -> Color:
 	return Color(v, v, v)
 
 
-func _draw() -> void:
+func _draw_all() -> void:
 	var area := _cell_area()
 	var r := Rect2(Vector2(cells.position * C), Vector2(cells.size * C)).grow(40)
 	draw_rect(r, _hc(GROUND))

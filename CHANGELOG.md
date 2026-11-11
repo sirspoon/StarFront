@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.21 (2026-11-11)
+- Fixed the game freezing for a moment when a big explosion hits a wall. Instead of repainting
+  whole 20x20-cell map tiles (and copying them back from the graphics chip), only small 5x5-cell
+  patches around the damage are repainted, one per frame, and laid over the map. In testing the
+  stall per shell dropped from about 200 ms to about 40 ms.
+
 ## v0.20 (2026-11-11)
 - Hold, then drag to move a squad and spread it along the drag (a ring shows when the hold has
   registered). Holding and letting go without dragging still adds a waypoint. Tap-then-drag scrolls.

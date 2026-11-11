@@ -69,6 +69,10 @@ var shot_path := ""  # --shot=file.png saves a screenshot (needs a display)
 var shot_time := 60.0
 var shot_zoom := 1.2
 var walls_destroyed := 0
+var perf_log := "--perf" in OS.get_cmdline_user_args()  # test aid: print the slowest frame regularly
+var perf_last := 0
+var perf_worst := 0.0
+var perf_frames := 0
 var cover_blocks := [0, 0]   # shots at each side stopped by low cover
 var cover_time := [0.0, 0.0] # soldier-seconds spent in cover, per side
 var field_time := [0.0, 0.0]
@@ -107,6 +111,8 @@ func _ready() -> void:
 		start_battle("legion")
 		if "--demo-damage" in args:
 			_demo_damage()
+		if "--perf-blast" in args:
+			_perf_blast()
 		if "--test-orders" in args:
 			_test_orders()
 		if "--test-carrier" in args:
@@ -179,6 +185,25 @@ func _test_carrier() -> void:
 
 
 ## Test aid: shell the chapel's west wall so screenshots show every damage stage.
+## Test aid: once the map is drawn, fire three tank shells into walls a second apart
+## (with --perf, the slow frames they cause show up in the log).
+func _perf_blast() -> void:
+	while not map_view.ready_drawn:
+		await get_tree().process_frame
+	for i in 60:
+		await get_tree().process_frame
+	var w: Dictionary = GameData.WEAPONS["siege_cannon"]
+	var b: Rect2i = map.buildings[2]
+	for k in 3:
+		print("PERF blast %d" % k)
+		var at := map.center_of(b.position + Vector2i(2 + k * 3, 0))
+		if "--perf-open" in OS.get_cmdline_user_args():
+			at = Vector2(400, 300 + k * 60)  # open ground near the Legion start
+		_blast(at, w, null, true)
+		for i in 40:
+			await get_tree().process_frame
+
+
 func _demo_damage() -> void:
 	var ch := map.chapel
 	var x := ch.position.x * BattleMap.CELL + 8
@@ -463,6 +488,15 @@ func _spawn_vehicle(team: int, kind_id: String, cy: int, counts: Dictionary) -> 
 # ---------------------------------------------------------------- main loop
 
 func _process(dt: float) -> void:
+	if perf_log:
+		var now_us := Time.get_ticks_usec()
+		if perf_last > 0:
+			perf_worst = maxf(perf_worst, (now_us - perf_last) / 1000.0)
+		perf_last = now_us
+		perf_frames += 1
+		if perf_frames % 40 == 0:
+			print("PERF worst frame %.0f ms over last 40 frames" % perf_worst)
+			perf_worst = 0.0
 	_camera_keys(dt)
 	if not touch_mode:
 		pointer_world = get_global_mouse_position()

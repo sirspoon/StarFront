@@ -19,7 +19,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   and the map drawing later (see the style guide).
 - The map is painted by `MapPainter` into 20x20-cell tiles at 2x resolution (`MapView`), repainted when
   `BattleMap.cells_changed` fires. Painting must stay deterministic per cell (hash-seeded), so a
-  repaint only changes what was destroyed. Nothing is painted in headless runs.
+  repaint only changes what was destroyed. Damage repaints 5x5-cell patches laid over the tiles,
+  shown straight from their viewports (no read-back). Nothing is painted in headless runs.
 
 ## Web version
 - `.github/workflows/web.yml` exports the web build (`export_presets.cfg`, preset "Web", no threads,
@@ -42,6 +43,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   `--shot-wall` for the last wall to fall. `--demo-damage` shells the chapel's west wall at the start
   (to see every damage stage); `--log-walls` prints where walls fall. Rendering under xvfb is software,
   so a full battle there takes a minute or two.
+- Performance: `--perf` prints the slowest frame every 40 frames (and how long each repair patch takes
+  to paint); `--perf-blast` fires three tank shells into a wall once the map is drawn (`--perf-open`: open ground).
 - `--test-carrier` checks one tap on a carrier selects it and a double tap boards the selected infantry.
 - `--test-orders` (with `--autotest`, headless is fine) runs a line order and a picked-soldier move and
   prints where the men ended up and whether the squad stayed in contact. `--shot-select` selects the
