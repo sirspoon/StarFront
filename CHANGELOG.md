@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.05 (2026-11-11)
+Textured floors and deeper cracks.
+- Floor slabs now have a worn stone surface like the ground outside (each slab gets its own patch,
+  so no two match), with grain and pitting, bevelled edges, chipped corners and the odd stain of
+  soot, damp or old blood. The chapel's marble and the tops of walls get the same treatment, lighter.
+- Cracks have depth: a dark gap that is widest in the middle, a lit lip on one side, small chips
+  knocked out along it, and branches. Damaged walls use the same cracks.
+
 ## v0.04 (2026-11-11)
 Ruins that look ruined.
 - Where a wall has collapsed, the wall left standing next to it now breaks off raggedly: each course

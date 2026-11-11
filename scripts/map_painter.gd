@@ -270,15 +270,95 @@ func _draw_floor(c: Vector2i) -> void:
 		if _h(q.x, q.y, 12) < 0.15:
 			col = col.darkened(0.3)  # soot
 		var sl: Rect2 = slabs[k]
-		var r := sl.grow(-0.5)
-		draw_rect(r, col)
-		draw_line(r.position, r.position + Vector2(r.size.x, 0), col.lightened(0.15), 0.5)
-		draw_line(r.position + Vector2(0, r.size.y), r.end, col.darkened(0.3), 0.5)
-		if _h(q.x, q.y, 13) < 0.18:
-			var a := r.position + Vector2(_h(q.x, q.y, 14) * r.size.x, 0)
-			draw_polyline(PackedVector2Array([a, a + Vector2(1.5, 2.5), a + Vector2(0.5, 4.5), a + Vector2(2, r.size.y)]),
-					Color(0.08, 0.07, 0.06, 0.7), 0.5)
+		_draw_slab(sl.grow(-0.5), col, q.x, q.y, 1.0)
 	draw_rect(Rect2(o, Vector2(C, C)), Color(0.06, 0.05, 0.04, 0.25), false, 0.4)
+
+
+## A random patch of one of the ground textures laid over r, so no two stones match.
+func _tex_patch(tex: Texture2D, r: Rect2, a: int, b: int, alpha: float) -> void:
+	var size := r.size * 2.0
+	var room := Vector2(tex.get_width(), tex.get_height()) - size
+	var off := Vector2(_h(a, b, 90) * room.x, _h(a, b, 91) * room.y)
+	draw_texture_rect_region(tex, r, Rect2(off, size), Color(1, 1, 1, alpha))
+
+
+## One flagstone: worn surface texture, pitting, bevelled edges, the odd chipped
+## corner, stain or crack. strength scales how weathered it looks.
+func _draw_slab(r: Rect2, col: Color, a: int, b: int, strength: float) -> void:
+	draw_rect(r, col)
+	_tex_patch(ground_fine, r, a, b, strength)
+	_tex_patch(ground_grit, r, a, b + 7, strength)
+	_seed(a, b, 15)
+	# grain and pitting
+	for i in int(10 * strength):
+		var p := r.position + Vector2(rng.randf() * r.size.x, rng.randf() * r.size.y)
+		var dark := rng.randf() < 0.6
+		draw_circle(p, rng.randf_range(0.2, 0.45), col.darkened(0.35) if dark else col.lightened(0.18))
+	# a stain: soot, damp or old blood
+	if rng.randf() < 0.18 * strength:
+		var p := r.position + Vector2(rng.randf() * r.size.x, rng.randf() * r.size.y)
+		var stain: Color = [Color(0.05, 0.04, 0.03, 0.3), Color(0.12, 0.16, 0.12, 0.25), Color(0.25, 0.06, 0.04, 0.2)][rng.randi() % 3]
+		draw_colored_polygon(_blob(p, rng.randf_range(1.5, 4.0), rng.randf_range(0.6, 1.0), 0.5, a * 7 + b), stain)
+	# bevelled edges: lit top and left, shadowed bottom and right, softened by wear
+	draw_line(r.position, r.position + Vector2(r.size.x, 0), col.lightened(0.2), 0.6)
+	draw_line(r.position, r.position + Vector2(0, r.size.y), col.lightened(0.1), 0.5)
+	draw_line(r.position + Vector2(0, r.size.y), r.end, col.darkened(0.4), 0.6)
+	draw_line(r.position + Vector2(r.size.x, 0), r.end, col.darkened(0.3), 0.5)
+	# a chipped corner
+	if rng.randf() < 0.25 * strength:
+		var corner := rng.randi() % 4
+		var p := [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)][corner] as Vector2
+		var dx := 1.0 if corner == 0 or corner == 3 else -1.0
+		var dy := 1.0 if corner < 2 else -1.0
+		var sz := rng.randf_range(1.2, 2.8)
+		var chip := PackedVector2Array([p, p + Vector2(dx * sz, 0), p + Vector2(dx * sz * 0.3, dy * sz * 0.4), p + Vector2(0, dy * sz)])
+		draw_colored_polygon(chip, col.darkened(0.55))
+		draw_line(chip[1], chip[2], col.lightened(0.15), 0.4)
+	# a crack running across it
+	if rng.randf() < 0.22 * strength:
+		var horiz := rng.randf() < 0.5
+		var p0: Vector2
+		var p1: Vector2
+		if horiz:
+			p0 = Vector2(r.position.x, r.position.y + rng.randf_range(0.2, 0.8) * r.size.y)
+			p1 = Vector2(r.end.x, r.position.y + rng.randf_range(0.2, 0.8) * r.size.y)
+		else:
+			p0 = Vector2(r.position.x + rng.randf_range(0.2, 0.8) * r.size.x, r.position.y)
+			p1 = Vector2(r.position.x + rng.randf_range(0.2, 0.8) * r.size.x, r.end.y)
+		if rng.randf() < 0.4:
+			p1 = p0.lerp(p1, rng.randf_range(0.4, 0.75))  # stops part way
+		_crack(p0, p1, r, rng.randf_range(0.5, 0.9), col)
+
+
+## A crack with depth: a dark gap that is widest in the middle, a lit lip on its
+## far side, small chips knocked out along it and a branch or two.
+func _crack(p0: Vector2, p1: Vector2, bounds: Rect2, width: float, surface: Color) -> void:
+	var pts := PackedVector2Array()
+	var n := 6
+	var dir := (p1 - p0)
+	var nrm := dir.orthogonal().normalized()
+	for i in n + 1:
+		var t := float(i) / n
+		var jit := 0.0 if i == 0 or i == n else rng.randf_range(-1.6, 1.6)
+		pts.append((p0 + dir * t + nrm * jit).clamp(bounds.position, bounds.end))
+	var lip := surface.lightened(0.28)
+	var gap := Color(0.04, 0.035, 0.03, 0.95)
+	for i in n:
+		var t := (i + 0.5) / n
+		var w := width * (1.15 - absf(t - 0.5) * 1.5)
+		draw_line(pts[i] + Vector2(0.45, 0.45), pts[i + 1] + Vector2(0.45, 0.45), lip, maxf(0.3, w * 0.6))
+		draw_line(pts[i], pts[i + 1], gap, maxf(0.25, w))
+	for i in range(1, n):
+		if rng.randf() < 0.3:
+			var p := pts[i]
+			draw_colored_polygon(PackedVector2Array([p + Vector2(-0.8, -0.3), p + Vector2(0.6, -0.7), p + Vector2(0.3, 0.8)]), gap)
+	for k in rng.randi_range(0, 2):
+		var start := pts[rng.randi_range(1, n - 1)]
+		var bdir := (dir.normalized() * 0.6 + nrm * (1.0 if rng.randf() < 0.5 else -1.0)).normalized()
+		var mid := (start + bdir * rng.randf_range(1.5, 3.0) + nrm * rng.randf_range(-0.6, 0.6)).clamp(bounds.position, bounds.end)
+		var end := (mid + bdir * rng.randf_range(1.0, 2.5)).clamp(bounds.position, bounds.end)
+		draw_line(start + Vector2(0.4, 0.4), mid + Vector2(0.4, 0.4), lip, 0.3)
+		draw_polyline(PackedVector2Array([start, mid, end]), gap, maxf(0.25, width * 0.45))
 
 
 func _draw_chapel_floor() -> void:
@@ -294,6 +374,8 @@ func _draw_chapel_floor() -> void:
 			col = col.lightened((_h(x, y, 21) - 0.5) * 0.08)
 			var tr := Rect2(Vector2(x, y) * (C * 0.5), Vector2(C * 0.5, C * 0.5))
 			draw_rect(tr, col)
+			_tex_patch(ground_fine, tr, x, y, 0.7)
+			_tex_patch(ground_grit, tr, x, y + 5, 0.5)
 			if x % 2 == 0 and y % 2 == 0:
 				draw_rect(Rect2(tr.position, Vector2(C, C)), Color(0.1, 0.09, 0.08, 0.5), false, 0.5)
 			if light and _h(x, y, 22) < 0.5:
@@ -544,6 +626,8 @@ func _draw_wall(c: Vector2i) -> void:
 				var gr := 0.5 if bx1 == x + 8.0 else 0.0
 				var br := Rect2(bx0 + gl, y + 0.4, bx1 - bx0 - gl - gr, 3.2)
 				draw_rect(br, col)
+				_tex_patch(ground_grit, br, bi, row, 0.6)
+				_tex_patch(ground_fine, br, bi, row + 3, 0.5)
 				draw_line(br.position, br.position + Vector2(br.size.x, 0), col.lightened(0.25), 0.5)
 				if _h(bi, row, 44) < 0.15:
 					draw_circle(br.position + Vector2(br.size.x * 0.7, 2), 0.8, col.darkened(0.3))  # pitting
@@ -580,11 +664,8 @@ func _draw_wall(c: Vector2i) -> void:
 		_seed(c.x, c.y, 45)
 		for n in stage + 1:
 			var p := top.position + Vector2(rng.randf() * C, rng.randf() * C)
-			var pts := PackedVector2Array([p])
-			for k in 4:
-				p += Vector2(rng.randf_range(-4, 4), rng.randf_range(-4, 4))
-				pts.append(p.clamp(top.position, top.end))
-			draw_polyline(pts, Color(0.06, 0.05, 0.05, 0.85), 0.7)
+			var q := p + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(6, 12)
+			_crack(p, q, top, rng.randf_range(0.7, 1.1), base)
 		draw_rect(top, Color(0.05, 0.04, 0.03, 0.12 * stage))  # soot
 
 
