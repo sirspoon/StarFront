@@ -90,7 +90,7 @@ func setup(m: Node) -> void:
 			+ "Right click enemy: focus fire on it\n" \
 			+ "Right click your carrier: climb aboard   U: unload\n" \
 			+ "Right click a wall (tank / lance team): shell it\n" \
-			+ "H: halt   1-9: pick squad   Space: pause\n" \
+			+ "H: halt   G: get down   R: assault   Space: pause\n" \
 			+ "WASD / arrows / middle-drag: scroll   Wheel: zoom\n\n" \
 			+ "Hold the Ashen Chapel. Sandbags, barricades and\n" \
 			+ "low walls stop most fire from their far side.\n" \
@@ -142,7 +142,7 @@ func _build_touch_bar() -> void:
 	touch_bar = HBoxContainer.new()
 	touch_bar.add_theme_constant_override("separation", 6)
 	panel.add_child(touch_bar)
-	for spec in [["Run", true], ["Face", true], ["Pick", true], ["Halt", false], ["Unload", false],
+	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Pick", true], ["Halt", false], ["Unload", false],
 			["Squads", true], ["Pause", true], ["?", false]]:
 		var b := Button.new()
 		b.text = spec[0]

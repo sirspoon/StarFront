@@ -43,6 +43,11 @@ var walk := 0.0
 var seen_by := [true, true]
 var is_vehicle := false
 var in_cover := false      # crouched behind cover facing the threat
+var behind_low := false    # waist-high cover between him and the threat
+var corner_cover := false  # a wall or wreck between him and the threat (leans out to fire)
+var posture := "stand"     # stand, crouch or prone (how he's drawn, and how hard he is to hit)
+var lean := 0.0            # leaning out round cover to fire: -1..1 sideways
+var lean_side := 1.0
 var strength := 1         # how much this unit counts towards its side's strength
 var board_vehicle = null  # carrier this soldier is walking to
 var carrier = null        # carrier this soldier is riding in
@@ -130,6 +135,7 @@ func tick(dt: float, now: float) -> void:
 			_follow_path(dt, false)
 	if state != State.ROUTING and is_alive():
 		_fight(dt, now)
+	_update_posture(dt)
 	if visible:
 		queue_redraw()
 
@@ -145,6 +151,30 @@ func _try_board() -> void:
 		path = map.find_path(position, v.position)
 		path_i = 0
 		running = true
+
+
+## How he holds himself: flat when pinned or in the Down stance (but kneeling behind
+## waist-high cover, so he can see over it), kneeling when in cover, otherwise upright.
+## When firing from behind a wall or wreck he leans out round it.
+func _update_posture(dt: float) -> void:
+	if state == State.PINNED:
+		posture = "prone"
+	elif squad.prone and not (running and moving):
+		posture = "crouch" if behind_low else "prone"
+	elif (in_cover or behind_low) and not moving:
+		posture = "crouch"
+	else:
+		posture = "stand"
+	var firing := burst_left > 0 or flash > 0.0
+	var want := 0.0
+	if firing and corner_cover and not moving:
+		if lean == 0.0:
+			# lean towards whichever side is open
+			var side := Vector2.from_angle(facing).orthogonal()
+			var right_open := not map.blocks(map.get_t(map.cell_of(position + side * BattleMap.CELL)))
+			lean_side = 1.0 if right_open else -1.0
+		want = lean_side
+	lean = move_toward(lean, want, dt * 6.0)
 
 
 func _update_state(under_fire: bool) -> void:
@@ -183,7 +213,9 @@ func _follow_path(dt: float, fleeing: bool) -> void:
 	var target := path[path_i]
 	var to := target - position
 	var spd := speed * map.speed_mult(position)
-	if running:
+	if squad.prone and not fleeing:
+		spd *= 0.35  # crawling
+	elif running:
 		spd *= 1.7
 	if suppression > 40.0:
 		spd *= 0.6
@@ -213,7 +245,7 @@ func _fight(dt: float, now: float) -> void:
 			burst_left -= 1
 			burst_timer = weapon.gap
 		return
-	if cooldown > 0.0 or (running and moving):
+	if cooldown > 0.0:
 		return
 	var bp = breach_point() if can_breach() else null
 	if bp != null:
@@ -317,16 +349,37 @@ func _draw() -> void:
 	if squad.selected:
 		var picked := squad.sub.has(self)
 		draw_arc(Vector2.ZERO, radius + 5.0, 0, TAU, 28, Color(1.0, 0.85, 0.3, 0.95) if picked else Color(0.45, 1.0, 0.45, 0.85), 2.0 if picked else 1.5)
-	draw_set_transform(Vector2(3, 4), 0, Vector2(1, 0.8))
-	draw_circle(Vector2.ZERO, radius + 1.0, Color(0, 0, 0, 0.35))
-	var prone := state == State.PINNED
-	var crouch := in_cover and not moving and flash <= 0.0 and not prone
-	draw_set_transform(Vector2.ZERO, facing, Vector2(1.25, 0.8) if prone else (Vector2(0.86, 0.86) if crouch else Vector2.ONE))
-	if moving and not prone:
-		var s := sin(walk) * radius * 0.45
-		var leg: Color = colors.armour
-		draw_circle(Vector2(s, -radius * 0.38), radius * 0.32, leg.darkened(0.3))
-		draw_circle(Vector2(-s, radius * 0.38), radius * 0.32, leg.darkened(0.3))
+	var prone := posture == "prone"
+	var crouch := posture == "crouch"
+	var r := radius
+	var off := Vector2.from_angle(facing).orthogonal() * lean * r * 0.9  # leaning out round cover
+	var leg: Color = Color(colors.coat).darkened(0.18)
+	# shadow: long and low when lying flat, small when kneeling
+	if prone:
+		draw_set_transform(off + Vector2(2, 3) - Vector2.from_angle(facing) * r * 0.6, facing, Vector2(1.9, 0.8))
+	else:
+		draw_set_transform(off + Vector2(3, 4), 0, Vector2(0.85, 0.7) if crouch else Vector2(1, 0.8))
+	draw_circle(Vector2.ZERO, r + 1.0, Color(0, 0, 0, 0.35))
+	draw_set_transform(off, facing, Vector2.ONE)
+	if prone:
+		# legs stretched out behind him, shuffling when he crawls
+		var c := sin(walk * 1.5) * r * 0.25 if moving else 0.0
+		for sgn in [-1.0, 1.0]:
+			var k: float = c * sgn
+			draw_line(Vector2(-r * 0.6, sgn * r * 0.3), Vector2(-r * 1.9 + k, sgn * r * 0.42), Color(0, 0, 0, 0.35), r * 0.62)
+			draw_line(Vector2(-r * 0.6, sgn * r * 0.3), Vector2(-r * 1.85 + k, sgn * r * 0.4), leg, r * 0.5)
+			draw_circle(Vector2(-r * 1.95 + k, sgn * r * 0.4), r * 0.26, Color(0.12, 0.11, 0.1))  # boots
+		draw_set_transform(off, facing, Vector2(1.1, 0.82))
+	elif crouch:
+		# kneeling: one knee forward, the other foot tucked behind
+		draw_circle(Vector2(r * 0.55, -r * 0.55), r * 0.36, leg)  # knee forward
+		draw_line(Vector2(-r * 0.2, r * 0.45), Vector2(-r * 0.95, r * 0.5), leg.darkened(0.15), r * 0.42)
+		draw_circle(Vector2(-r * 1.05, r * 0.5), r * 0.24, Color(0.12, 0.11, 0.1))  # foot tucked behind
+		draw_set_transform(off, facing, Vector2(0.86, 0.9))
+	elif moving:
+		var sw := sin(walk) * r * 0.45
+		draw_circle(Vector2(sw, -r * 0.38), r * 0.32, leg)
+		draw_circle(Vector2(-sw, r * 0.38), r * 0.32, leg)
 	if faction == "sworn":
 		_draw_sworn()
 	else:
@@ -339,6 +392,8 @@ func _draw() -> void:
 			pts.append(m + Vector2.from_angle(i * TAU / 8.0) * rr)
 		draw_colored_polygon(pts, Color(1.0, 0.9, 0.5, 0.95))
 	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+	if squad.prone and squad.selected:
+		draw_line(Vector2(-4, r + 7.0), Vector2(4, r + 7.0), Color(0.6, 0.8, 1.0, 0.8), 1.5)  # Down stance marker
 	if max_hp > 1 and (squad.selected or hp < max_hp):
 		for i in max_hp:
 			var c := Color(0.9, 0.85, 0.6) if i < hp else Color(0.2, 0.2, 0.2)

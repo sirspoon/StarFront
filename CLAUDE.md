@@ -45,6 +45,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   so a full battle there takes a minute or two.
 - Performance: `--perf` prints the slowest frame every 40 frames (and how long each repair patch takes
   to paint); `--perf-blast` fires three tank shells into a wall once the map is drawn (`--perf-open`: open ground).
+- `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
+  screenshot on the player's Nth squad.
 - `--test-carrier` checks one tap on a carrier selects it and a double tap boards the selected infantry.
 - `--test-orders` (with `--autotest`, headless is fine) runs a line order and a picked-soldier move and
   prints where the men ended up and whether the squad stayed in contact. `--shot-select` selects the

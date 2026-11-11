@@ -124,6 +124,9 @@ func _ready() -> void:
 			_test_orders()
 		if "--test-carrier" in args:
 			_test_carrier()
+		if "--prone" in args:  # test aid: the Legion fights in the Down stance
+			for sq in _player_squads():
+				sq.set_prone(true)
 	else:
 		hud.show_menu()
 
@@ -603,6 +606,11 @@ func _take_shot() -> void:
 			if vehicles_only:
 				break
 	camera.position = c / maxi(n, 1)
+	var squad_shot := false
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--shot-squad="):  # centre on one of the player's squads (by number)
+			var q: Squad = _player_squads()[int(a.trim_prefix("--shot-squad="))]
+			camera.position = q.center()
 	if "--shot-wall" in OS.get_cmdline_user_args() and last_wall_down != null:
 		camera.position = last_wall_down
 	for a in OS.get_cmdline_user_args():
@@ -656,8 +664,11 @@ func _update_spotting() -> void:
 	for s in soldiers:
 		if not s.is_alive():
 			continue
-		var hidden := not s.is_vehicle and map.cell_cover(map.cell_of(s.position)) > 0.2 and time - s.last_fire_time > 4.0 and not s.moving
+		var quiet := time - s.last_fire_time > 4.0
+		var hidden := not s.is_vehicle and map.cell_cover(map.cell_of(s.position)) > 0.2 and quiet and not s.moving
 		var sight := SIGHT_HIDDEN if hidden else SIGHT
+		if not s.is_vehicle and s.posture == "prone" and quiet:
+			sight = minf(sight, SIGHT_HIDDEN if map.cell_cover(map.cell_of(s.position)) > 0.0 else 380.0)
 		for team in 2:
 			if team == s.team:
 				s.seen_by[team] = true
@@ -698,12 +709,19 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 	else:
 		p *= 1.0 - map.cover_vs(target.position, shooter.position)
 	if shooter.moving:
-		p *= 0.5
+		p *= 0.3 if shooter.running else 0.5  # assaulting: firing on the run
+	elif shooter.posture == "prone" and shooter.state != Soldier.State.PINNED:
+		p *= 1.25  # lying flat, braced: a steadier aim
 	if shooter.state == Soldier.State.PINNED:
 		p *= 0.5
 	p *= 1.0 - shooter.suppression / 200.0
-	if target.state == Soldier.State.PINNED:
-		p *= 0.75
+	if target.posture == "prone" and not target.is_vehicle:
+		p *= 0.7  # a man lying flat is a small target
+		var tt := map.get_t(map.cell_of(target.position))
+		if tt == BattleMap.T.RUBBLE or tt == BattleMap.T.CRATER:
+			p *= 0.7  # ...and flat in rubble or a crater, very hard to hit
+	elif target.posture == "crouch":
+		p *= 0.9
 	var hit := randf() < p
 	if hit:
 		hits[shooter.team] += 1
@@ -1001,6 +1019,8 @@ func log_message(text: String) -> void:
 
 func select_squad(sq: Squad, add: bool) -> void:
 	plan_fresh = true
+	if hud != null:
+		hud.sync_touch("Down", sq.prone)
 	if not add:
 		for o in squads:
 			o.selected = false
@@ -1085,6 +1105,16 @@ func _unhandled_input(e: InputEvent) -> void:
 				var v = sq.vehicle()
 				if sq.selected and v != null:
 					v.unload()
+		elif k == KEY_G:
+			var any_up := _player_squads().any(func(q): return q.selected and not q.prone)
+			for sq in _player_squads():
+				if sq.selected:
+					sq.set_prone(any_up)
+		elif k == KEY_R:
+			var any_slow := _player_squads().any(func(q): return q.selected and not q.running)
+			for sq in _player_squads():
+				if sq.selected:
+					sq.set_assault(any_slow)
 		elif k == KEY_H:
 			for sq in _player_squads():
 				if sq.selected:
@@ -1540,8 +1570,20 @@ func focus_squad(sq: Squad, add: bool) -> void:
 ## The touch bar's buttons.
 func touch_button(key: String, on: bool) -> void:
 	match key:
-		"Run":
+		"Assault":
 			run_toggle = on
+			if on:
+				hud.sync_touch("Down", false)
+			for sq in _player_squads():
+				if sq.selected:
+					sq.set_assault(on)  # speeds up (or slows) orders they're already carrying out
+		"Down":
+			for sq in _player_squads():
+				if sq.selected:
+					sq.set_prone(on)
+			if on:
+				run_toggle = false
+				hud.sync_touch("Assault", false)
 		"Face":
 			face_mode = on
 		"Pick":

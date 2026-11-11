@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.25 (2026-11-11)
+Stances.
+- Soldiers in cover now kneel (knee forward, foot tucked behind, lower outline), and a man firing
+  from behind a wall corner or wreck leans out to the open side to take his shots, then ducks back.
+- New Down stance (button on phones, G on PC): the squad lies flat, with legs stretched out behind.
+  Flat men aim better (+25%), are harder to hit (-30%, and -30% more in rubble or a crater) and
+  harder to spot until they fire. Anyone behind waist-high cover stays kneeling so he can see over it.
+  Squads in the Down stance crawl slowly when ordered to move.
+- Run is now Assault (button on phones, R on PC): faster movement, and men fire on the move, but
+  badly until they stop. Turning it on or off with squads selected changes the orders they are
+  already carrying out too. Assault and Down cancel each other.
+
 ## v0.24 (2026-11-11)
 - When hold-dragging a line for a squad to spread along, pause at the end of the line: it locks
   (a blue ring shows) and further dragging sets the way they'll face, without lifting your finger.

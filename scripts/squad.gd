@@ -14,6 +14,7 @@ var start_size := 0
 var facing := Vector2.ZERO  # the direction the squad watches (ZERO = no order)
 var sub: Array = []          # soldiers picked out individually (Alt+click); orders go to them only
 var think_timer := randf() * 1.2
+var prone := false      # 'Down' stance: lie flat (crouch behind low cover), crawl when moving
 var queue: Array = []   # orders still to come: {kind: "move"/"line", a, b, face, run}
 var current = null      # the order being carried out now (for drawing the route), or null
 
@@ -386,6 +387,9 @@ func think(main: Node, dt: float) -> void:
 		var cell := map.cell_of(m.position)
 		var cur := map.cell_cover_dir(cell, threat)
 		m.in_cover = threat != Vector2.ZERO and cur >= 0.6
+		var ahead := map.get_t(map.cell_of(m.position + threat * float(BattleMap.CELL))) if threat != Vector2.ZERO else BattleMap.T.OPEN
+		m.behind_low = ahead == BattleMap.T.LOW
+		m.corner_cover = ahead == BattleMap.T.WALL or ahead == BattleMap.T.WRECK
 		if threat == Vector2.ZERO or m.moving or m.state != Soldier.State.READY or m.burst_left > 0 or cur >= 0.55:
 			continue
 		var best := cell
@@ -414,6 +418,29 @@ func think(main: Node, dt: float) -> void:
 					best = n
 		if best != cell:
 			m.go_to(map.center_of(best), false)
+
+
+## Assault on or off for the orders the squad is carrying out now and those planned.
+func set_assault(on: bool) -> void:
+	running = on
+	if on:
+		prone = false
+	for m in members:
+		if m.is_alive() and m.state != Soldier.State.ROUTING:
+			m.running = on
+	var v = vehicle()
+	if v != null:
+		v.running = on
+	for o in queue:
+		o.run = on
+	if current != null:
+		current.run = on
+
+
+func set_prone(on: bool) -> void:
+	prone = on
+	if on:
+		set_assault(false)
 
 
 func halt() -> void:
