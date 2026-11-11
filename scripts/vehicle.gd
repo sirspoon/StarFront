@@ -21,6 +21,8 @@ var shaken := 0.0
 var track_phase := 0.0
 var smoke_timer := 0.0
 var engine_sound: AudioStreamPlayer2D
+var was_moving := false
+var rev_cooldown := 0.0
 
 
 func setup_vehicle(m: Node, sq: Squad, t: int, kind_id: String) -> void:
@@ -57,7 +59,7 @@ func setup_vehicle(m: Node, sq: Squad, t: int, kind_id: String) -> void:
 	engine_sound = m.sfx.make_engine()
 	if engine_sound != null:
 		add_child(engine_sound)
-		engine_sound.pitch_scale = 0.8 if role == "tank" else 1.0
+		engine_sound.pitch_scale = 0.75 if role == "tank" else 0.9
 		engine_sound.autoplay = true  # starts when the vehicle is placed on the map
 
 
@@ -192,9 +194,14 @@ func tick(dt: float, now: float) -> void:
 	shaken = maxf(0.0, shaken - dt)
 	if engine_sound != null:
 		# revs up and gets louder when moving; the tank is deeper than the carrier
-		var base := 0.8 if role == "tank" else 1.0
-		engine_sound.pitch_scale = move_toward(engine_sound.pitch_scale, base * (1.25 if moving else 0.85), dt * 0.6)
-		engine_sound.volume_db = move_toward(engine_sound.volume_db, -9.0 if moving else -17.0, dt * 12.0)
+		var base := 0.85 if role == "tank" else 1.0
+		engine_sound.pitch_scale = move_toward(engine_sound.pitch_scale, base * (1.15 if moving else 0.8), dt * 0.4)
+		engine_sound.volume_db = move_toward(engine_sound.volume_db, -8.0 if moving else -16.0, dt * 10.0)
+		rev_cooldown -= dt
+		if moving and not was_moving and rev_cooldown <= 0.0:
+			main.sfx.play("engine_rev", position, 0.0 if role == "tank" else -3.0, 0.05)  # groaning into motion
+			rev_cooldown = 4.0
+		was_moving = moving
 	recoil = maxf(0.0, recoil - dt * 3.0)
 	_drive(dt)
 	_aim_and_fire(dt, now)

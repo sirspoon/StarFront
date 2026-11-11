@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.28 (2026-11-11)
+Sound changes.
+- Armour hits are now a heavy thud on a hollow hull, with booming hull tones ringing inside it.
+- Bullet weapons (stubbers, carbines, rotor and tank cannon) have their own ricochet: a sharp crack
+  and a gritty, tumbling whizz. Lumen and fusion weapons keep the electric whine.
+- Vehicle engines are lower and heavier, and groan as they pull away from a standstill.
+
 ## v0.27 (2026-11-11)
 Sound.
 - Sound effects, made from scratch by `tools/make_sounds.py` (no recordings): heavy explosions with

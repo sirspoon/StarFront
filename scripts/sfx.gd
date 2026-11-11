@@ -6,13 +6,13 @@ extends Node2D
 
 const VARIANTS := {
 	"explosion_big": 3, "explosion_small": 3, "cannon": 2, "fusion": 2, "fusion_small": 2,
-	"laser": 4, "stubber": 2, "carbine": 3, "rotor": 2, "ricochet": 4, "clang": 2,
-	"collapse": 2, "lance": 2,
+	"laser": 4, "stubber": 2, "carbine": 3, "rotor": 2, "ricochet": 4, "ricochet_bullet": 4, "clang": 2,
+	"collapse": 2, "lance": 2, "engine_rev": 2,
 }
 const VOLUME := {  # dB, to balance them against each other
 	"explosion_big": 2.0, "explosion_small": -2.0, "cannon": 1.0, "fusion": 0.0, "fusion_small": -4.0,
-	"laser": -9.0, "stubber": -5.0, "carbine": -4.0, "rotor": -3.0, "ricochet": -13.0, "clang": -11.0,
-	"collapse": -1.0, "lance": -5.0,
+	"laser": -9.0, "stubber": -5.0, "carbine": -4.0, "rotor": -3.0, "ricochet": -13.0, "ricochet_bullet": -12.0, "clang": -7.0,
+	"collapse": -1.0, "lance": -5.0, "engine_rev": -6.0,
 }
 ## Which sound each weapon makes (once per burst).
 const WEAPON_SOUND := {
@@ -20,6 +20,8 @@ const WEAPON_SOUND := {
 	"rotor_cannon": "rotor", "lance_launcher": "lance", "fusion_carbine": "fusion_small",
 	"siege_cannon": "cannon", "fusion_cannon": "fusion",
 }
+## Energy weapons: their glancing shots whine electrically; everything else is a bullet.
+const ENERGY := ["lumen_rifle", "fusion_carbine", "fusion_cannon"]
 const POOL := 40
 
 var enabled := true

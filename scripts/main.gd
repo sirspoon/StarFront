@@ -760,7 +760,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 				effects.spark(sp)
 				sfx.play("clang", sp, 0.0, 0.12)
 				if randf() < 0.5:
-					_ricochet(sp, target.position - shooter.position)
+					_ricochet(sp, target.position - shooter.position, w)
 	if w.get("blast", 0.0) > 0.0:
 		_blast(end, w, shooter, show)
 		return
@@ -777,7 +777,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 			if show:
 				effects.spark(target.position)
 				if randf() < 0.4:
-					_ricochet(target.position, target.position - shooter.position)
+					_ricochet(target.position, target.position - shooter.position, w)
 			target.morale -= 1.0
 		else:
 			var away := (target.position - shooter.position).normalized()
@@ -793,7 +793,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 		if show:
 			effects.puff(end, Color(0.55, 0.5, 0.42), 4.0)
 			if hard and randf() < 0.25:
-				_ricochet(end, end - muzzle)
+				_ricochet(end, end - muzzle, w)
 		if randf() < (0.5 if float(w.get("pen", 0)) >= 2.0 else 0.2):
 			decals.add_burn(end, 1.2 + float(w.get("pen", 0)) * 0.25)
 
@@ -824,9 +824,10 @@ func _fire_sound(shooter: Soldier, w: Dictionary, muzzle: Vector2) -> void:
 	sfx.play(Sfx.WEAPON_SOUND.get(w.name, "laser"), muzzle)
 
 
-func _ricochet(pos: Vector2, incoming: Vector2) -> void:
+func _ricochet(pos: Vector2, incoming: Vector2, w := {}) -> void:
 	effects.ricochet(pos, incoming)
-	sfx.play("ricochet", pos, 0.0, 0.15)
+	var energy: bool = w.is_empty() or Sfx.ENERGY.any(func(k): return GameData.WEAPONS[k] == w)
+	sfx.play("ricochet" if energy else "ricochet_bullet", pos, 0.0, 0.15)
 
 
 func _shot_lights(muzzle: Vector2, end: Vector2, w: Dictionary) -> void:

@@ -236,15 +236,50 @@ def ricochet(rng):
 
 
 def clang(rng):
-    """A round bouncing off armour plate."""
+    """A round hitting the side of a hollow armoured hull: a heavy thud, the hull's
+    low booming tones, and the sound bouncing around the empty space inside."""
+    dur = 1.1
+    n = int(dur * SR)
+    t = T(dur)
+    thud = chirp(dur, 150, 70, 8) * env(n, 0.001, 0.07) * 1.6
+    knock = filt(noise(n, rng), lo=150, hi=1400) * env(n, 0.0005, 0.02) * 1.4
+    f0 = rng.uniform(105, 140)
+    hull = sum(np.sin(2 * np.pi * f0 * r * t + rng.uniform(0, 6)) * env(n, 0.002, d) * a
+               for r, d, a in [(1.0, 0.32, 1.0), (1.58, 0.24, 0.7), (2.31, 0.18, 0.5), (3.7, 0.1, 0.3), (5.9, 0.06, 0.2)])
+    x = thud + knock + hull * 0.8
+    # inside the hull: a few quick echoes that keep feeding back (a boxy, hollow ring)
+    box = np.copy(x)
+    for delay, gain in [(0.009, 0.55), (0.014, 0.45), (0.021, 0.35)]:
+        d = int(delay * SR)
+        for k in range(1, 7):
+            seg = filt(x, hi=1200) * gain ** k
+            box[d * k:] += seg[: n - d * k]
+    x = sat(box / np.max(np.abs(box)), 1.8)
+    return finish(reverb(x, 0.6, 0.15, rng, bright=2000), peak=0.85, fade=0.15)
+
+
+def ricochet_bullet(rng):
+    """A bullet glancing off: a sharp metallic crack, then a gritty whizz falling
+    in pitch as it tumbles away."""
     dur = 0.7
     n = int(dur * SR)
     t = T(dur)
-    f0 = rng.uniform(260, 420)
-    x = sum(np.sin(2 * np.pi * f0 * r * t) * env(n, 0.0005, 0.25 / (i + 1)) / (i + 1)
-            for i, r in enumerate([1.0, 2.76, 5.4, 8.93]))
-    x += filt(noise(n, rng), lo=2000) * env(n, 0.0002, 0.005)
-    return finish(reverb(x, 0.5, 0.2, rng), peak=0.7, fade=0.1)
+    crack = filt(noise(n, rng), lo=1800) * env(n, 0.0002, 0.006) * 1.6
+    ping = sum(np.sin(2 * np.pi * f * t) * env(n, 0.0003, 0.03) / (i + 1)
+               for i, f in enumerate([rng.uniform(2100, 2900), rng.uniform(4300, 5200)])) * 0.6
+    f0 = rng.uniform(1700, 2400)
+    f1 = rng.uniform(500, 800)
+    f = f0 + (f1 - f0) * (t / dur) ** 0.5
+    tumble = 1 + 0.5 * np.sin(2 * np.pi * rng.uniform(55, 90) * t)  # the tumbling bullet's flutter
+    whizz_tone = np.sin(2 * np.pi * np.cumsum(f) / SR) * tumble
+    hiss = np.zeros(n)
+    w = noise(n, rng)
+    for k in range(0, n, 512):
+        seg = slice(k, min(n, k + 512))
+        hiss[seg] = filt(w, lo=f[k] * 0.6, hi=f[k] * 1.8)[seg]
+    whizz = (whizz_tone * 0.45 + hiss * 1.2) * env(n, 0.01, 0.16)
+    x = crack + ping + whizz
+    return finish(reverb(x, 0.6, 0.25, rng, bright=6000), peak=0.75, fade=0.1)
 
 
 def collapse(rng):
@@ -278,25 +313,53 @@ def lance(rng):
 
 
 def engine(rng, dur=2.0):
-    """A tracked vehicle's engine and tracks, as a seamless loop: diesel chug,
-    exhaust rumble and the clatter of track links."""
+    """A tracked vehicle's engine and tracks, as a seamless loop: a deep, uneven
+    diesel growl, exhaust rumble and the clatter of track links."""
     n = int(dur * SR)
     t = T(dur)
-    chug = 0.6 + 0.4 * np.maximum(0, np.sin(2 * np.pi * 7.5 * t)) ** 2  # 15 cycles: loops cleanly
-    drone = sum(np.sin(2 * np.pi * 30 * h * t + rng.uniform(0, 6)) / h ** 0.8 for h in range(1, 7))
-    x = sat(drone * chug * 0.5, 2.5)
-    x += filt(noise(n, rng), hi=260) * chug * 1.4  # circular filter: still loops seamlessly
+    # 4.5 firing pulses a second (9 per loop) with uneven strength: a heavy, labouring beat
+    beat = sum(np.maximum(0, np.sin(2 * np.pi * 4.5 * t + ph)) ** 6 * a
+               for ph, a in [(0, 1.0), (2.1, 0.7), (4.2, 0.85)])
+    chug = 0.45 + 0.55 * beat / np.max(beat)
+    drone = sum(np.sin(2 * np.pi * 22.5 * h * t + rng.uniform(0, 6)) / h ** 0.6 for h in range(1, 10))
+    x = sat(drone * chug * 0.6, 3.0)
+    x += filt(noise(n, rng), hi=140) * chug * 1.8  # circular filter: still loops seamlessly
+    x += filt(noise(n, rng), lo=120, hi=400) * chug * 0.4  # the exhaust's growl
     clatter = np.zeros(n)
-    for k in range(20):  # 10 links a second
-        at = k * dur / 20 + rng.uniform(-0.005, 0.005)
-        ln = int(0.02 * SR)
-        knock = filt(noise(ln, rng), lo=900, hi=4000) * env(ln, 0.0005, 0.005) * (0.5 if k % 2 else 0.8)
-        i = int(at * SR) % n
-        idx = (np.arange(ln) + i) % n
+    for k in range(16):  # 8 links a second
+        at = k * dur / 16 + rng.uniform(-0.005, 0.005)
+        ln = int(0.025 * SR)
+        knock = filt(noise(ln, rng), lo=500, hi=2200) * env(ln, 0.0005, 0.006) * (0.4 if k % 2 else 0.6)
+        idx = (np.arange(ln) + int(at * SR)) % n
         clatter[idx] += knock
-    x += clatter * 0.6
-    x = x + 0.9 * filt(x, lo=170, hi=650)  # (circular, so it still loops)
+    x += clatter * 0.5
+    x = x + 0.9 * filt(x, lo=120, hi=500)  # (circular, so it still loops)
     return x / np.max(np.abs(x)) * 0.85  # no fade: it loops
+
+
+def engine_rev(rng):
+    """Getting going: the engine groans under load, its note climbing, the tracks
+    grinding and clanking into motion."""
+    dur = 2.4
+    n = int(dur * SR)
+    t = T(dur)
+    rise = 1 - np.exp(-t / 0.8)
+    f = 20 + 26 * rise  # the engine note climbing as it takes the load
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    load = 1 + 0.6 * np.sin(2 * np.pi * 3.0 * t) * np.exp(-t / 1.2)  # straining surges
+    groan = sum(np.sin(ph * h + rng.uniform(0, 6)) / h ** 0.7 for h in range(1, 10)) * load
+    x = sat(groan * 0.5, 3.0) * env(n, 0.15, 1.2, hold=0.8)
+    x += filt(noise(n, rng), hi=180) * env(n, 0.2, 1.0, hold=0.9) * 1.6
+    x += filt(noise(n, rng), lo=150, hi=500) * env(n, 0.1, 0.6, hold=0.6) * 0.6  # exhaust bark
+    grind = np.zeros(n)
+    for k in range(18):  # track links clanking, speeding up
+        at = 0.25 + 1.8 * (k / 18) ** 0.75
+        ln = int(0.03 * SR)
+        grind_k = filt(noise(ln, rng), lo=400, hi=2000) * env(ln, 0.0005, 0.008) * 0.6
+        place(grind, grind_k, at)
+    x += grind
+    x = x + 0.9 * filt(x, lo=120, hi=500)
+    return finish(reverb(x, 0.8, 0.15, rng), fade=0.6)
 
 
 # ---------------------------------------------------------------- make them all
@@ -313,10 +376,12 @@ def main():
         "carbine": (3, lambda r: burst(r, 4, 0.08, 1.35, explosive=True)),
         "rotor": (2, lambda r: burst(r, 5, 0.1, 2.0, spin=True, tail=1.6)),
         "ricochet": (4, ricochet),
+        "ricochet_bullet": (4, ricochet_bullet),
         "clang": (2, clang),
         "collapse": (2, collapse),
         "lance": (2, lance),
         "engine": (1, engine),
+        "engine_rev": (2, engine_rev),
     }
     for name, (count, fn) in makers.items():
         for i in range(count):
