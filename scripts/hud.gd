@@ -102,7 +102,9 @@ func setup(m: Node) -> void:
 				+ "Tap a soldier or vehicle: select it\n" \
 				+ "Drag with it selected: move there (infantry line up\n" \
 				+ "   along the drag, in cover; Run on: run)\n" \
+				+ "Or double-tap the ground: move there\n" \
 				+ "Tap empty ground: deselect, then drag to scroll\n" \
+				+ "Tap a squad card: select it and go to it\n" \
 				+ "Two fingers: scroll   Pause: orders still work\n" \
 				+ "Pinch: zoom\n" \
 				+ "Tap an enemy: focus fire   Tap your carrier: board\n" \
@@ -238,7 +240,7 @@ func build_squad_cards() -> void:
 			b.add_theme_constant_override("outline_size", 0)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.focus_mode = Control.FOCUS_NONE
-		b.pressed.connect(func(): main.select_squad(sq, Input.is_key_pressed(KEY_SHIFT)))
+		b.pressed.connect(func(): main.focus_squad(sq, Input.is_key_pressed(KEY_SHIFT)))
 		row.add_child(b)
 		var bar := ProgressBar.new()
 		bar.custom_minimum_size = Vector2(50 if main.touch_mode else 80, 12)

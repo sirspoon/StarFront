@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.17 (2026-11-11)
+- Double-tap the ground with a squad selected to move it there (dragging still works too). A lone
+  tap on empty ground still clears the selection, just after a moment's wait for a second tap.
+- Tapping a squad's card selects it and glides the camera over to it.
+
 ## v0.16 (2026-11-11)
 - Loading screen: the menu shows straight away over a dark backdrop with a loading bar, and the
   battlefield only fades in once it is fully drawn. Picking a side before then starts the battle as

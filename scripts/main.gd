@@ -48,6 +48,11 @@ var t_mode := ""              # "" (maybe a tap), "line", "pan", "pinch" or "don
 var pinch_prev_dist := 0.0
 var pinch_prev_center := Vector2.ZERO
 var run_toggle := false
+const DOUBLE_TAP_MS := 450
+var tap_pending := false  # a lone tap on the ground that may become a double tap
+var tap_time := 0
+var tap_frame := 0
+var tap_pos := Vector2.ZERO
 var face_mode := false
 var pick_mode := false
 var pointer_world := Vector2.ZERO  # where the mouse or dragging finger is on the map
@@ -417,6 +422,10 @@ func _process(dt: float) -> void:
 	_camera_keys(dt)
 	if not touch_mode:
 		pointer_world = get_global_mouse_position()
+	# wait for both the time and a few frames, so a slow device still sees the second tap
+	if tap_pending and Time.get_ticks_msec() - tap_time >= DOUBLE_TAP_MS and Engine.get_process_frames() - tap_frame > 10:
+		tap_pending = false
+		_deselect_all()
 	for sm in smokes.duplicate():
 		sm[1] -= dt
 		if sm[1] <= 0.0:
@@ -1179,6 +1188,7 @@ func _touch_input(e: InputEvent) -> void:
 		if t_mode == "" and sd.position.distance_to(t_start) > 18.0:
 			if started and not over and _player_squads().any(func(q): return q.selected and (q.vehicle() != null or not q.alive().is_empty())):
 				t_mode = "line"
+				tap_pending = false
 				rdragging = true
 				rdrag_start = _screen_to_world(t_start)
 			else:
@@ -1205,6 +1215,7 @@ func _tap(wp: Vector2) -> void:
 		return
 	var s := _soldier_at(wp, player_team, 16.0)
 	if s != null:
+		tap_pending = false
 		if pick_mode and not s.is_vehicle:
 			_pick_soldier(wp)
 			return
@@ -1225,9 +1236,39 @@ func _tap(wp: Vector2) -> void:
 		if on_enemy or on_wall:
 			_order(wp, run_toggle)
 			return
+		# a second tap close by soon after: move there. A lone tap clears the
+		# selection once it's clear no second tap is coming.
+		var now := Time.get_ticks_msec()
+		if tap_pending and (now - tap_time < DOUBLE_TAP_MS or Engine.get_process_frames() - tap_frame <= 10) and wp.distance_to(tap_pos) < 40.0 / camera.zoom.x:
+			tap_pending = false
+			_order(wp, run_toggle)
+			return
+		tap_pending = true
+		tap_time = now
+		tap_frame = Engine.get_process_frames()
+		tap_pos = wp
+		return
+	_deselect_all()
+
+
+func _deselect_all() -> void:
 	for sq in squads:
 		sq.selected = false
 		sq.sub.clear()
+
+
+## Called by a squad card: select the squad and glide the camera over to it.
+func focus_squad(sq: Squad, add: bool) -> void:
+	select_squad(sq, add)
+	if sq.alive().is_empty() and sq.carrier() == null and sq.vehicle() == null:
+		return
+	var from := camera.position
+	camera.position = sq.center()
+	_clamp_camera()
+	var to := camera.position
+	camera.position = from
+	var tw := create_tween()
+	tw.tween_property(camera, "position", to, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 ## The touch bar's buttons.
