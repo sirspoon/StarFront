@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.26 (2026-11-11)
+More battle effects.
+- Ricochets: shots glancing off armour, walls and cover sometimes fly off as a bright streak.
+- Blood: a hit sprays droplets and streaks away from the shooter, and wounded men leave smears as
+  they move. Each body lies in its own pool, irregular in shape and size, sometimes with a smear or
+  spatter around it.
+- Small burn marks where shots strike the ground (more from heavy weapons).
+- More smoke: shell bursts leave smoke hanging about, heavy weapons give a puff of gunsmoke, and
+  burning wrecks smoke more.
+- Ground marks are redrawn at most four times a second, and the oldest small ones are cleared once
+  there are 700, so long battles don't slow down.
+
 ## v0.25 (2026-11-11)
 Stances.
 - Soldiers in cover now kneel (knee forward, foot tucked behind, lower outline), and a man firing

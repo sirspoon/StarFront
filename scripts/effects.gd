@@ -20,6 +20,15 @@ func puff(pos: Vector2, color: Color, size: float = 6.0) -> void:
 	puffs.append({"pos": pos, "color": color, "t": 0.0, "size": size})
 
 
+## A shot glancing off: a bright streak flying off at an angle, and sparks.
+func ricochet(pos: Vector2, incoming: Vector2) -> void:
+	var out := incoming.normalized().reflect(Vector2.from_angle(randf() * TAU)).rotated(randf_range(-0.6, 0.6))
+	if out.dot(incoming) > 0.3:
+		out = -out
+	tracers.append({"from": pos, "to": pos + out.normalized() * randf_range(40, 110), "color": Color(1.0, 0.9, 0.6), "width": 1.0, "t": 0.0})
+	spark(pos)
+
+
 func spark(pos: Vector2) -> void:
 	sparks.append({"pos": pos, "t": 0.0, "seed": randf() * TAU})
 

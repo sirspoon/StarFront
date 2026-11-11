@@ -136,6 +136,12 @@ func tick(dt: float, now: float) -> void:
 	if state != State.ROUTING and is_alive():
 		_fight(dt, now)
 	_update_posture(dt)
+	if bleeding > 0.0:
+		bleeding -= dt
+		bleed_step -= dt
+		if moving and bleed_step <= 0.0:
+			bleed_step = 0.5
+			main.decals.add_smear(position, -Vector2.from_angle(facing), 9.0, Color(colors.blood))
 	if visible:
 		queue_redraw()
 
@@ -338,6 +344,7 @@ func take_hit(dmg: int, from: Soldier) -> void:
 		queue_redraw()
 	else:
 		morale -= 10.0 * nerve
+		bleeding = 6.0  # a wounded man leaves a trail for a while
 
 
 # ---------------------------------------------------------------- drawing
@@ -454,10 +461,39 @@ func _draw_sworn() -> void:
 	draw_line(Vector2(r * 0.32, -2.2), Vector2(r * 0.32, 2.2), Color(1.0, 0.25, 0.1), 1.8)  # eye lenses
 
 
+var pool_seed := randi()
+var bleeding := 0.0
+var bleed_step := 0.0
+
+
+## Each body lies in its own pool: an irregular shape of varying size, darker at
+## the middle, sometimes with a smear where he fell or spatter around it.
 func _draw_corpse() -> void:
 	var blood: Color = colors.blood
-	draw_set_transform(Vector2(2, 1), facing, Vector2(1.4, 1.0))
-	draw_circle(Vector2.ZERO, radius * 1.1, Color(blood, 0.75))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = pool_seed
+	var size := radius * rng.randf_range(0.7, 1.6)
+	blood = blood.darkened(0.55)  # pooled blood is dark, almost black at the middle
+	var centre := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0, radius * 0.5)
+	var squash := rng.randf_range(0.55, 1.0)
+	var rot := rng.randf() * TAU
+	for layer in 2:
+		var pts := PackedVector2Array()
+		var lr := size * (1.0 if layer == 0 else rng.randf_range(0.45, 0.65))
+		var n := 14
+		for i in n:
+			var a := i * TAU / n
+			var rr := lr * rng.randf_range(0.65, 1.2)
+			pts.append(centre + Vector2(cos(a) * rr, sin(a) * rr * squash).rotated(rot))
+		draw_colored_polygon(pts, Color(blood.darkened(layer * 0.3), 0.6 + layer * 0.2))
+	for i in rng.randi_range(0, 3):  # lobes where it ran out across the ground
+		var a := rng.randf() * TAU
+		draw_circle(centre + Vector2.from_angle(a) * size * rng.randf_range(0.7, 1.1), size * rng.randf_range(0.2, 0.4), Color(blood, 0.55))
+	if rng.randf() < 0.4:  # a smear where he slumped
+		var a := rng.randf() * TAU
+		draw_line(centre, centre + Vector2.from_angle(a) * size * rng.randf_range(1.5, 2.5), Color(blood.darkened(0.2), 0.5), size * 0.4)
+	for i in rng.randi_range(0, 5):  # spatter
+		draw_circle(Vector2.from_angle(rng.randf() * TAU) * size * rng.randf_range(1.2, 2.2), rng.randf_range(0.5, 1.2), Color(blood, 0.6))
 	draw_set_transform(Vector2.ZERO, facing + 2.2, Vector2(1.3, 0.75))
 	var coat: Color = colors.coat
 	draw_circle(Vector2.ZERO, radius * 0.85, coat.darkened(0.45))

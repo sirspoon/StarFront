@@ -386,7 +386,7 @@ func add_fire(p: Vector2) -> void:
 	var smoke := SimpleParticles.new()
 	smoke.texture = dot
 	smoke.position = p
-	smoke.amount = 36
+	smoke.amount = 50
 	smoke.lifetime = 5.0
 	smoke.preprocess = 5.0
 	smoke.emission_radius = 8.0
@@ -750,7 +750,10 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 			if got_in:
 				effects.explosion(target.position + Vector2(randf_range(-8, 8), randf_range(-8, 8)), 14.0)
 			else:
-				effects.spark(target.position + (shooter.position - target.position).normalized() * target.radius)
+				var sp := target.position + (shooter.position - target.position).normalized() * target.radius
+				effects.spark(sp)
+				if randf() < 0.5:
+					effects.ricochet(sp, target.position - shooter.position)
 	if w.get("blast", 0.0) > 0.0:
 		_blast(end, w, shooter, show)
 		return
@@ -766,13 +769,26 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 		if randf() < target.armor * (1.0 - w.ap):
 			if show:
 				effects.spark(target.position)
+				if randf() < 0.4:
+					effects.ricochet(target.position, target.position - shooter.position)
 			target.morale -= 1.0
 		else:
+			var away := (target.position - shooter.position).normalized()
 			if show:
 				effects.puff(target.position, Color(target.colors.blood), 5.0)
+			if target.max_hp == 1 or randf() < 0.5:
+				decals.add_blood(target.position + away * 2.0, away, 0.7 + float(w.dmg) * 0.2, Color(target.colors.blood))
 			target.take_hit(w.dmg, shooter)
-	elif show:
-		effects.puff(end, Color(0.55, 0.5, 0.42), 4.0)
+	else:
+		# the miss lands somewhere: off cover or a wall it may glance, in the open it scorches the ground
+		var t_end := map.get_t(map.cell_of(end))
+		var hard := t_end == BattleMap.T.WALL or t_end == BattleMap.T.LOW or t_end == BattleMap.T.WRECK or lc.x >= 0
+		if show:
+			effects.puff(end, Color(0.55, 0.5, 0.42), 4.0)
+			if hard and randf() < 0.25:
+				effects.ricochet(end, end - muzzle)
+		if randf() < (0.5 if float(w.get("pen", 0)) >= 2.0 else 0.2):
+			decals.add_burn(end, 1.2 + float(w.get("pen", 0)) * 0.25)
 
 
 ## A shot at a spot rather than a soldier: used to blow holes in walls.
@@ -794,6 +810,8 @@ func _shot_lights(muzzle: Vector2, end: Vector2, w: Dictionary) -> void:
 	var col: Color = w.tracer
 	var size: float = w.width
 	light_fx.flash(muzzle, col, 0.9 + size * 0.15, 36.0 + size * 10.0, 0.08)
+	if float(w.get("pen", 0)) >= 2.0:
+		effects.puff(muzzle, Color(0.42, 0.4, 0.38), 3.0 + size)  # gunsmoke from heavy weapons
 	light_fx.streak(muzzle, end, col, 0.55 + size * 0.1, 26.0 + size * 9.0, Effects.TRACER_TIME * 1.1)
 
 
@@ -865,6 +883,8 @@ func _blast(at: Vector2, w: Dictionary, shooter: Soldier, show: bool) -> void:
 	var r: float = w.blast
 	if show:
 		effects.explosion(at, r)
+		if r >= 30.0 or randf() < 0.5:
+			add_smoke(at, 6.0 + r * 0.15, clampf(r / 30.0, 0.6, 1.5))  # the burst's smoke hangs about
 		light_fx.flash(at, Color(1.0, 0.6, 0.3), 2.4, r * 3.0 + 40.0, 0.6, true)
 	decals.add_scorch(at, r * 0.7)
 	if w.get("wall", 0.0) > 0.0:
