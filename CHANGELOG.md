@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.16 (2026-11-11)
+- Loading screen: the menu shows straight away over a dark backdrop with a loading bar, and the
+  battlefield only fades in once it is fully drawn. Picking a side before then starts the battle as
+  soon as loading finishes.
+
 ## v0.15 (2026-11-11)
 Touch controls refined.
 - Tapping a soldier or vehicle always selects its squad (it no longer toggles off).

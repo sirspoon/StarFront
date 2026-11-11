@@ -16,6 +16,8 @@ const CHUNK := Vector2i(20, 20)  # tile size in cells
 var map: BattleMap
 var enabled := true
 var ready_drawn := false
+var tiles_total := 1  # for the loading bar
+var tiles_done := 0
 var sprites := {}  # Vector2i tile -> Sprite2D
 var occluders := {}  # row -> Array of LightOccluder2D: walls cast shadows from lights
 var dirty := {}
@@ -43,18 +45,21 @@ func setup(m: BattleMap) -> void:
 	Settings.stage("making ground textures")
 	await _make_ground_textures()
 	var all: Array = []
+	tiles_done = 0
 	for cx in ceili(float(BattleMap.W) / CHUNK.x):
 		for cy in ceili(float(BattleMap.H) / CHUNK.y):
 			all.append(Vector2i(cx, cy))
 	if Settings.on("shadows", not Settings.is_phone()):
 		for y in BattleMap.H:
 			_build_occluders(y)
+	tiles_total = all.size()
 	SCALE = Settings.detail()
 	use_normals = Settings.on("normals", true)
 	BATCH = Settings.batch()
 	for i in range(0, all.size(), BATCH):
 		_where = "map tiles %d-%d of %d (%s)" % [i + 1, mini(i + BATCH, all.size()), all.size(), Settings.summary()]
 		await _bake(all.slice(i, i + BATCH))
+		tiles_done = mini(i + BATCH, all.size())
 		if BATCH == 1:
 			for f in 3:
 				await get_tree().process_frame  # let the phone's graphics catch up between tiles

@@ -24,6 +24,10 @@ var squad_panel: PanelContainer
 var touch_bar: HBoxContainer
 var touch_buttons := {}
 var loading_label: Label
+var backdrop: ColorRect      # hides the battlefield until it is fully drawn
+var load_bar: ProgressBar
+var load_text: Label
+var pending_faction := ""    # a side picked before loading finished
 
 
 func setup(m: Node) -> void:
@@ -111,6 +115,7 @@ func setup(m: Node) -> void:
 		help_panel.visible = false
 		_build_touch_bar()
 	loading_label = Label.new()
+	loading_label.visible = false  # replaced by the loading bar in the menu
 	loading_label.text = "Preparing the battlefield..."
 	loading_label.add_theme_font_size_override("font_size", 18)
 	loading_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
@@ -261,6 +266,7 @@ func _process(dt: float) -> void:
 
 
 func _refresh() -> void:
+	_update_loading()
 	if loading_label.visible and (main.map_view.ready_drawn or not main.map_view.enabled):
 		loading_label.visible = false
 	var f0: Dictionary = GameData.FACTIONS[main.factions[0]]
@@ -323,6 +329,11 @@ func _centre_panel() -> PanelContainer:
 
 
 func show_menu() -> void:
+	backdrop = ColorRect.new()
+	backdrop.color = Color(0.06, 0.055, 0.05)
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_child(backdrop)
 	menu_panel = _centre_panel()
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
@@ -358,6 +369,15 @@ func show_menu() -> void:
 	info.add_theme_color_override("font_color", Color(0.6, 0.57, 0.5))
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(info)
+	load_text = Label.new()
+	load_text.text = "Preparing the battlefield..."
+	load_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(load_text)
+	load_bar = ProgressBar.new()
+	load_bar.custom_minimum_size = Vector2(620, 14)
+	load_bar.show_percentage = false
+	load_bar.max_value = 1.0
+	v.add_child(load_bar)
 	for key in ["legion", "sworn"]:
 		var f: Dictionary = GameData.FACTIONS[key]
 		var b := Button.new()
@@ -365,10 +385,43 @@ func show_menu() -> void:
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		b.custom_minimum_size = Vector2(620, 72)
 		b.focus_mode = Control.FOCUS_NONE
-		b.pressed.connect(func():
-			menu_panel.queue_free()
-			main.start_battle(key))
+		b.pressed.connect(func(): _choose(key))
 		v.add_child(b)
+
+
+func _map_ready() -> bool:
+	return main.map_view.ready_drawn or not main.map_view.enabled
+
+
+func _choose(key: String) -> void:
+	if _map_ready():
+		menu_panel.queue_free()
+		main.start_battle(key)
+	else:
+		pending_faction = key
+		load_text.text = "Starting as %s when the battlefield is ready..." % GameData.FACTIONS[key].name
+
+
+## Loading bar, revealing the battlefield, and starting a battle picked early.
+func _update_loading() -> void:
+	if backdrop == null or not is_instance_valid(backdrop):
+		return
+	var mv = main.map_view
+	if not _map_ready():
+		load_bar.value = float(mv.tiles_done) / maxf(mv.tiles_total, 1)
+		if pending_faction == "":
+			load_text.text = "Preparing the battlefield...  %d%%" % int(load_bar.value * 100)
+		return
+	var b := backdrop
+	backdrop = null
+	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	create_tween().tween_property(b, "modulate:a", 0.0, 0.8).finished.connect(b.queue_free)
+	if is_instance_valid(load_bar):
+		load_bar.visible = false
+		load_text.visible = false
+	if pending_faction != "":
+		menu_panel.queue_free()
+		main.start_battle(pending_faction)
 
 
 func show_end(text: String) -> void:
