@@ -62,6 +62,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   title screen, without or with the "What's new" box open.
 - `--shot-heavy` (with `--shot-team=0|1`) waits for a set-up heavy gun firing and centres on it. Test
   results print heavy gun kills and the share of time each side's heavy gun was set up.
+- `--shot-flame` waits for a flamer's jet and centres on it. Test results also print men killed by
+  their own side and kills by the Pyre Warden / Bastion Brother.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

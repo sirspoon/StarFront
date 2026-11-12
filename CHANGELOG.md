@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.43 (2026-11-12)
+Grenade fix, two heavy Sworn warriors, more Legion heavy guns.
+- Grenades no longer blow up the men who threw them. Before, a man with a wall right in front of
+  him would throw straight into it and it dropped at his feet. Now only a man with a clear throw
+  does it (the squad moves up to find one if needed), nobody throws a frag or tank-breaker so
+  close that he or a friend is in the blast, and a throw's scatter can't land it at his feet.
+- New for the Sworn, both in very heavy armour (four wounds, hard to hurt with rifles) but slow:
+  - Pyre Warden: a flame projector. Each jet fills a narrow cone out to about 7 cells, licks round
+    cover, burns everyone in it and terrifies them. Walls stop it.
+  - Bastion Brother: a hail cannon, a multi-barrelled gun that spins up and sprays ten rounds.
+- The Legion now has three Heavy Gun Teams.
+- Balance: in test battles the Legion still wins about one in six, as before.
+
 ## v0.42 (2026-11-12)
 Heavy Gun Team crews.
 - The gunner works the gun; the loader changes the ammunition. A load lasts six bursts, then the

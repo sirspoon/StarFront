@@ -744,7 +744,14 @@ func _draw_sworn() -> void:
 		var cape := PackedVector2Array([Vector2(-2, -r * 0.8), Vector2(-r * 1.7, -r * 0.6),
 				Vector2(-r * 1.9, 0), Vector2(-r * 1.7, r * 0.6), Vector2(-2, r * 0.8)])
 		draw_colored_polygon(cape, trim.darkened(0.35))
-	draw_rect(Rect2(-r - 3.0, -r * 0.6, 6.0, r * 1.2), arm.darkened(0.3))  # power pack
+	var bastion: bool = data.get("bastion", false)
+	if kind == "pyre_warden":
+		for s in [-1.0, 1.0]:  # twin fuel tanks on his back
+			draw_circle(Vector2(-r - 1.0, s * r * 0.35), r * 0.38, Color(0.35, 0.3, 0.22))
+			draw_arc(Vector2(-r - 1.0, s * r * 0.35), r * 0.38, 0, TAU, 12, Color(0.12, 0.1, 0.08), 1.0)
+		draw_line(Vector2(-r - 1.0, 0), Vector2(r * 0.3, r * 0.5), Color(0.15, 0.13, 0.1), 1.6)  # fuel hose
+	else:
+		draw_rect(Rect2(-r - 3.0, -r * 0.6, 6.0, r * 1.2), arm.darkened(0.3))  # power pack
 	if data.get("loader", false):
 		draw_rect(Rect2(-r - 6.0, -r * 0.5, 4.0, r), Color(0.3, 0.27, 0.2))  # ammunition crate
 		draw_line(Vector2(-r - 2.0, -r * 0.3), Vector2(1, r * 0.5), Color(0.6, 0.5, 0.25), 1.2)  # belt
@@ -754,6 +761,15 @@ func _draw_sworn() -> void:
 	var bladed := kind == "oathblade" or kind == "blade_champion"
 	if heavy:
 		_draw_heavy_gun(Color(0.13, 0.12, 0.12), trim.darkened(0.2), 6.0, r + 15.0, true)
+	elif kind == "pyre_warden":
+		draw_rect(Rect2(1, 1.0, r + 6.0, 5.0), Color(0.16, 0.14, 0.12))  # the projector
+		draw_rect(Rect2(r + 5.0, 0.5, 3.5, 6.0), trim.darkened(0.3))  # nozzle
+		draw_circle(Vector2(r + 9.5, 3.5), 1.6 + sin(walk * 3.0 + float(pool_seed % 7)) * 0.3, Color(0.5, 0.75, 1.0, 0.9))  # pilot flame
+	elif kind == "bastion":
+		for k in 3:  # the hail cannon's spinning barrels
+			draw_rect(Rect2(3, 0.0 + k * 2.4, r + 10.0, 1.8), Color(0.15, 0.14, 0.14))
+		draw_rect(Rect2(1, -0.6, r * 0.7, 8.0), Color(0.2, 0.18, 0.17))  # housing
+		draw_rect(Rect2(r + 9.0, -0.3, 2.5, 7.5), trim.darkened(0.2))
 	elif bladed:
 		draw_rect(Rect2(1, 2.5, r * 0.8, 3.0), Color(0.13, 0.12, 0.12))  # pistol
 		draw_rect(Rect2(r * 0.8, 2.0, 2.0, 4.0), trim.darkened(0.2))
@@ -768,8 +784,13 @@ func _draw_sworn() -> void:
 		draw_circle(Vector2(r + 9.0, 3.2), 2.2, Color(0.6, 0.85, 1.0))  # fusion glow
 	for s in [-1.0, 1.0]:
 		var p := Vector2(-1, s * r * 0.72)
-		draw_circle(p, r * 0.45, coat.lightened(0.08))
-		draw_arc(p, r * 0.45, 0, TAU, 14, trim, 1.3)
+		var pad := r * (0.55 if bastion else 0.45)  # massive plate pauldrons on the heavy armour
+		draw_circle(p, pad, coat.lightened(0.08))
+		draw_arc(p, pad, 0, TAU, 14, trim, 1.6 if bastion else 1.3)
+		if bastion:
+			draw_arc(p, pad * 0.6, 0, TAU, 12, coat.darkened(0.25), 1.0)
+	if bastion:
+		draw_rect(Rect2(-r * 0.4, -r * 0.25, r * 0.5, r * 0.5), trim.darkened(0.15))  # chest seal
 	draw_circle(Vector2(1, 0), r * 0.42, arm)
 	draw_line(Vector2(r * 0.32, -2.2), Vector2(r * 0.32, 2.2), Color(1.0, 0.25, 0.1), 1.8)  # eye lenses
 

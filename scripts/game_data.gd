@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.42"
+const VERSION := "0.43"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -35,6 +35,11 @@ const WEAPONS := {
 		"acc": 0.19, "ap": 0.55, "dmg": 2, "pen": 3, "vdmg": 1, "supp": 12.0, "tracer": Color(1.0, 0.42, 0.2), "width": 2.2},
 	"heavy_mass_gun": {"name": "Heavy mass-reactive gun", "range": 470.0, "cooldown": 2.6, "burst": 4, "gap": 0.14,
 		"acc": 0.11, "ap": 0.45, "dmg": 2, "pen": 4, "vdmg": 2, "supp": 16.0, "tracer": Color(0.6, 0.85, 1.0), "width": 2.8},
+	"pyre_projector": {"name": "Pyre projector", "range": 115.0, "cooldown": 2.2, "burst": 1, "gap": 0.0,
+		"acc": 0.55, "ap": 0.5, "dmg": 1, "pen": 3, "vdmg": 1, "supp": 28.0, "flame": true, "cone": 0.35,
+		"tracer": Color(1.0, 0.55, 0.15), "width": 4.0},
+	"hail_cannon": {"name": "Hail cannon", "range": 380.0, "cooldown": 3.2, "burst": 10, "gap": 0.05,
+		"acc": 0.1, "ap": 0.4, "dmg": 1, "pen": 4, "vdmg": 1, "supp": 8.0, "tracer": Color(0.6, 0.85, 1.0), "width": 1.6},
 	"fusion_cannon": {"name": "Fusion cannon", "range": 540.0, "cooldown": 6.0, "burst": 1, "gap": 0.0,
 		"acc": 0.55, "ap": 0.9, "dmg": 4, "pen": 9, "vdmg": 6, "blast": 24.0, "wall": 70.0, "supp": 40.0,
 		"tracer": Color(0.7, 0.9, 1.0), "width": 5.0},
@@ -48,6 +53,7 @@ const MELEE := {
 	"trench_knife": {"name": "Trench knife", "cooldown": 0.75, "hit": 0.6, "parry": 0.25, "dmg": 1, "ap": 0.45, "sound": "melee_blade", "blade": true},
 	"hook_sabre": {"name": "Hook sabre", "cooldown": 0.85, "hit": 0.65, "parry": 0.35, "dmg": 1, "ap": 0.55, "sound": "melee_blade", "blade": true},
 	"edict_blade": {"name": "Edict blade", "cooldown": 0.85, "hit": 0.65, "parry": 0.4, "dmg": 2, "ap": 0.8, "sound": "melee_power", "blade": true},
+	"gauntlet": {"name": "Bastion gauntlet", "cooldown": 1.6, "hit": 0.5, "parry": 0.1, "dmg": 2, "ap": 0.7, "sound": "melee_blunt", "blade": false},
 	"edict_greatblade": {"name": "Edict greatblade", "cooldown": 1.0, "hit": 0.7, "parry": 0.45, "dmg": 3, "ap": 0.85, "sound": "melee_power", "blade": true},
 }
 
@@ -98,6 +104,10 @@ const SOLDIERS := {
 		"radius": 10.0, "weapon": "heavy_mass_gun", "heavy": true, "grenades": {}},
 	"hw_loader_s": {"name": "Sworn Loader", "hp": 2, "armor": 0.4, "speed": 36.0, "morale": 95.0, "nerve": 0.5,
 		"radius": 10.0, "weapon": "mass_pistol", "loader": true, "grenades": {"he": 1}},
+	"pyre_warden": {"name": "Pyre Warden", "hp": 4, "armor": 0.75, "speed": 26.0, "morale": 120.0, "nerve": 0.3,
+		"radius": 12.0, "weapon": "pyre_projector", "melee": "gauntlet", "bastion": true, "grenades": {}},
+	"bastion": {"name": "Bastion Brother", "hp": 4, "armor": 0.75, "speed": 26.0, "morale": 120.0, "nerve": 0.3,
+		"radius": 12.0, "weapon": "hail_cannon", "melee": "gauntlet", "bastion": true, "grenades": {}},
 	"oathblade": {"name": "Sworn Oathblade", "hp": 3, "armor": 0.5, "speed": 47.0, "morale": 100.0, "nerve": 0.45,
 		"radius": 10.0, "weapon": "mass_pistol", "melee": "edict_blade", "charger": true, "grenades": {"he": 1, "ap": 1}},
 	"blade_champion": {"name": "Oathblade Champion", "hp": 4, "armor": 0.6, "speed": 47.0, "morale": 115.0, "nerve": 0.4,
@@ -134,6 +144,8 @@ const FACTIONS := {
 			{"name": "Conscript Squad", "members": ["sergeant", "conscript", "conscript", "conscript", "conscript", "conscript", "gunner"]},
 			{"name": "Raider Squad", "members": ["raider_sgt", "raider", "raider", "raider", "raider", "raider", "raider", "raider"]},
 			{"name": "Heavy Gun Team", "members": ["hw_gunner", "hw_loader"]},
+			{"name": "Heavy Gun Team", "members": ["hw_gunner", "hw_loader"]},
+			{"name": "Heavy Gun Team", "members": ["hw_gunner", "hw_loader"]},
 			{"name": "Stubber Team", "members": ["sergeant", "gunner", "gunner"]},
 			{"name": "Lance Team", "members": ["sergeant", "lancer", "lancer"]},
 			{"vehicle": "vigil"},
@@ -149,6 +161,8 @@ const FACTIONS := {
 			{"name": "Sworn Talon", "members": ["champion", "brother", "brother", "cannoneer"]},
 			{"name": "Oathblade Talon", "members": ["blade_champion", "oathblade", "oathblade"]},
 			{"name": "Heavy Gun Team", "members": ["hw_gunner_s", "hw_loader_s"]},
+			{"name": "Pyre Warden", "members": ["pyre_warden"]},
+			{"name": "Bastion Brother", "members": ["bastion"]},
 			{"name": "Breacher Talon", "members": ["champion", "brother", "breacher", "breacher"]},
 			{"vehicle": "verdict"},
 		],

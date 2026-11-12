@@ -109,19 +109,27 @@ func _carry_out(sq: Squad, dt: float) -> void:
 		return
 	var best: Soldier = null
 	var bd := INF
+	var nearest: Soldier = null  # nearest man with the grenade, clear throw or not
+	var nd := INF
 	for m in sq.effective():
 		if m.state != Soldier.State.READY or m.in_melee or m.grenades.get(kind, 0) <= 0:
 			continue
 		var d: float = m.position.distance_to(aim)
-		if d < bd:
+		if d < nd:
+			nd = d
+			nearest = m
+		if d <= RANGE and d < bd and _clear_throw(m, aim, kind):
 			bd = d
 			best = m
-	if best == null:
+	if nearest == null:
 		return  # nobody able just now (pinned, fighting): try again shortly
-	if bd > RANGE:
-		if not o.moved:
-			o.moved = true  # move up just far enough, then throw
-			sq.order_move(main.map, aim + (best.position - aim).normalized() * RANGE * 0.75, false, false, true)
+	if best == null:
+		if not o.moved and not sq.effective().any(func(m): return m.moving):
+			# out of reach, or a wall in the way: move up to a spot with a clear throw
+			o.moved = true
+			sq.order_move(main.map, aim + (nearest.position - aim).normalized() * RANGE * 0.6, false, false, true)
+		elif o.moved and not sq.effective().any(func(m): return m.moving):
+			o.moved = false  # got there and still no clear throw: try again from here
 		return
 	var spot := aim
 	if kind == "smoke" and o.left > 0:
@@ -134,6 +142,23 @@ func _carry_out(sq: Squad, dt: float) -> void:
 	o.next = 0.4
 
 
+## Can m throw at aim without it hitting a wall on the way, or bursting on top of himself
+## or his own side?
+func _clear_throw(m: Soldier, aim: Vector2, kind: String) -> bool:
+	if main.map.first_obstacle(m.position, aim) != aim:
+		return false  # a wall between: it would bounce back at him
+	if kind == "smoke":
+		return true
+	var safe: float = float(G[kind].blast) + 12.0
+	if m.position.distance_to(aim) < safe + 6.0:
+		return false  # too close to throw it safely
+	for f in main.soldiers:
+		if f.team == m.team and f.is_alive() and not f.is_vehicle and f.state != Soldier.State.EMBARKED \
+				and f.position.distance_to(aim) < safe:
+			return false  # one of ours is in the blast
+	return true
+
+
 func _throw(m: Soldier, kind: String, spot: Vector2) -> void:
 	m.grenades[kind] -= 1
 	m.facing = (spot - m.position).angle()
@@ -142,9 +167,11 @@ func _throw(m: Soldier, kind: String, spot: Vector2) -> void:
 	m.burst_left = 0
 	var d := m.position.distance_to(spot)
 	var land := spot + Vector2.from_angle(randf() * TAU) * randf() * d * 0.12  # nobody throws perfectly
-	land = main.map.first_obstacle(m.position, land)
-	if land != spot:
-		land = land.move_toward(m.position, 6.0)  # bounced off a wall
+	var hit_wall: Vector2 = main.map.first_obstacle(m.position, land)
+	if hit_wall != land:
+		land = hit_wall.move_toward(m.position, 6.0)  # glanced off a wall
+	if kind != "smoke" and land.distance_to(m.position) < float(G[kind].blast) + 10.0:
+		land = spot  # never let the scatter drop it at his own feet
 	flying.append({"from": m.position, "to": land, "t": 0.0, "dur": 0.45 + d / 320.0, "kind": kind, "thrower": m})
 	main.grenades_thrown[m.team] += 1
 

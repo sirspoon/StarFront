@@ -5,6 +5,7 @@ extends RefCounted
 ## When a whole version is reached (1.0, 2.0 ...), start a new heading for it.
 
 const TEXT := """PROTOTYPE (before 1.0)
+- Sworn Pyre Warden (flamer) and Bastion Brother (hail cannon) in very heavy armour
 - Heavy Gun Teams: set them up by cover, a window or lying Down for deadly fire
 - Grenades: frag, tank-breaker and smoke screens, thrown where you pick
 - Close combat: Raider and Oathblade assault squads charge in with blades;

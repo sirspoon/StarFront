@@ -10,6 +10,8 @@ var sparks: Array = []   # {pos, t, seed}
 var markers: Array = []  # {pos, color, t}
 var blasts: Array = []   # {pos, r, t}
 var chunks: Array = []   # flying debris {pos, vel, t, size, color}
+var flames: Array = []   # jets of fire {from, to, cone, t, seed}
+const FLAME_TIME := 0.55
 
 
 func tracer(from: Vector2, to: Vector2, color: Color, width: float) -> void:
@@ -47,6 +49,10 @@ func debris(pos: Vector2, n: int = 10) -> void:
 	puff(pos + Vector2(randf_range(-8, 8), randf_range(-8, 8)), Color(0.5, 0.46, 0.4), 12.0)
 
 
+func flame(from: Vector2, to: Vector2, cone: float) -> void:
+	flames.append({"from": from, "to": to, "cone": cone, "t": 0.0, "seed": randf() * 100.0})
+
+
 func marker(pos: Vector2, color: Color) -> void:
 	markers.append({"pos": pos, "color": color, "t": 0.0})
 
@@ -54,7 +60,7 @@ func marker(pos: Vector2, color: Color) -> void:
 func _process(dt: float) -> void:
 	if get_parent().paused:
 		return  # freeze tracers and blasts while the game is paused
-	for list in [tracers, puffs, sparks, markers, blasts, chunks]:
+	for list in [tracers, puffs, sparks, markers, blasts, chunks, flames]:
 		for e in list:
 			e.t += dt
 	tracers = tracers.filter(func(e): return e.t < TRACER_TIME)
@@ -63,6 +69,7 @@ func _process(dt: float) -> void:
 	markers = markers.filter(func(e): return e.t < 0.7)
 	blasts = blasts.filter(func(e): return e.t < 0.8)
 	chunks = chunks.filter(func(e): return e.t < 0.6)
+	flames = flames.filter(func(e): return e.t < FLAME_TIME)
 	for e in chunks:
 		e.pos += e.vel * dt
 		e.vel *= 1.0 - minf(1.0, dt * 4.0)
@@ -103,6 +110,28 @@ func _draw() -> void:
 	for e in chunks:
 		var col: Color = e.color
 		draw_rect(Rect2(e.pos - Vector2(e.size, e.size) * 0.5, Vector2(e.size, e.size)), Color(col, 1.0 - e.t / 0.6))
+	for e in flames:
+		# the jet roars out, widening, then gutters away as burning blobs
+		var k: float = e.t / FLAME_TIME
+		var from: Vector2 = e.from
+		var to: Vector2 = e.to
+		var head: Vector2 = from.lerp(to, minf(1.0, e.t / 0.14))
+		var d := from.distance_to(head)
+		if d < 2.0:
+			continue
+		var dir := (head - from) / d
+		var side := dir.orthogonal()
+		var fade := 1.0 - maxf(0.0, (k - 0.5) / 0.5)
+		var wide: float = tan(e.cone) * d
+		draw_colored_polygon(PackedVector2Array([from + side * 2.0, head + side * wide, head + dir * 6.0, head - side * wide, from - side * 2.0]),
+				Color(1.0, 0.45, 0.1, 0.55 * fade))
+		draw_colored_polygon(PackedVector2Array([from + side * 1.2, head + side * wide * 0.5, head - side * wide * 0.5, from - side * 1.2]),
+				Color(1.0, 0.85, 0.4, 0.75 * fade))
+		for i in 9:
+			var f := float(i + 1) / 10.0
+			var wob := sin(e.seed + i * 2.3 + e.t * 30.0)
+			var p := from.lerp(head, f) + side * wob * wide * f * 0.6
+			draw_circle(p, 2.0 + f * wide * 0.5, Color(1.0, 0.55 + 0.3 * (1.0 - f), 0.15, 0.5 * fade))
 	for e in markers:
 		var k: float = e.t / 0.7
 		var col: Color = e.color

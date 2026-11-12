@@ -18,6 +18,8 @@ var grenades: Grenades
 var grenade_mode := false  # the next click / tap picks where to throw grenades
 var grenades_thrown := [0, 0]
 var heavy_kills := [0, 0]
+var friendly_kills := [0, 0]   # men killed by their own side (stray grenades, shells)
+var bastion_kills := [0, 0]    # kills by the Sworn's heavy-armoured flamers and hail cannons: [flamer, hail]
 var heavy_time := [0.0, 0.0]   # seconds a heavy gun was on the field, per side...
 var heavy_set_time := [0.0, 0.0]  # ...and of those, set up
 var light_fx: LightFX
@@ -765,7 +767,8 @@ func _process(dt: float) -> void:
 	_update_objective(dt)
 	_check_end()
 	if shot_path != "" and time >= shot_time and (not "--shot-melee" in OS.get_cmdline_user_args() or _melee_spot() != null) \
-			and (not "--shot-heavy" in OS.get_cmdline_user_args() or _heavy_spot() != null):
+			and (not "--shot-heavy" in OS.get_cmdline_user_args() or _heavy_spot() != null) \
+			and (not "--shot-flame" in OS.get_cmdline_user_args() or effects.flames.any(func(f): return f.t > 0.12)):
 		_take_shot()
 
 
@@ -821,6 +824,9 @@ func _take_shot() -> void:
 		camera.position = _melee_spot()
 	if "--shot-heavy" in OS.get_cmdline_user_args():
 		camera.position = _heavy_spot()
+	if "--shot-flame" in OS.get_cmdline_user_args():
+		var fl: Dictionary = effects.flames.filter(func(f): return f.t > 0.12)[0]
+		camera.position = (fl.from + fl.to) * 0.5
 	if "--shot-wall" in OS.get_cmdline_user_args() and last_wall_down != null:
 		camera.position = last_wall_down
 	for a in OS.get_cmdline_user_args():
@@ -917,6 +923,9 @@ func nearest_seen_enemy(team: int, from: Vector2) -> Soldier:
 
 
 func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vector2) -> void:
+	if w.get("flame", false):
+		resolve_flame(shooter, target, w, muzzle)
+		return
 	shots[shooter.team] += 1
 	_fire_sound(shooter, w, muzzle)
 	var d := shooter.position.distance_to(target.position)
@@ -1022,6 +1031,47 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 				_ricochet(end, end - muzzle, w)
 		if randf() < (0.5 if float(w.get("pen", 0)) >= 2.0 else 0.2):
 			decals.add_burn(end, 1.2 + float(w.get("pen", 0)) * 0.25)
+
+
+## A jet of fire: it fills a narrow cone out to its reach (stopped by walls), licking round
+## cover, and burns and terrifies everyone in it.
+func resolve_flame(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vector2) -> void:
+	shots[shooter.team] += 1
+	_fire_sound(shooter, w, muzzle)
+	var dir := (target.position - muzzle).normalized()
+	var reach: float = w.range
+	var end := map.first_obstacle(muzzle, muzzle + dir * reach)
+	var show := shooter.visible or target.visible
+	if show:
+		effects.flame(muzzle, end, w.cone)
+		light_fx.flash(muzzle.lerp(end, 0.5), Color(1.0, 0.55, 0.2), 2.2, 160.0, 0.5)
+	for k in 3:
+		decals.add_burn(muzzle.lerp(end, 0.45 + k * 0.25) + Vector2(randf_range(-5, 5), randf_range(-5, 5)), 2.0)
+	for e in soldiers.duplicate():
+		if e.team == shooter.team or not e.is_alive() or e.state == Soldier.State.EMBARKED:
+			continue
+		var v: Vector2 = e.position - muzzle
+		var d := v.length()
+		if d > reach + e.radius or d < 1.0:
+			continue
+		if absf(wrapf(v.angle() - dir.angle(), -PI, PI)) > float(w.cone) + atan(e.radius / d):
+			continue
+		if not map.los_clear(muzzle, e.position):
+			continue
+		if e.is_vehicle:
+			if randf() < 0.5:
+				e.receive_hit(w, shooter.position, shooter)
+			continue
+		e.add_suppression(float(w.supp) * (1.0 - d / reach * 0.4), time)
+		e.morale -= 3.0 * e.nerve  # men fear fire above all
+		var p: float = w.acc * (1.0 - map.cover_vs(e.position, shooter.position) * 0.35)  # flames get round cover
+		if e.posture == "prone":
+			p *= 0.85
+		if randf() < p:
+			hits[shooter.team] += 1
+			if randf() < e.armor * (1.0 - float(w.ap)):
+				continue  # his armour shrugs it off
+			e.take_hit(int(w.dmg), shooter)
 
 
 ## A blow in close combat: armour may turn it, otherwise it wounds.
@@ -1215,6 +1265,12 @@ func on_vehicle_destroyed(v: Vehicle, killer: Soldier) -> void:
 func on_death(s: Soldier, killer: Soldier) -> void:
 	if s.heavy and not s.is_vehicle:
 		_take_over_gun(s)
+	if killer != null and killer.team == s.team:
+		friendly_kills[s.team] += 1
+	if killer != null and killer.kind == "pyre_warden":
+		bastion_kills[0] += 1
+	elif killer != null and killer.kind == "bastion":
+		bastion_kills[1] += 1
 	if killer != null and killer.heavy and not killer.is_vehicle:
 		heavy_kills[killer.team] += 1
 	if killer != null and killer.charger:
@@ -1324,9 +1380,9 @@ func _end(winner: int, reason: String) -> void:
 		else:
 			fled[s.team] += 1
 	if autotest:
-		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d cover=%d%%/%d%% blocked=%s flank=%s crossfire=%d%%/%d%% blows=%s mkills=%s raider_kills=%d blade_kills=%d grenades=%s heavy_kills=%s heavy_set=%d%%/%d%% %s" % [
+		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d cover=%d%%/%d%% blocked=%s flank=%s crossfire=%d%%/%d%% blows=%s mkills=%s raider_kills=%d blade_kills=%d grenades=%s heavy_kills=%s heavy_set=%d%%/%d%% own_side_kills=%s flamer_hail_kills=%s %s" % [
 				factions[winner] if winner >= 0 else "draw", int(time), shots, hits,
-				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, flank_shots, int(100 * crossfire_time[0] / maxf(field_time[0], 1)), int(100 * crossfire_time[1] / maxf(field_time[1], 1)), blows, melee_kills, assault_kills[0], assault_kills[1], grenades_thrown, heavy_kills, int(100 * heavy_set_time[0] / maxf(heavy_time[0], 1)), int(100 * heavy_set_time[1] / maxf(heavy_time[1], 1)), reason])
+				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, flank_shots, int(100 * crossfire_time[0] / maxf(field_time[0], 1)), int(100 * crossfire_time[1] / maxf(field_time[1], 1)), blows, melee_kills, assault_kills[0], assault_kills[1], grenades_thrown, heavy_kills, int(100 * heavy_set_time[0] / maxf(heavy_time[0], 1)), int(100 * heavy_set_time[1] / maxf(heavy_time[1], 1)), friendly_kills, bastion_kills, reason])
 		get_tree().quit()
 		return
 	var head := "DRAW"

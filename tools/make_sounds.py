@@ -212,6 +212,26 @@ def heavy_laser(rng, shots=5, gap=0.12):
     return finish(x, fade=0.35)
 
 
+def flamer(rng):
+    """A flame projector: the click of the igniter, then a roaring whoosh of burning
+    fuel with a crackle in it, and a gurgling tail as the jet cuts off."""
+    dur = 1.6
+    n = int(dur * SR)
+    t = T(dur)
+    shape = np.clip(t / 0.06, 0, 1) * np.clip((0.75 - t) / 0.35, 0, 1) ** 1.5
+    roar = filt(noise(n, rng), lo=80, hi=1400) * shape * 1.4
+    hiss = filt(noise(n, rng), lo=1800, hi=6000) * shape * 0.35
+    rumble = np.sin(2 * np.pi * np.cumsum(55 + 20 * shape + 5 * rng.standard_normal(n).cumsum() / SR) / SR) * shape * 0.5
+    crackle = np.zeros(n)
+    for _ in range(40):
+        cl = int(0.004 * SR)
+        place(crackle, filt(noise(cl, rng), lo=2000) * rng.uniform(0.1, 0.4), rng.uniform(0.05, 1.0))
+    click = np.zeros(n)
+    place(click, filt(noise(int(0.01 * SR), rng), lo=2500) * 0.5, 0.0)
+    x = sat(roar + hiss + rumble + crackle + click, 1.6)
+    return finish(reverb(x, 0.9, 0.2, rng, bright=3000), peak=0.85, fade=0.5)
+
+
 def round_(rng, weight, n):
     """One heavy round firing: crack, blast body, low thump and the bolt's clack."""
     crack = filt(noise(n, rng), lo=2000) * env(n, 0.0002, 0.008) * 1.5
@@ -482,6 +502,8 @@ def main():
         "melee_power": (3, power_blade),
         "smoke": (2, smoke_pop),
         "heavy_laser": (2, heavy_laser),
+        "flamer": (2, flamer),
+        "hail": (2, lambda r: burst(r, 10, 0.05, 1.15, spin=True, tail=1.5)),
         "heavy_mass": (2, lambda r: burst(r, 4, 0.14, 1.8, explosive=True, tail=1.6)),
     }
     only = sys.argv[1:]  # e.g. make_sounds.py smg pistol: just those
