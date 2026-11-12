@@ -24,10 +24,10 @@ const WEAPON_SOUND := {
 	"rotor_cannon": "rotor", "lance_launcher": "lance", "fusion_carbine": "fusion_small",
 	"siege_cannon": "cannon", "fusion_cannon": "fusion",
 	"ripper_smg": "smg", "mass_pistol": "pistol", "heavy_lumen": "heavy_laser", "heavy_mass_gun": "heavy_mass",
-	"pyre_projector": "flamer", "hail_cannon": "hail", "lumen_lance": "beam",
+	"pyre_projector": "flamer", "hail_cannon": "hail", "lumen_lance": "beam", "lumen_pulse": "heavy_laser", "fusion_cannon_he": "cannon",
 }
 ## Energy weapons: their glancing shots whine electrically; everything else is a bullet.
-const ENERGY := ["lumen_rifle", "fusion_carbine", "fusion_cannon", "heavy_lumen"]
+const ENERGY := ["lumen_pulse", "lumen_rifle", "fusion_carbine", "fusion_cannon", "heavy_lumen"]
 const POOL := 40
 
 var enabled := true

@@ -93,6 +93,7 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `--trenches=1` turns on the trench lines option for a test.
 - `--shot-beam` waits until the Legion tank's lumen lance has been firing a few frames and centres on the
   beam; `--shot-tank --shot-team=0|1 --shot-zoom=5` for a close look at either tank.
+- `--log-guns` prints each change of a tank's main gun setting (beam / pulse, AP / HE).
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

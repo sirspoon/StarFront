@@ -1304,6 +1304,7 @@ func beam_start(v: Vehicle, sl: Dictionary) -> void:
 	sfx.play("beam", v.position, 2.0, 0.04)
 	sl.beam_acc = 0.0
 	sl.beam_n = 0
+	sl.beam_vhit = 0.0
 	shake(v.position, 2.0)
 
 
@@ -1331,18 +1332,25 @@ func beam_tick(v: Vehicle, sl: Dictionary, dt: float) -> void:
 	if sl.beam_acc < 0.2:
 		return
 	sl.beam_acc -= 0.2
-	# every fifth of a second: burn what's in the beam
+	# every fifth of a second: burn what's in the beam. A longer beam does the same harm in all,
+	# spread over its length (dose: the share of the old 1.3 s beam's harm per tick)
+	var dose := float(w.get("dose", 1.0))
 	if show:
 		light_fx.flash(end, Color(1.0, 0.55, 0.25), 2.4, 110.0, 0.25)
 		effects.spark(end)
 		effects.puff(end, Color(0.35, 0.3, 0.27), 6.0)
 	decals.add_burn(end + Vector2(randf_range(-3, 3), randf_range(-3, 3)), 2.6)
 	sl.beam_n = int(sl.get("beam_n", 0)) + 1
+	if sl.beam_n % 6 == 0:
+		sfx.play("beam", v.position, 2.0, 0.04)  # keep the hum going
 	if hit_vehicle != null:
-		if sl.beam_n % 2 == 0 and hit_vehicle.receive_hit(w, v.position, v) and show:  # burning into the armour
-			effects.explosion(end, 10.0)
+		sl.beam_vhit = float(sl.get("beam_vhit", 0.0)) + 0.5 * dose
+		if sl.beam_vhit >= 1.0:  # burning through the armour
+			sl.beam_vhit -= 1.0
+			if hit_vehicle.receive_hit(w, v.position, v) and show:
+				effects.explosion(end, 10.0)
 	elif map.blocks(map.get_t(map.cell_of(end + dir * 4.0))):
-		var fell := map.damage_walls(end + dir * 4.0, 10.0, float(w.wall) * 0.2)
+		var fell := map.damage_walls(end + dir * 4.0, 10.0, float(w.wall) * 0.2 * dose)
 		walls_destroyed += fell.size()
 		for c in fell:
 			effects.debris(map.center_of(c))
@@ -1361,12 +1369,12 @@ func beam_tick(v: Vehicle, sl: Dictionary, dt: float) -> void:
 			if off < 40.0 and s.team != v.team:
 				s.add_suppression(6.0, time)  # the beam sweeping past
 			continue
-		s.add_suppression(float(w.supp) * 0.3, time)
-		if randf() < 0.25 * GameData.LETHALITY and randf() >= s.armor * (1.0 - float(w.ap)):
+		s.add_suppression(float(w.supp) * 0.3 * maxf(dose, 0.6), time)
+		if randf() < 0.25 * dose * GameData.LETHALITY and randf() >= s.armor * (1.0 - float(w.ap)):
 			s.take_hit(int(w.dmg), v)
 	for k in 3:  # whatever burns at the far end catches
 		var c := map.cell_of(end + Vector2(randf_range(-10, 10), randf_range(-10, 10)))
-		if map.flammable(c) and randf() < 0.25:
+		if map.flammable(c) and randf() < 0.25 * maxf(dose, 0.5):
 			ignite(c)
 
 
@@ -1902,6 +1910,15 @@ func _end(winner: int, reason: String) -> void:
 			left[player_team], start_counts[player_team], left[1 - player_team], start_counts[1 - player_team]])
 
 
+## Switch the main gun setting of the selected tanks (beam / pulse, AP / HE).
+func switch_guns() -> void:
+	for sq in _player_squads():
+		var v = sq.vehicle()
+		if sq.selected and v != null and v.is_alive() and v.gun_mode() != "":
+			var m: String = v.switch_gun()
+			log_message("[color=#e8c070]%s: main gun to %s[/color]" % [sq.name, m])
+
+
 func log_message(text: String) -> void:
 	if autotest:
 		return
@@ -2000,6 +2017,8 @@ func _unhandled_input(e: InputEvent) -> void:
 			hud.toggle_battle_menu()
 		elif k == KEY_F1:
 			hud.toggle_help()
+		elif k == KEY_V:
+			switch_guns()
 		elif k == KEY_U:
 			for sq in _player_squads():
 				var v = sq.vehicle()
@@ -2647,6 +2666,8 @@ func touch_button(key: String, on: bool) -> void:
 				var v = sq.vehicle()
 				if sq.selected and v != null:
 					v.unload()
+		"Gun":
+			switch_guns()
 		"Squads":
 			hud.set_squads_visible(on)
 		"Pause":

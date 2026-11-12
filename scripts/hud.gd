@@ -91,6 +91,7 @@ func setup(m: Node) -> void:
 			+ "Right click an enemy: focus fire   your carrier: board\n" \
 			+ "Right click a wall (tank / lance team): shell it\n" \
 			+ "R assault   G get down   H halt   U unload\n" \
+			+ "V tank main gun: beam / pulse (Legion), AP / HE (Sworn)\n" \
 			+ "C cover view: green low cover, blue windows,\n" \
 			+ "   white standing walls, yellow rubble, red wire\n" \
 			+ "T then click: grenades. At armour: tank-breakers,\n" \
@@ -157,10 +158,10 @@ func _build_touch_bar() -> void:
 	touch_bar = HBoxContainer.new()
 	touch_bar.add_theme_constant_override("separation", 6)
 	panel.add_child(touch_bar)
-	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Grenade", true], ["Cover", true], ["Pick", true], ["Halt", false], ["Unload", false],
+	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Grenade", true], ["Cover", true], ["Pick", true], ["Halt", false], ["Unload", false], ["Gun", false],
 			["Squads", true], ["Pause", true], ["?", false], ["Menu", false]]:
 		var b := Button.new()
-		var hints := {"Assault": "R", "Down": "G", "Pick": "Alt", "Halt": "H", "Unload": "U", "Grenade": "T", "Cover": "C", "Pause": "Space", "?": "F1", "Menu": "Esc"}
+		var hints := {"Assault": "R", "Down": "G", "Pick": "Alt", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "?": "F1", "Menu": "Esc"}
 		b.text = spec[0] if main.touch_mode or not hints.has(spec[0]) else "%s (%s)" % [spec[0], hints[spec[0]]]
 		b.toggle_mode = spec[1]
 		b.focus_mode = Control.FOCUS_NONE
@@ -319,6 +320,8 @@ func _refresh() -> void:
 			var v = sq.vehicle()
 			if v != null:
 				r.label.text = "Hull %d/%d  %s" % [maxi(v.hp, 0), v.max_hp, st]
+				if v.gun_mode() != "":
+					r.label.text += "  " + v.gun_mode()
 				if v.passengers.size() > 0:
 					r.label.text += "  +%d" % v.passengers.size()
 				r.bar.tooltip_text = "Hull"

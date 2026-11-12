@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.64"
+const VERSION := "0.65"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -25,8 +25,12 @@ const WEAPONS := {
 		"acc": 0.6, "ap": 0.9, "dmg": 4, "pen": 9, "vdmg": 5, "supp": 20.0,
 		"tracer": Color(0.75, 0.9, 1.0), "width": 4.0},
 	"lumen_lance": {"name": "Lumen lance", "range": 600.0, "cooldown": 8.5, "burst": 1, "gap": 0.0,
-		"acc": 0.9, "ap": 0.9, "dmg": 2, "pen": 9, "vdmg": 1, "supp": 30.0, "beam": 1.3, "wall": 200.0,
-		"tracer": Color(1.0, 0.45, 0.18), "width": 5.0},
+		"acc": 0.9, "ap": 0.9, "dmg": 2, "pen": 9, "vdmg": 1, "supp": 30.0, "beam": 4.0, "dose": 0.325, "wall": 200.0,
+		"tracer": Color(1.0, 0.45, 0.18), "width": 5.0, "mode": "Beam"},
+	# the lance's other setting: short pulses, often, for men in the open
+	"lumen_pulse": {"name": "Lumen lance (pulse)", "range": 560.0, "cooldown": 2.4, "burst": 4, "gap": 0.22,
+		"acc": 0.3, "ap": 0.6, "dmg": 2, "pen": 5, "vdmg": 1, "supp": 16.0, "tracer": Color(1.0, 0.5, 0.22), "width": 3.4,
+		"light": true, "mode": "Pulse"},
 	"siege_cannon": {"name": "Siege cannon", "range": 620.0, "cooldown": 5.0, "burst": 1, "gap": 0.0,
 		"acc": 0.5, "ap": 0.6, "dmg": 3, "pen": 9, "vdmg": 6, "blast": 42.0, "wall": 80.0, "supp": 40.0,
 		"tracer": Color(1.0, 0.9, 0.6), "width": 3.5},
@@ -43,9 +47,13 @@ const WEAPONS := {
 		"tracer": Color(1.0, 0.55, 0.15), "width": 4.0},
 	"hail_cannon": {"name": "Hail cannon", "range": 380.0, "cooldown": 3.2, "burst": 10, "gap": 0.05,
 		"acc": 0.1, "ap": 0.4, "dmg": 1, "pen": 4, "vdmg": 1, "supp": 8.0, "tracer": Color(0.6, 0.85, 1.0), "width": 1.6},
-	"fusion_cannon": {"name": "Fusion cannon", "range": 540.0, "cooldown": 6.0, "burst": 1, "gap": 0.0,
-		"acc": 0.55, "ap": 0.9, "dmg": 4, "pen": 9, "vdmg": 6, "blast": 24.0, "wall": 70.0, "supp": 40.0,
-		"tracer": Color(0.7, 0.9, 1.0), "width": 5.0},
+	"fusion_cannon": {"name": "Fusion cannon (AP)", "range": 540.0, "cooldown": 6.0, "burst": 1, "gap": 0.0,
+		"acc": 0.6, "ap": 0.95, "dmg": 4, "pen": 10, "vdmg": 7, "blast": 10.0, "wall": 55.0, "supp": 30.0,
+		"tracer": Color(0.7, 0.9, 1.0), "width": 5.0, "mode": "AP"},
+	# high explosive: a wide burst for men and walls, little use against armour
+	"fusion_cannon_he": {"name": "Fusion cannon (HE)", "range": 540.0, "cooldown": 6.0, "burst": 1, "gap": 0.0,
+		"acc": 0.5, "ap": 0.45, "dmg": 2, "pen": 5, "vdmg": 2, "blast": 44.0, "wall": 90.0, "supp": 55.0,
+		"tracer": Color(1.0, 0.85, 0.6), "width": 4.0, "mode": "HE"},
 }
 
 ## Close-combat weapons. hit = chance a blow lands; parry = how much it spoils the enemy's
@@ -136,13 +144,13 @@ const VEHICLES := {
 		"weapons": [{"weapon": "heavy_stubber", "mount": Vector2(10, -7)}]},
 	"vigil": {"name": "Vigil Tank", "role": "tank", "hp": 14, "armour": [9, 7, 5], "speed": 36.0,
 		"turn": 1.0, "length": 62.0, "width": 38.0, "capacity": 0,
-		"weapons": [{"weapon": "lumen_lance", "turret": true}, {"weapon": "heavy_stubber", "mount": Vector2(22, 9)}]},
+		"weapons": [{"weapon": "lumen_lance", "alt": "lumen_pulse", "turret": true}, {"weapon": "heavy_stubber", "mount": Vector2(22, 9)}]},
 	"pilgrim": {"name": "Pilgrim Carrier", "role": "carrier", "hp": 9, "armour": [6, 5, 4], "speed": 50.0,
 		"turn": 1.5, "length": 52.0, "width": 32.0, "capacity": 6,
 		"weapons": [{"weapon": "rotor_cannon", "mount": Vector2(8, 0)}]},
 	"verdict": {"name": "Verdict Tank", "role": "tank", "hp": 14, "armour": [9, 8, 6], "speed": 32.0,
 		"turn": 0.9, "length": 64.0, "width": 40.0, "capacity": 0,
-		"weapons": [{"weapon": "fusion_cannon", "turret": true}, {"weapon": "rotor_cannon", "mount": Vector2(18, -13)}]},
+		"weapons": [{"weapon": "fusion_cannon", "alt": "fusion_cannon_he", "turret": true}, {"weapon": "rotor_cannon", "mount": Vector2(18, -13)}]},
 }
 
 const FACTIONS := {

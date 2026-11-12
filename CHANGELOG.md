@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.65 (2026-11-12)
+Tank main gun settings.
+- The Legion tank's lumen lance beam now holds for 4 seconds instead of 1.3, doing the same harm in
+  all (to armour, walls and men), spread over the longer beam. If its target dies the beam swings on
+  to the next one, or holds where it is, instead of sweeping round with the hull.
+- New "Gun (V)" button: switches a selected tank's main gun setting.
+  - Legion: Beam (anti-armour, melts walls) or Pulse (four quick bolts every ~2.4 s, for men in the open).
+  - Sworn: AP (a piercing fusion bolt, harder hitting against armour than before, small burst) or HE
+    (a wide blast for infantry and walls, little use against tanks).
+  - Changing over takes the crew 1.5 s. The squad list shows the setting next to the hull.
+- The computer's tanks pick for themselves: the anti-armour setting while an enemy vehicle is in sight
+  and range (and for 15 s after), otherwise the anti-infantry one.
+
 ## v0.64 (2026-11-12)
 Fix for the phone crash a few minutes into a battle.
 - Every patch of map repainted after damage (walls hit, shell holes, burnt or crushed bushes) kept two

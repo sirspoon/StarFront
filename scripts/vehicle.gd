@@ -59,13 +59,67 @@ func setup_vehicle(m: Node, sq: Squad, t: int, kind_id: String) -> void:
 		var w: Dictionary = GameData.WEAPONS[wd.weapon]
 		slots.append({"weapon": w, "turret": wd.get("turret", false), "mount": wd.get("mount", Vector2.ZERO),
 				"cooldown": randf_range(0.5, 2.0), "burst_left": 0, "burst_timer": 0.0, "target": null,
-				"angle": 0.0, "flash": 0.0})
+				"angle": 0.0, "flash": 0.0,
+				"modes": [w, GameData.WEAPONS[wd.alt]] if wd.has("alt") else []})
 	weapon = slots[0].weapon
 	engine_sound = m.sfx.make_engine()
 	if engine_sound != null:
 		add_child(engine_sound)
 		engine_sound.pitch_scale = 0.75 if role == "tank" else 0.9
 		engine_sound.autoplay = true  # starts when the vehicle is placed on the map
+
+
+## The main gun's settings (beam / pulse, AP / HE): which one is loaded, and switching.
+func gun_mode() -> String:
+	for sl in slots:
+		if not sl.modes.is_empty():
+			return sl.weapon.get("mode", "")
+	return ""
+
+
+func switch_gun() -> String:
+	for sl in slots:
+		if not sl.modes.is_empty():
+			_set_mode(sl, sl.modes[1] if sl.weapon == sl.modes[0] else sl.modes[0])
+			return sl.weapon.get("mode", "")
+	return ""
+
+
+func _set_mode(sl: Dictionary, w: Dictionary) -> void:
+	if sl.weapon == w:
+		return
+	sl.weapon = w
+	sl.beam_t = 0.0  # cut the beam
+	sl.burst_left = 0
+	sl.cooldown = maxf(sl.cooldown, 1.5)  # the crew change over
+	weapon = slots[0].weapon
+	if "--log-guns" in OS.get_cmdline_user_args():
+		print("GUN %s %s -> %s at %.0f s" % [faction, vdata.name, w.get("mode", ""), main.time])
+
+
+var _mode_think := 0.0
+var _armour_seen := -100.0
+
+
+## The computer's tanks pick the setting for what they can see: the anti-armour one when an
+## enemy vehicle is in range, otherwise the one for men.
+func _auto_mode(sl: Dictionary, dt: float) -> void:
+	_mode_think -= dt
+	if _mode_think > 0.0 or sl.get("beam_t", 0.0) > 0.0 or sl.burst_left > 0:
+		return
+	_mode_think = 2.0
+	var at: Dictionary = sl.modes[0] if int(sl.modes[0].pen) >= int(sl.modes[1].pen) else sl.modes[1]
+	var men: Dictionary = sl.modes[1] if at == sl.modes[0] else sl.modes[0]
+	var armour := false
+	for e in main.soldiers:
+		if e.is_vehicle and e.team != team and e.is_alive() and e.seen_by[team] \
+				and position.distance_to(e.position) <= float(at.range):
+			armour = true
+			break
+	if armour:
+		_armour_seen = main.time
+	# keep the anti-armour setting a while after the enemy vehicle drops out of sight
+	_set_mode(sl, at if armour or main.time - _armour_seen < 15.0 else men)
 
 
 func can_breach() -> bool:
@@ -313,6 +367,8 @@ func _aim_and_fire(dt: float, now: float) -> void:
 	for sl in slots:
 		sl.flash = maxf(0.0, sl.flash - dt)
 		sl.cooldown -= dt
+		if not sl.modes.is_empty() and (team != main.player_team or main.autotest):
+			_auto_mode(sl, dt)
 		var t = sl.target
 		if t != null and (not is_instance_valid(t) or not t.is_alive()):
 			sl.target = null
@@ -324,6 +380,10 @@ func _aim_and_fire(dt: float, now: float) -> void:
 			sl.beam_t -= dt
 			if sl.get("beam_point") != null and t == null:
 				turret_goal = (sl.beam_point - position).angle()
+			elif t == null:
+				# the target's gone: swing the beam on to the next one, or hold it where it is
+				sl.target = pick_target(sl.weapon, position)
+				turret_goal = (sl.target.position - position).angle() if sl.target != null else turret_angle
 			sl.flash = 0.06
 			last_fire_time = now
 			main.beam_tick(self, sl, dt)
@@ -394,7 +454,9 @@ func _fire(sl: Dictionary, t: Soldier, now: float) -> void:
 		sl.beam_point = null
 		main.beam_start(self, sl)
 		return
-	if sl.turret:
+	if sl.turret and sl.weapon.get("light", false):
+		recoil = maxf(recoil, 0.3)  # a pulse: a kick of the turret, not the whole tank
+	elif sl.turret:
 		recoil = 1.0
 		main.big_gun_fx(self, _mount_pos(sl), Vector2.from_angle(turret_angle))
 	main.resolve_shot(self, t, sl.weapon, _mount_pos(sl))
