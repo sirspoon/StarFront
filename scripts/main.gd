@@ -275,6 +275,12 @@ func _test_touch() -> void:
 				before[m] = m.position
 			await get_tree().create_timer(4.0).timeout
 			n += 1
+			await get_tree().create_timer(8.0).timeout
+			if not sq.is_coherent():
+				print("TSPLIT %s via %s:" % [sq.name, how])
+				for m in sq.alive():
+					print("   %s state=%s path=%d/%d wait=%s dist_to_dest=%d moved=%d run=%s prone=%s" % [m.kind, Soldier.State.keys()[m.state],
+							m.path_i, m.path.size(), m.wait_for_squad, m.position.distance_to(dest), m.position.distance_to(before[m]), m.running, sq.prone])
 			for m in sq.alive():
 				if m.position.distance_to(before[m]) < 6.0 and m.position.distance_to(dest) > 70.0:
 					stuck += 1
@@ -763,6 +769,8 @@ func _separate(dt: float) -> void:
 			var l2 := d.length_squared()
 			if l2 >= min_d * min_d or l2 < 0.0001:
 				continue
+			if (a.squeeze > 0.0 or b.squeeze > 0.0) and not a.is_vehicle and not b.is_vehicle:
+				continue  # one of them is squeezing past
 			var l := sqrt(l2)
 			var push := d / l * (min_d - l) * 0.5 * k
 			var wa := 0.0 if a.is_vehicle and not b.is_vehicle else (2.0 if b.is_vehicle else 1.0)
@@ -770,6 +778,10 @@ func _separate(dt: float) -> void:
 			if a.is_vehicle and b.is_vehicle:
 				wa = 1.0
 				wb = 1.0
+			elif not a.is_vehicle and not b.is_vehicle and a.moving != b.moving:
+				# a man standing still steps aside for one who is walking
+				wa = 0.2 if a.moving else 1.8
+				wb = 0.2 if b.moving else 1.8
 			if map.walkable(map.cell_of(a.position - push * wa)):
 				a.position -= push * wa
 			if map.walkable(map.cell_of(b.position + push * wb)):

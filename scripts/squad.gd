@@ -333,7 +333,7 @@ func order_line(map: BattleMap, a: Vector2, b: Vector2, face: Vector2, run: bool
 ## they stay in contact, and each spot snaps to nearby cover facing face.
 func line_positions(map: BattleMap, a: Vector2, b: Vector2, n: int, face: Vector2) -> Array[Vector2]:
 	var dir := (b - a).normalized()
-	var max_len := (n - 1) * COH * 0.8
+	var max_len := (n - 1) * COH * 0.65  # leaves room for each man snapping to cover nearby
 	if a.distance_to(b) > max_len:
 		b = a + dir * max_len
 	var taken := {}
@@ -512,10 +512,16 @@ func pick_slots(map: BattleMap, pos: Vector2, n: int, dir := Vector2.ZERO) -> Ar
 		if chosen.size() >= n:
 			break
 		var ok := true
+		var linked := chosen.is_empty()
 		for ch in chosen:
-			if (ch - cand[1]).length_squared() < 2:
+			var d2: int = (ch - cand[1]).length_squared()
+			if d2 < 2:
 				ok = false
 				break
+			if sqrt(d2) * BattleMap.CELL <= COH * 0.8:
+				linked = true  # within reach of a squad-mate's spot: they'll stay in contact
+		if not linked:
+			ok = false
 		if ok:
 			chosen.append(cand[1])
 	while chosen.size() < n:

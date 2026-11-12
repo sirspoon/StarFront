@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.33 (2026-11-12)
+- Fixed squad members getting stuck behind squad-mates who arrived first (worst for the big Sworn):
+  a man standing still now steps aside for one who is walking, and a man held up for a moment
+  squeezes past.
+- Spots picked for a squad's men are always within reach of each other, and lines are spaced a little
+  tighter, so squads stay in contact when they arrive.
+
 ## v0.32 (2026-11-12)
 - "Your will" is now said with the stress on "your", so it no longer sounds like "you will".
 - New Sworn death sounds: instead of spoken words, a strained, breaking grunt ("uhh", "aargh" or a

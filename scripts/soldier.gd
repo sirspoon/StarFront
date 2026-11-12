@@ -42,6 +42,9 @@ var flash := 0.0
 var walk := 0.0
 var seen_by := [true, true]
 var is_vehicle := false
+var stall := 0.0      # how long he has been held up while trying to walk
+var squeeze := 0.0    # squeezing past squad-mates (not pushed apart) for this long
+var progress_from := Vector2.ZERO
 var wait_for_squad := false  # got ahead of slower squad-mates: pausing for them
 var in_cover := false      # crouched behind cover facing the threat
 var behind_low := false    # waist-high cover between him and the threat
@@ -251,6 +254,16 @@ func _follow_path(dt: float, fleeing: bool) -> void:
 		facing = lerp_angle(facing, to.angle(), minf(1.0, dt * 8.0))
 	moving = true
 	walk += dt * spd * 0.25
+	# held up (by men standing in the way)? after a moment, squeeze past them
+	squeeze = maxf(0.0, squeeze - dt)
+	if position.distance_to(progress_from) < step * 0.35:
+		stall += dt
+		if stall > 0.8:
+			squeeze = 1.2
+			stall = 0.0
+	else:
+		stall = maxf(0.0, stall - dt * 2.0)
+	progress_from = position
 
 
 func _fight(dt: float, now: float) -> void:
