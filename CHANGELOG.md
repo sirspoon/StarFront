@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.54 (2026-11-12)
+Seeing cover, sight and range.
+- Cover view (the Cover button, or C on a PC): colours the ground by what it gives your men. Green:
+  low cover (sandbags, barricades, low walls) they can fire over. Blue: windows, cover they can shoot
+  through. White: standing walls and wrecks that block sight, shots and movement. Yellow: rubble and
+  craters, some cover. Olive: bushes and hedges. Red crosses: barbed wire. A collapsed wall shows no
+  colour at all, so it's easy to tell what's still standing. A key to the colours shows at the top
+  while it's on. It also comes on by itself while you drag out a move order.
+- A selected squad (one or two at a time) shows what it can see: a shaded area out to sight range,
+  cut off by walls, wrecks, hedges and smoke, with a fainter ring inside it where they can still pick
+  out enemies keeping still in cover. An orange ring, labelled, marks the reach of each of its weapons.
+
 ## v0.53 (2026-11-12)
 Longer, more tactical battles (around 8-10 minutes instead of 2-3).
 - Shooting hits far less often (all weapons), and fewer of the hits that land wound: most only graze

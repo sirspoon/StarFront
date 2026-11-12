@@ -91,6 +91,8 @@ func setup(m: Node) -> void:
 			+ "Right click an enemy: focus fire   your carrier: board\n" \
 			+ "Right click a wall (tank / lance team): shell it\n" \
 			+ "R assault   G get down   H halt   U unload\n" \
+			+ "C cover view: green low cover, blue windows,\n" \
+			+ "   white standing walls, yellow rubble, red wire\n" \
 			+ "T then click: grenades. At armour: tank-breakers,\n" \
 			+ "   at infantry: frags, at open ground: smoke screen\n" \
 			+ "Alt + click: pick single soldiers   1-9: squads\n" \
@@ -155,10 +157,10 @@ func _build_touch_bar() -> void:
 	touch_bar = HBoxContainer.new()
 	touch_bar.add_theme_constant_override("separation", 6)
 	panel.add_child(touch_bar)
-	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Grenade", true], ["Pick", true], ["Halt", false], ["Unload", false],
+	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Grenade", true], ["Cover", true], ["Pick", true], ["Halt", false], ["Unload", false],
 			["Squads", true], ["Pause", true], ["?", false], ["Menu", false]]:
 		var b := Button.new()
-		var hints := {"Assault": "R", "Down": "G", "Pick": "Alt", "Halt": "H", "Unload": "U", "Grenade": "T", "Pause": "Space", "?": "F1", "Menu": "Esc"}
+		var hints := {"Assault": "R", "Down": "G", "Pick": "Alt", "Halt": "H", "Unload": "U", "Grenade": "T", "Cover": "C", "Pause": "Space", "?": "F1", "Menu": "Esc"}
 		b.text = spec[0] if main.touch_mode or not hints.has(spec[0]) else "%s (%s)" % [spec[0], hints[spec[0]]]
 		b.toggle_mode = spec[1]
 		b.focus_mode = Control.FOCUS_NONE
@@ -458,6 +460,26 @@ func show_options() -> void:
 	_menu_button(row, "Cancel", func():
 		options_panel.queue_free()
 		options_panel = null)
+
+
+var cover_key: Label = null
+
+
+## The key to the Cover view's colours, under the top bar while it's on.
+func show_cover_key(on: bool) -> void:
+	if cover_key == null:
+		cover_key = Label.new()
+		cover_key.text = "COVER:  green low cover (fire over it)   blue windows   white standing walls   " \
+				+ "yellow rubble/craters   olive bushes/hedges   red wire   (no colour: open, or the wall has collapsed)"
+		cover_key.add_theme_font_size_override("font_size", 12)
+		cover_key.add_theme_color_override("font_color", Color(0.9, 0.88, 0.75))
+		cover_key.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+		cover_key.add_theme_constant_override("outline_size", 4)
+		cover_key.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+		cover_key.position = Vector2(10, 40)
+		cover_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(cover_key)
+	cover_key.visible = on
 
 
 func toggle_help() -> void:

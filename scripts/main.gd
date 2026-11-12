@@ -15,7 +15,9 @@ var map_view: MapView
 var roofs: Roofs
 var effects: Effects
 var grenades: Grenades
-var grenade_mode := false  # the next click / tap picks where to throw grenades
+var grenade_mode := false
+var cover_mode := false   # the Cover view (C): colours the ground by the cover it gives
+var cover_view: CoverView  # the next click / tap picks where to throw grenades
 var grenades_thrown := [0, 0]
 var heavy_kills := [0, 0]
 var friendly_kills := [0, 0]
@@ -606,6 +608,9 @@ func _build_world(seed_value: int) -> void:
 	overlay.main = self
 	overlay.z_index = 10
 	add_child(overlay)
+	cover_view = CoverView.new()
+	add_child(cover_view)
+	cover_view.setup(self)
 	_add_fires()
 	light_fx = LightFX.new()
 	light_fx.z_index = 6
@@ -988,6 +993,8 @@ func _take_shot() -> void:
 		if a.begins_with("--shot-squad="):  # centre on one of the player's squads (by number)
 			var q: Squad = _player_squads()[int(a.trim_prefix("--shot-squad="))]
 			camera.position = q.center()
+			if "--shot-pick" in OS.get_cmdline_user_args():
+				q.selected = true
 	if "--shot-melee" in OS.get_cmdline_user_args():
 		camera.position = _melee_spot()
 	if "--shot-heavy" in OS.get_cmdline_user_args():
@@ -1007,6 +1014,9 @@ func _take_shot() -> void:
 			sq.selected = true
 	if "--shot-nohud" in OS.get_cmdline_user_args():
 		hud.visible = false
+	if "--shot-cover" in OS.get_cmdline_user_args():
+		cover_mode = true
+		hud.show_cover_key(true)
 	paused = true
 	for i in 3:
 		await RenderingServer.frame_post_draw
@@ -1719,6 +1729,10 @@ func _unhandled_input(e: InputEvent) -> void:
 			for sq in _player_squads():
 				if sq.selected:
 					sq.halt()
+		elif k == KEY_C:
+			cover_mode = not cover_mode
+			hud.sync_touch("Cover", cover_mode)
+			hud.show_cover_key(cover_mode)
 		elif k == KEY_T:
 			grenade_mode = not grenade_mode
 			hud.sync_touch("Grenade", grenade_mode)
@@ -2328,6 +2342,9 @@ func touch_button(key: String, on: bool) -> void:
 			face_mode = on
 		"Grenade":
 			grenade_mode = on
+		"Cover":
+			cover_mode = on
+			hud.show_cover_key(on)
 		"Pick":
 			pick_mode = on
 			if not on:

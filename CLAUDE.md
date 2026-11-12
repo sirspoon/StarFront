@@ -82,6 +82,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   one map tile at a time), to test the phone settings here.
 - Test battles stop at 30 minutes (`battle_length` in autotest). Results end with a `KILLS {...}` line:
   kills by kind of killer (`/melee` for close combat), for seeing what drives casualties.
+- `--shot-cover` turns on the Cover view for a screenshot; `--shot-pick` (with `--shot-squad=N`) selects
+  that squad, to see its sight area and weapon range rings.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

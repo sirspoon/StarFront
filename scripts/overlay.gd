@@ -62,6 +62,10 @@ func _draw() -> void:
 			if s.team != main.player_team and s.is_alive() and s.visible and main.roofs.hides(s.position):
 				draw_arc(s.position, s.radius + 4.0, 0, TAU, 20, Color(1.0, 0.3, 0.2, 0.85), 1.6)
 				draw_circle(s.position, 2.0, Color(1.0, 0.3, 0.2, 0.85))
+	var chosen: Array = main.squads.filter(func(q): return q.team == main.player_team and q.selected)
+	if main.started and chosen.size() <= 2:  # with more selected the rings would only clutter
+		for sq in chosen:
+			_draw_sight(sq)
 	for sq in main.squads:
 		if sq.team == main.player_team and (sq.selected or main.paused):
 			_draw_route(sq)
@@ -202,3 +206,74 @@ func _dashed(a: Vector2, b: Vector2, col: Color) -> void:
 
 func _grenade_col(kind: String, a: float) -> Color:
 	return Color({"he": Color(1.0, 0.45, 0.25), "ap": Color(1.0, 0.8, 0.3), "smoke": Color(0.8, 0.85, 0.9)}[kind], a)
+
+
+var sight_cache := {}  # squad -> [time worked out, centre, outline points]
+const RAYS := 96
+
+
+## What a selected squad can see: an area out to sight range, cut off by walls, wrecks,
+## hedges and smoke; a fainter ring where they can still pick out men keeping still in
+## cover; and a ring for the reach of each of their weapons.
+func _draw_sight(sq: Squad) -> void:
+	var men: Array = sq.effective()
+	if men.is_empty():
+		return
+	var c := Vector2.ZERO
+	for m in men:
+		c += m.position
+	c /= men.size()
+	var map: BattleMap = main.map
+	var cached = sight_cache.get(sq)
+	var pts: PackedVector2Array
+	if cached == null or main.time - float(cached[0]) > 0.3 or c.distance_to(cached[1]) > 8.0 or main.paused:
+		pts = PackedVector2Array()
+		var reach: float = main.SIGHT
+		for i in RAYS:
+			var dir := Vector2.from_angle(i * TAU / RAYS)
+			var d := 12.0
+			var start := map.cell_of(c)
+			while d < reach:
+				var p := c + dir * d
+				var cell := map.cell_of(p)
+				var t := map.get_t(cell)
+				if cell != start and (map.blocks(t) or t == BattleMap.T.HEDGE):
+					break
+				var smoked := false
+				for s in map.smoke_screens:
+					if p.distance_to(s[0]) < float(s[1]):
+						smoked = true
+				if smoked:
+					break
+				d += 8.0
+			pts.append(c + dir * minf(d, reach))
+		sight_cache[sq] = [main.time, c, pts]
+	else:
+		pts = cached[2]
+	var fill := Color(1.0, 0.95, 0.7, 0.07)
+	var none := PackedVector2Array()
+	for i in pts.size():
+		draw_primitive(PackedVector2Array([c, pts[i], pts[(i + 1) % pts.size()]]), PackedColorArray([fill, fill, fill]), none)
+	var outline := pts.duplicate()
+	outline.append(pts[0])
+	draw_polyline(outline, Color(1.0, 0.95, 0.7, 0.35), 1.0)
+	draw_arc(c, main.SIGHT_HIDDEN, 0, TAU, 64, Color(1.0, 0.95, 0.7, 0.18), 1.0)  # spots men keeping still in cover
+	# weapon reach: one ring per weapon, labelled
+	var seen := {}
+	var weapons: Array = []
+	var v = sq.vehicle()
+	if v != null:
+		for sl in v.slots:
+			weapons.append(sl.weapon)
+	else:
+		for m in men:
+			weapons.append(m.weapon)
+	var k := 0
+	for w in weapons:
+		if seen.has(w.name):
+			continue
+		seen[w.name] = true
+		var r: float = w.range
+		draw_arc(c, r, 0, TAU, 96, Color(1.0, 0.55, 0.25, 0.55), 1.4)
+		draw_string(ThemeDB.fallback_font, c + Vector2(-40, -r - 4 - k * 0.0), w.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1.0, 0.65, 0.35, 0.9))
+		k += 1
