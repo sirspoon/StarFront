@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.51 (2026-11-12)
+- Android: back to preparing the battlefield one map tile at a time. Four at once (v0.50) made the
+  app crash as the battle map loaded, presumably running out of graphics memory. The menus and
+  options from v0.50 stay; choosing lower map detail in Options is the way to load faster.
+
 ## v0.50 (2026-11-12)
 Options, a battle menu, and quicker loading on Android.
 - The Android app prepares the battlefield four map tiles at a time instead of one (the one-at-a-time

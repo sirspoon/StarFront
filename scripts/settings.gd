@@ -7,7 +7,7 @@ extends RefCounted
 ##   normals=0           no normal maps (flat lighting)
 ##   lights=0            no combat lights or moonlight
 ##   bake=0              no detailed map at all: a plain flat one (no off-screen drawing)
-##   batch=N             map tiles drawn per frame (default 4, 1 in a phone's browser)
+##   batch=N             map tiles drawn per frame (default 4, 1 on phones)
 ## Most can also be chosen in the game's Options menu and are saved on the device.
 ##   sound=0             no sound effects
 ##   safe                all of the above off
@@ -99,9 +99,8 @@ static func batch() -> int:
 	for n in [1, 2, 4, 8]:
 		if q.contains("batch=%d" % n):
 			return n
-	# one at a time only in a phone's browser, which runs out of graphics memory otherwise;
-	# the installed app (and every PC) paints four at once
-	return 1 if is_phone() and OS.has_feature("web") else 4
+	# one at a time on phones (browser or app): four at once crashed the Android app (v0.50)
+	return 1 if is_phone() else 4
 
 
 static func summary() -> String:
