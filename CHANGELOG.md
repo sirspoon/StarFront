@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.61 (2026-11-12)
+- Bunker roofs: the sandbags along the edges are proper bags now, in two staggered rows like the
+  sandbag walls (rounded, seamed, tied off, lit along one edge), with a gap over the doorway.
+- The doorway stands out from above: a dark opening in the back wall with steps going down, under a
+  pale concrete lintel between two posts.
+- The ledge over the firing slit is a bright, sunlit concrete lip now (it read as a shadow), with the
+  slit in deep shade beyond it.
+
 ## v0.60 (2026-11-12)
 - Bunkers show which way they face with their roof on: the roof juts out over the firing slit, so
   there's a deep band of shade along the front under a pale concrete lip, and a short sandbag blast

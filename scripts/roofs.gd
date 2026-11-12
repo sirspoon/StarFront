@@ -341,37 +341,59 @@ class RoofPiece:
 		if kind == "chapel":
 			_chapel_spire(map, r)
 		if kind == "bunker":
-			# sandbags laid along the roof's edges, and an armoured periscope cupola
+			# sandbags laid along the roof's edges (a gap at the doorway), and an armoured periscope cupola
 			var rr := Rect2(Vector2(r.position * C), Vector2(r.size * C))
-			for edge in 4:
-				var a: Vector2 = [rr.position, Vector2(rr.end.x, rr.position.y), rr.end, Vector2(rr.position.x, rr.end.y)][edge]
-				var b: Vector2 = [Vector2(rr.end.x, rr.position.y), rr.end, Vector2(rr.position.x, rr.end.y), rr.position][edge]
-				var inward := (rr.get_center() - (a + b) * 0.5).normalized() * 4.0
-				var n := int(a.distance_to(b) / 7.0)
-				for k in n:
-					var q := a.lerp(b, (k + 0.5) / n) + inward
-					draw_circle(q + Vector2(0.8, 1.0), 3.2, Color(0, 0, 0, 0.35))
-					draw_circle(q, 3.2, Color(0.47, 0.42, 0.31).lightened((_h(index, k + edge * 10, 410) - 0.5) * 0.15))
-			# the roof juts out over the firing slit: a dark band of shade along the front, under a lit lip
 			var fr: int = map.building_front[index]
+			var back: int = [1, 0, 3, 2][fr]
+			var mids := [Vector2(rr.get_center().x, rr.position.y), Vector2(rr.get_center().x, rr.end.y),
+					Vector2(rr.position.x, rr.get_center().y), Vector2(rr.end.x, rr.get_center().y)]
+			var door: Vector2 = mids[back]
+			var corners := [[rr.position, Vector2(rr.end.x, rr.position.y)], [Vector2(rr.position.x, rr.end.y), rr.end],
+					[rr.position, Vector2(rr.position.x, rr.end.y)], [Vector2(rr.end.x, rr.position.y), rr.end]]
+			for edge in 4:
+				var a: Vector2 = corners[edge][0]
+				var b: Vector2 = corners[edge][1]
+				var along := (b - a).normalized()
+				var inward := (rr.get_center() - (a + b) * 0.5).normalized()
+				for row in 2:  # two staggered rows, like the sandbag walls
+					var n := int(a.distance_to(b) / 7.0)
+					for k in n:
+						var q := a.lerp(b, (k + 0.5 + row * 0.5) / (n + row * 0.5)) + inward * (4.0 + row * 4.5)
+						if edge == back and q.distance_to(door + inward * 4.0) < 9.0:
+							continue  # the doorway
+						_bag(q, along, Color(0.47, 0.42, 0.31).lightened((_h(index, k + edge * 10 + row * 50, 410) - 0.5) * 0.16 + row * 0.04))
+			# the doorway: a dark opening in the back wall under a concrete lintel, steps going down
+			var din := (rr.get_center() - door).normalized()
+			var dacross := din.orthogonal()
+			var hole := PackedVector2Array([door + dacross * 6.0, door - dacross * 6.0, door - dacross * 6.0 + din * 6.0, door + dacross * 6.0 + din * 6.0])
+			draw_colored_polygon(hole, Color(0.03, 0.03, 0.03))
+			for k in 3:  # steps down into the dark
+				var sp := door + din * (1.5 + k * 1.6)
+				draw_line(sp + dacross * 5.0, sp - dacross * 5.0, Color(0.32, 0.32, 0.3, 0.8 - k * 0.25), 0.8)
+			draw_line(door + dacross * 7.5 - din * 0.5, door - dacross * 7.5 - din * 0.5, Color(0.7, 0.7, 0.65), 2.4)  # the lintel
+			for sgn in [-1.0, 1.0]:  # door posts
+				draw_rect(Rect2(door + dacross * sgn * 7.0 - Vector2(1.5, 1.5), Vector2(3, 3)), Color(0.62, 0.62, 0.58))
+			# the roof juts out over the firing slit: a lit concrete ledge, the slit in shade beyond it
 			var band: Rect2
 			var lip: Rect2
 			match fr:
 				0:
-					band = Rect2(rr.position.x, rr.position.y - 6, rr.size.x, 7)
-					lip = Rect2(rr.position.x, rr.position.y, rr.size.x, 3)
+					band = Rect2(rr.position.x, rr.position.y - 5, rr.size.x, 5)
+					lip = Rect2(rr.position.x - 1, rr.position.y - 1, rr.size.x + 2, 5)
 				1:
-					band = Rect2(rr.position.x, rr.end.y - 1, rr.size.x, 7)
-					lip = Rect2(rr.position.x, rr.end.y - 3, rr.size.x, 3)
+					band = Rect2(rr.position.x, rr.end.y, rr.size.x, 5)
+					lip = Rect2(rr.position.x - 1, rr.end.y - 4, rr.size.x + 2, 5)
 				2:
-					band = Rect2(rr.position.x - 6, rr.position.y, 7, rr.size.y)
-					lip = Rect2(rr.position.x, rr.position.y, 3, rr.size.y)
+					band = Rect2(rr.position.x - 5, rr.position.y, 5, rr.size.y)
+					lip = Rect2(rr.position.x - 1, rr.position.y - 1, 5, rr.size.y + 2)
 				_:
-					band = Rect2(rr.end.x - 1, rr.position.y, 7, rr.size.y)
-					lip = Rect2(rr.end.x - 3, rr.position.y, 3, rr.size.y)
-			draw_rect(band, Color(0.01, 0.01, 0.01, 0.9))  # the slit in deep shade under the overhang
-			draw_rect(lip, Color(0.55, 0.55, 0.5))
-			draw_rect(lip, Color(0.15, 0.15, 0.14), false, 0.6)
+					band = Rect2(rr.end.x, rr.position.y, 5, rr.size.y)
+					lip = Rect2(rr.end.x - 4, rr.position.y - 1, 5, rr.size.y + 2)
+			draw_rect(band, Color(0.01, 0.01, 0.01, 0.85))  # the slit in deep shade under the ledge
+			draw_rect(lip, Color(0.72, 0.71, 0.66))  # the ledge, catching the light
+			var lit_edge := Rect2(lip.position, Vector2(lip.size.x, 1.2) if fr < 2 else Vector2(1.2, lip.size.y))
+			draw_rect(lit_edge, Color(0.88, 0.87, 0.82))
+			draw_rect(lip, Color(0.25, 0.25, 0.23), false, 0.7)
 			var cp := rr.get_center()
 			draw_circle(cp + Vector2(2, 3), 5.0, Color(0, 0, 0, 0.4))
 			draw_circle(cp, 5.0, Color(0.28, 0.29, 0.26))
@@ -495,3 +517,22 @@ class RoofPiece:
 			var fc := col.lightened(0.25 * shade) if shade > 0.0 else col.darkened(-0.35 * shade)
 			draw_colored_polygon(PackedVector2Array([c, c + Vector2.from_angle(a0) * rad, c + Vector2.from_angle(a1) * rad]), fc)
 			draw_line(c, c + Vector2.from_angle(a0) * rad, col.darkened(0.4), 0.5)
+
+
+	## A sandbag seen from above: a fat, rounded bag lying along `along`, with its seam and a lit edge.
+	func _bag(p: Vector2, along: Vector2, col: Color) -> void:
+		var across := along.orthogonal()
+		var pts := PackedVector2Array()
+		for k in 14:
+			var a := k * TAU / 14.0
+			var cx := cos(a)
+			var cy := sin(a)
+			pts.append(p + along * signf(cx) * pow(absf(cx), 0.55) * 3.4 + across * signf(cy) * pow(absf(cy), 0.7) * 2.4)
+		var sh := PackedVector2Array()
+		for q in pts:
+			sh.append(q + Vector2(0.8, 1.0))
+		draw_colored_polygon(sh, Color(0, 0, 0, 0.38))
+		draw_colored_polygon(pts, col)
+		draw_line(p - along * 2.5, p + along * 2.5, col.darkened(0.25), 0.4)  # the stitched seam
+		draw_line(p - along * 3.0 - across * 1.1, p - along * 3.0 + across * 1.1, col.darkened(0.35), 0.5)  # tied end
+		draw_line(p - along * 2.5 - across * 2.0, p + along * 2.5 - across * 2.0, col.lightened(0.25), 0.5)
