@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.30 (2026-11-12)
+PC controls brought in line with the phone.
+- Right click: move. Shift + right click: add a waypoint (Shift + right-drag adds a line at the end
+  of the route).
+- Right-drag: spread the squad along the line, in cover. Pause at the end of the line, then keep
+  dragging to set the way they'll face.
+- Right-drag starting on the selected squad, or on the last waypoint of its route: turn them to face
+  that way (at the end of the route if they have one).
+- Right click an enemy (focus fire), your carrier (board) or a wall (shell it) as before.
+- Scrolling also works by pushing the mouse against the screen edge; the wheel zooms towards the cursor.
+- The button bar now shows on PC too, with each button's key (Assault R, Down G, Halt H, Unload U,
+  Pause Space, help F1). The help panel starts hidden; the ? button shows it.
+
 ## v0.29 (2026-11-12)
 - Fixed every infantry weapon playing the Legion's laser sound: the Sworn's carbines and rotor cannon,
   the stubbers, lance rockets and fusion carbines now make their own sounds.

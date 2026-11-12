@@ -82,20 +82,22 @@ func setup(m: Node) -> void:
 	root.add_child(help_panel)
 	var help := Label.new()
 	help.text = "CONTROLS  (F1 hides)\n" \
-			+ "Left click / drag: select squads\n" \
-			+ "Right click ground: move   (Shift: run)\n" \
+			+ "Left click / drag a box: select squads (Shift adds)\n" \
+			+ "Right click: move there   (Shift: add a waypoint)\n" \
 			+ "Right drag: line up along it, in cover\n" \
-			+ "Ctrl + right click: face that way\n" \
-			+ "Alt + click: pick out single soldiers\n" \
-			+ "Right click enemy: focus fire on it\n" \
-			+ "Right click your carrier: climb aboard   U: unload\n" \
+			+ "   pause at the end, keep dragging: set facing\n" \
+			+ "Right drag from your selected squad, or from the\n" \
+			+ "   last waypoint: face that way\n" \
+			+ "Right click an enemy: focus fire   your carrier: board\n" \
 			+ "Right click a wall (tank / lance team): shell it\n" \
-			+ "H: halt   G: get down   R: assault   Space: pause\n" \
-			+ "WASD / arrows / middle-drag: scroll   Wheel: zoom\n\n" \
+			+ "R assault   G get down   H halt   U unload\n" \
+			+ "Alt + click: pick single soldiers   1-9: squads\n" \
+			+ "Space: pause (orders still work)\n" \
+			+ "WASD / arrows / screen edge / middle-drag: scroll\n" \
+			+ "Wheel: zoom\n\n" \
 			+ "Hold the Ashen Chapel. Sandbags, barricades and\n" \
 			+ "low walls stop most fire from their far side.\n" \
-			+ "Men must stay in contact with their squad.\n" \
-			+ "Fire pins men down and breaks their morale."
+			+ "Men must stay in contact with their squad."
 	help_panel.add_child(help)
 	if main.touch_mode:
 		help.text = "TOUCH CONTROLS  (? hides)\n" \
@@ -116,8 +118,8 @@ func setup(m: Node) -> void:
 				+ "Hold the Ashen Chapel. Sandbags, barricades and\n" \
 				+ "low walls stop most fire from their far side.\n" \
 				+ "Men must stay in contact with their squad."
-		help_panel.visible = false
-		_build_touch_bar()
+	help_panel.visible = false  # the "?" button (or F1) shows it
+	_build_touch_bar()
 	loading_label = Label.new()
 	loading_label.visible = false  # replaced by the loading bar in the menu
 	loading_label.text = "Preparing the battlefield..."
@@ -145,11 +147,12 @@ func _build_touch_bar() -> void:
 	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Pick", true], ["Halt", false], ["Unload", false],
 			["Squads", true], ["Pause", true], ["?", false]]:
 		var b := Button.new()
-		b.text = spec[0]
+		var hints := {"Assault": "R", "Down": "G", "Pick": "Alt", "Halt": "H", "Unload": "U", "Pause": "Space", "?": "F1"}
+		b.text = spec[0] if main.touch_mode or not hints.has(spec[0]) else "%s (%s)" % [spec[0], hints[spec[0]]]
 		b.toggle_mode = spec[1]
 		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(64, 44)
-		b.add_theme_font_size_override("font_size", 16)
+		b.custom_minimum_size = Vector2(64, 44) if main.touch_mode else Vector2(0, 30)
+		b.add_theme_font_size_override("font_size", 16 if main.touch_mode else 13)
 		touch_bar.add_child(b)
 		touch_buttons[spec[0]] = b
 		var key: String = spec[0]

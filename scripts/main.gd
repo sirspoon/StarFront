@@ -639,9 +639,9 @@ func _process(dt: float) -> void:
 		else:
 			t_mode = "held"
 	# drawing a line, then pausing: fix the line and go on to set the facing
-	if touch_mode and t_mode == "line" and touches.size() == 1 and Time.get_ticks_msec() - line_still_ms >= HOLD_MS \
+	if t_mode == "line" and ((touch_mode and touches.size() == 1) or right_held) and Time.get_ticks_msec() - line_still_ms >= HOLD_MS \
 			and Engine.get_process_frames() - line_still_frame > 10:
-		var tp: Vector2 = touches.values()[0]
+		var tp: Vector2 = touches.values()[0] if touches.size() == 1 else get_viewport().get_mouse_position()
 		line_b = _screen_to_world(tp)
 		if line_b.distance_to(rdrag_start) > 20.0 / camera.zoom.x:
 			t_mode = "line_face"
@@ -1202,16 +1202,20 @@ func _unhandled_input(e: InputEvent) -> void:
 		match mb.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
 				if mb.pressed:
-					_zoom(1.12)
+					_zoom(1.12, mb.position)
 			MOUSE_BUTTON_WHEEL_DOWN:
 				if mb.pressed:
-					_zoom(1.0 / 1.12)
+					_zoom(1.0 / 1.12, mb.position)
 			MOUSE_BUTTON_MIDDLE:
 				panning = mb.pressed
 			MOUSE_BUTTON_LEFT:
 				if not started or over:
 					return
-				if mb.pressed and mb.alt_pressed:
+				if mb.pressed and face_mode:
+					_order_face(wp)
+					face_mode = false
+					hud.sync_touch("Face", false)
+				elif mb.pressed and (mb.alt_pressed or pick_mode):
 					_pick_soldier(wp)
 				elif mb.pressed:
 					dragging = true
@@ -1223,23 +1227,21 @@ func _unhandled_input(e: InputEvent) -> void:
 				if not started or over:
 					return
 				if mb.pressed:
-					rdragging = true
-					rdrag_start = wp
-				elif rdragging:
-					rdragging = false
-					if mb.ctrl_pressed:
-						_order_face(wp)
-					elif rdrag_start.distance_to(wp) > 24.0:
-						_order_line(rdrag_start, wp, mb.shift_pressed)
-					else:
-						_order(rdrag_start, mb.shift_pressed)
-	elif e is InputEventMouseMotion and panning:
-		camera.position -= (e as InputEventMouseMotion).relative / camera.zoom
-		_clamp_camera()
+					_right_press(mb, wp)
+				else:
+					_right_release(mb, wp)
+	elif e is InputEventMouseMotion:
+		var mm := e as InputEventMouseMotion
+		if panning:
+			camera.position -= mm.relative / camera.zoom
+			_clamp_camera()
+		elif right_held:
+			_right_motion(mm)
 	elif e is InputEventKey and e.is_pressed() and not e.is_echo():
 		var k := (e as InputEventKey).keycode
 		if k == KEY_SPACE and started and not over:
 			paused = not paused
+			hud.sync_touch("Pause", paused)
 		elif k == KEY_F1:
 			hud.toggle_help()
 		elif k == KEY_U:
@@ -1249,14 +1251,12 @@ func _unhandled_input(e: InputEvent) -> void:
 					v.unload()
 		elif k == KEY_G:
 			var any_up := _player_squads().any(func(q): return q.selected and not q.prone)
-			for sq in _player_squads():
-				if sq.selected:
-					sq.set_prone(any_up)
+			touch_button("Down", any_up)
+			hud.sync_touch("Down", any_up)
 		elif k == KEY_R:
 			var any_slow := _player_squads().any(func(q): return q.selected and not q.running)
-			for sq in _player_squads():
-				if sq.selected:
-					sq.set_assault(any_slow)
+			touch_button("Assault", any_slow)
+			hud.sync_touch("Assault", any_slow)
 		elif k == KEY_H:
 			for sq in _player_squads():
 				if sq.selected:
@@ -1437,10 +1437,105 @@ func _order(wp: Vector2, run: bool) -> void:
 	effects.marker(wp, Color(1.0, 0.8, 0.3) if run else Color(0.5, 1.0, 0.5))
 
 
-func _zoom(f: float) -> void:
+## Zoom in or out, keeping the map point under the cursor where it is.
+func _zoom(f: float, at_screen = null) -> void:
+	var before := _screen_to_world(at_screen) if at_screen != null else camera.position
 	var z := clampf(camera.zoom.x * f, 0.5, 2.5)
 	camera.zoom = Vector2(z, z)
+	if at_screen != null:
+		camera.position += before - _screen_to_world(at_screen)
 	_clamp_camera()
+
+
+# ---------------------------------------------------------------- mouse orders
+# Right button, mirroring the phone: click to move (Shift: add a waypoint),
+# drag to spread out along a line (pause, then keep dragging, to set facing),
+# drag from the selected squad or its last waypoint to turn them.
+
+var right_held := false
+var right_start_screen := Vector2.ZERO
+
+
+func _right_press(mb: InputEventMouseButton, wp: Vector2) -> void:
+	right_held = true
+	right_start_screen = mb.position
+	t_start = mb.position
+	pointer_world = wp
+	if mb.ctrl_pressed:
+		t_mode = "ctrl"
+		return
+	var own := _soldier_at(wp, player_team)
+	face_squads = _face_targets(wp, own)
+	if not face_squads.is_empty():
+		t_mode = "face"
+		face_anchor = wp
+	else:
+		t_mode = "press"
+
+
+func _right_motion(mm: InputEventMouseMotion) -> void:
+	pointer_world = _screen_to_world(mm.position)
+	if t_mode == "press" and mm.position.distance_to(right_start_screen) > 12.0 and _has_selection():
+		t_mode = "line"
+		rdragging = true
+		rdrag_start = _screen_to_world(right_start_screen)
+		line_still_at = mm.position
+		line_still_ms = Time.get_ticks_msec()
+		line_still_frame = Engine.get_process_frames()
+	elif t_mode == "line" and mm.position.distance_to(line_still_at) > 6.0:
+		line_still_at = mm.position  # still moving: restart the pause timer
+		line_still_ms = Time.get_ticks_msec()
+		line_still_frame = Engine.get_process_frames()
+
+
+func _right_release(mb: InputEventMouseButton, wp: Vector2) -> void:
+	if not right_held:
+		return
+	right_held = false
+	var mode := t_mode
+	t_mode = ""
+	rdragging = false
+	var add := mb.shift_pressed  # Shift: add to the route instead of replacing it
+	match mode:
+		"ctrl":
+			_order_face(wp)
+		"face":
+			var dir := wp - face_anchor
+			if dir.length() > 14.0 / camera.zoom.x:
+				for sq in face_squads:
+					sq.set_final_facing(dir)
+				effects.marker(wp, Color(0.6, 0.8, 1.0))
+			face_squads = []
+		"line":
+			if add:
+				plan_fresh = false
+			_plan("line", rdrag_start, wp, not add)
+		"line_face":
+			if add:
+				plan_fresh = false
+			var mid := (rdrag_start + line_b) * 0.5
+			var fdir := wp - mid
+			_plan("line", rdrag_start, line_b, not add, fdir.normalized() if fdir.length() > 14.0 / camera.zoom.x else Vector2.ZERO)
+		"press":
+			_right_click(wp, add)
+
+
+func _right_click(wp: Vector2, add: bool) -> void:
+	if not _has_selection():
+		return
+	# a click on an enemy, your carrier or (for tanks and lance teams) a wall is that order
+	var sel: Array = _player_squads().filter(func(q): return q.selected)
+	var own := _soldier_at(wp, player_team)
+	var boards: bool = own != null and own.is_vehicle and own.free_space() > 0 and not own.squad.selected \
+			and sel.any(func(q): return q.vehicle() == null)
+	var on_enemy := _soldier_at(wp, 1 - player_team) != null
+	var on_wall := map.get_t(map.cell_of(wp)) == BattleMap.T.WALL and sel.any(func(q): return q.can_breach())
+	if boards or on_enemy or on_wall:
+		_order(wp, run_toggle)
+		return
+	if add:
+		plan_fresh = false
+	_plan("move", wp, wp, not add)
 
 
 func _camera_keys(dt: float) -> void:
@@ -1453,6 +1548,20 @@ func _camera_keys(dt: float) -> void:
 		v.y -= 1
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
 		v.y += 1
+	# screen-edge scrolling with the mouse
+	if not touch_mode and started and DisplayServer.window_is_focused():
+		var mp := get_viewport().get_mouse_position()
+		var vs := get_viewport_rect().size
+		if Rect2(Vector2.ZERO, vs).has_point(mp):
+			var edge := 10.0
+			if mp.x < edge:
+				v.x -= 1
+			elif mp.x > vs.x - edge:
+				v.x += 1
+			if mp.y < edge:
+				v.y -= 1
+			elif mp.y > vs.y - edge:
+				v.y += 1
 	if v != Vector2.ZERO:
 		camera.position += v.normalized() * 700.0 * dt / camera.zoom.x
 		_clamp_camera()

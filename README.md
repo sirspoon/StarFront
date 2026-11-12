@@ -27,23 +27,22 @@ If it struggles or crashes, add `?safe` to the address (or one at a time: `?shad
   each with a troop carrier and a tank.
 - Win by holding the chapel unchallenged for 3 minutes, or by breaking the enemy. (No time limit for now, for testing.)
 
-### Controls
+### Controls (PC)
 | Input | Action |
 |---|---|
-| Left click / drag | Select squads (Shift adds) |
-| Right click ground | Move there (soldiers pick cover nearby). Shift + right click runs |
-| Right drag | Line the squad up along the line, in cover, facing away from where they came |
-| Ctrl + right click | Face that way (they prefer targets in that arc) |
-| Alt + click a soldier | Pick out individual soldiers to order on their own |
-| Right click a visible enemy | Concentrate fire on that soldier or vehicle |
-| Right click your own carrier (infantry selected) | Climb aboard |
-| U | Unload the selected carriers |
-| Right click a wall (tank or Lance Team selected) | Shell the wall until it falls |
-| H | Halt selected squads |
+| Left click / drag a box | Select squads (Shift adds) |
+| Right click | Move there (soldiers pick cover nearby). Shift + right click adds a waypoint |
+| Right drag | Line the squad up along the line, in cover. Pause at the end, then keep dragging to set facing |
+| Right drag from the selected squad (or its last waypoint) | Face that way |
+| Right click an enemy / your carrier / a wall | Focus fire / climb aboard / shell it (tank or Lance Team) |
+| R / G / H / U | Assault / get down / halt / unload |
+| Alt + click a soldier | Pick out single soldiers |
 | 1-9 | Select a squad and jump to it |
-| Space | Pause |
-| WASD / arrows / middle-drag, mouse wheel | Scroll, zoom |
+| Space | Pause (orders still work) |
+| WASD / arrows / screen edge / middle-drag, wheel | Scroll, zoom |
 | F1 | Show or hide help |
+
+On a phone the controls are touch gestures: see the ? button in the game.
 
 ## How the battle works
 - **Line of sight:** walls and wrecks block it. You only see enemies your men can see, and an enemy
