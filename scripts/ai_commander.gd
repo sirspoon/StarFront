@@ -15,6 +15,8 @@ func _init(m: Node, t: int) -> void:
 
 
 func tick(dt: float) -> void:
+	if "--debug-assault" in OS.get_cmdline_user_args():
+		debug(dt)
 	timer -= dt
 	if timer > 0.0:
 		return
@@ -68,6 +70,9 @@ func _think(sq: Squad) -> void:
 	if ready.is_empty():
 		return
 	var c := sq.center()
+	if ready.any(func(m): return m.charger):
+		_think_assault(sq, ready, c)
+		return
 	var rng: float = ready[0].weapon.range
 	var busy := ready.any(func(m): return m.moving)
 	var enemy: Soldier = main.nearest_seen_enemy(team, c)
@@ -101,3 +106,45 @@ func _think(sq: Squad) -> void:
 	if c.distance_to(goal) < 50.0:
 		return
 	sq.order_move(main.map, c.move_toward(goal, 260.0), enemy == null and c.distance_to(goal) > 450.0)
+
+
+## Assault troops close in on the nearest enemy foot soldiers, from cover to cover while
+## they're far off and at a run for the last stretch; the men charge in themselves.
+func _think_assault(sq: Squad, ready: Array, c: Vector2) -> void:
+	var enemy: Soldier = null
+	var bd := INF
+	for s in main.soldiers:
+		if s.team == team or s.is_vehicle or not s.is_alive() or not s.seen_by[team] or s.state == Soldier.State.ROUTING:
+			continue
+		var d := c.distance_to(s.position)
+		if d < bd:
+			bd = d
+			enemy = s
+	if ready.any(func(m): return m.in_melee or m.charging != null):
+		return  # already stuck in
+	if enemy == null:
+		if not ready.any(func(m): return m.moving):
+			var goal := _goal(sq)
+			if c.distance_to(goal) > 50.0:
+				sq.order_move(main.map, c.move_toward(goal, 260.0), c.distance_to(goal) > 450.0)
+		return
+	sq.facing = (enemy.position - c).normalized()
+	if bd < 190.0:
+		sq.order_move(main.map, enemy.position, true)  # go in hard for the last stretch
+	elif not ready.any(func(m): return m.moving):
+		sq.order_move(main.map, c.move_toward(enemy.position, minf(140.0, bd - 120.0)), false)  # cover to cover
+
+
+var dbg_t := 0.0
+func debug(dt: float) -> void:
+	dbg_t -= dt
+	if dbg_t > 0.0:
+		return
+	dbg_t = 10.0
+	for sq in main.squads:
+		if sq.team == team and sq.members.any(func(m): return m.charger):
+			var st := []
+			for m in sq.members:
+				st.append("%s%s%s" % [["R", "P", "X", "D", "F", "E"][m.state], "M" if m.in_melee else "", "C" if m.charging != null else ""])
+			var e: Soldier = main.nearest_seen_enemy(team, sq.center())
+			print("t=%d %s at %s run=%s enemy_d=%d %s" % [main.time, sq.name, sq.center().round(), sq.running, -1 if e == null else int(e.position.distance_to(sq.center())), " ".join(st)])

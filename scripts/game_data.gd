@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.36"
+const VERSION := "0.37"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -27,9 +27,24 @@ const WEAPONS := {
 	"siege_cannon": {"name": "Siege cannon", "range": 620.0, "cooldown": 5.0, "burst": 1, "gap": 0.0,
 		"acc": 0.5, "ap": 0.6, "dmg": 3, "pen": 9, "vdmg": 6, "blast": 42.0, "wall": 80.0, "supp": 40.0,
 		"tracer": Color(1.0, 0.9, 0.6), "width": 3.5},
+	"ripper_smg": {"name": "Ripper gun", "range": 180.0, "cooldown": 1.3, "burst": 4, "gap": 0.06,
+		"acc": 0.22, "ap": 0.0, "dmg": 1, "pen": 1, "supp": 5.0, "tracer": Color(1.0, 0.8, 0.45), "width": 1.1},
+	"mass_pistol": {"name": "Mass-reactive pistol", "range": 190.0, "cooldown": 1.5, "burst": 2, "gap": 0.12,
+		"acc": 0.2, "ap": 0.3, "dmg": 2, "pen": 2, "supp": 6.0, "tracer": Color(0.6, 0.85, 1.0), "width": 1.8},
 	"fusion_cannon": {"name": "Fusion cannon", "range": 540.0, "cooldown": 6.0, "burst": 1, "gap": 0.0,
 		"acc": 0.55, "ap": 0.9, "dmg": 4, "pen": 9, "vdmg": 6, "blast": 24.0, "wall": 70.0, "supp": 40.0,
 		"tracer": Color(0.7, 0.9, 1.0), "width": 5.0},
+}
+
+## Close-combat weapons. hit = chance a blow lands; parry = how much it spoils the enemy's
+## blows (if he can see them coming); ap = how much armour it cuts through; cooldown =
+## seconds between blows. Anyone without one fights with the butt of his gun.
+const MELEE := {
+	"gun_butt": {"name": "Gun butt", "cooldown": 1.5, "hit": 0.4, "parry": 0.1, "dmg": 1, "ap": 0.0, "sound": "melee_blunt", "blade": false},
+	"trench_knife": {"name": "Trench knife", "cooldown": 0.75, "hit": 0.6, "parry": 0.25, "dmg": 1, "ap": 0.45, "sound": "melee_blade", "blade": true},
+	"hook_sabre": {"name": "Hook sabre", "cooldown": 0.85, "hit": 0.65, "parry": 0.35, "dmg": 1, "ap": 0.55, "sound": "melee_blade", "blade": true},
+	"edict_blade": {"name": "Edict blade", "cooldown": 0.85, "hit": 0.65, "parry": 0.4, "dmg": 2, "ap": 0.8, "sound": "melee_power", "blade": true},
+	"edict_greatblade": {"name": "Edict greatblade", "cooldown": 1.0, "hit": 0.7, "parry": 0.45, "dmg": 3, "ap": 0.85, "sound": "melee_power", "blade": true},
 }
 
 ## nerve multiplies morale loss (higher = panics sooner). Optional traits for later units:
@@ -44,6 +59,10 @@ const SOLDIERS := {
 		"radius": 7.0, "weapon": "lumen_rifle", "leader": true},
 	"lancer": {"name": "Lancer", "hp": 1, "armor": 0.1, "speed": 42.0, "morale": 65.0, "nerve": 1.1,
 		"radius": 7.0, "weapon": "lance_launcher"},
+	"raider": {"name": "Trench Raider", "hp": 1, "armor": 0.15, "speed": 54.0, "morale": 78.0, "nerve": 0.9,
+		"radius": 7.0, "weapon": "ripper_smg", "melee": "trench_knife", "charger": true},
+	"raider_sgt": {"name": "Raider Sergeant", "hp": 1, "armor": 0.2, "speed": 54.0, "morale": 85.0, "nerve": 0.8,
+		"radius": 7.0, "weapon": "ripper_smg", "melee": "hook_sabre", "charger": true, "leader": true},
 	"brother": {"name": "Sworn Brother", "hp": 3, "armor": 0.5, "speed": 38.0, "morale": 95.0, "nerve": 0.5,
 		"radius": 10.0, "weapon": "mass_carbine"},
 	"cannoneer": {"name": "Sworn Cannoneer", "hp": 3, "armor": 0.5, "speed": 34.0, "morale": 95.0, "nerve": 0.5,
@@ -52,6 +71,10 @@ const SOLDIERS := {
 		"radius": 10.0, "weapon": "fusion_carbine"},
 	"champion": {"name": "Sworn Champion", "hp": 4, "armor": 0.6, "speed": 38.0, "morale": 110.0, "nerve": 0.4,
 		"radius": 10.0, "weapon": "mass_carbine", "leader": true},
+	"oathblade": {"name": "Sworn Oathblade", "hp": 3, "armor": 0.5, "speed": 47.0, "morale": 100.0, "nerve": 0.45,
+		"radius": 10.0, "weapon": "mass_pistol", "melee": "edict_blade", "charger": true},
+	"blade_champion": {"name": "Oathblade Champion", "hp": 4, "armor": 0.6, "speed": 47.0, "morale": 115.0, "nerve": 0.4,
+		"radius": 10.0, "weapon": "mass_pistol", "melee": "edict_greatblade", "charger": true, "leader": true},
 }
 
 ## armour = [front, side, rear]. Carriers hold a squad; one starts the battle inside.
@@ -82,6 +105,7 @@ const FACTIONS := {
 			{"name": "Conscript Squad", "members": ["sergeant", "conscript", "conscript", "conscript", "conscript", "conscript", "gunner"]},
 			{"name": "Conscript Squad", "members": ["sergeant", "conscript", "conscript", "conscript", "conscript", "conscript", "gunner"]},
 			{"name": "Conscript Squad", "members": ["sergeant", "conscript", "conscript", "conscript", "conscript", "conscript", "gunner"]},
+			{"name": "Raider Squad", "members": ["raider_sgt", "raider", "raider", "raider", "raider", "raider", "raider", "raider"]},
 			{"name": "Stubber Team", "members": ["sergeant", "gunner", "gunner"]},
 			{"name": "Lance Team", "members": ["sergeant", "lancer", "lancer"]},
 			{"vehicle": "vigil"},
@@ -95,6 +119,7 @@ const FACTIONS := {
 		"squads": [
 			{"name": "Sworn Talon", "carrier": "pilgrim", "members": ["champion", "brother", "brother", "cannoneer"]},
 			{"name": "Sworn Talon", "members": ["champion", "brother", "brother", "cannoneer"]},
+			{"name": "Oathblade Talon", "members": ["blade_champion", "oathblade", "oathblade"]},
 			{"name": "Breacher Talon", "members": ["champion", "brother", "breacher", "breacher"]},
 			{"vehicle": "verdict"},
 		],

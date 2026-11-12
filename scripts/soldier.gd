@@ -55,6 +55,18 @@ var lean_side := 1.0
 var strength := 1         # how much this unit counts towards its side's strength
 var board_vehicle = null  # carrier this soldier is walking to
 var carrier = null        # carrier this soldier is riding in
+# close combat
+const CHARGE_RANGE := 130.0   # assault troops rush enemies this close
+var melee: Dictionary = {}
+var charger := false          # assault troops: charge into close combat
+var melee_target: Soldier = null
+var in_melee := false         # locked in a fight at arm's length
+var melee_cd := 0.0
+var swing := 0.0              # 1 just after a blow, fading (for drawing)
+var charging: Soldier = null  # the enemy he's rushing at
+var charge_check := 0.0
+var charge_fresh := false     # the first blow after a charge lands harder
+var resume_to = null          # where he was going before he charged
 
 
 func setup(m: Node, sq: Squad, t: int, kind_id: String) -> void:
@@ -67,6 +79,8 @@ func setup(m: Node, sq: Squad, t: int, kind_id: String) -> void:
 	data = GameData.SOLDIERS[kind_id]
 	colors = GameData.FACTIONS[faction]
 	weapon = GameData.WEAPONS[data.weapon]
+	melee = GameData.MELEE[data.get("melee", "gun_butt")]
+	charger = data.get("charger", false)
 	hp = data.hp
 	max_hp = hp
 	armor = data.armor
@@ -149,7 +163,12 @@ func tick(dt: float, now: float) -> void:
 		State.READY:
 			_follow_path(dt, false)
 	if state != State.ROUTING and is_alive():
-		_fight(dt, now)
+		if not _melee(dt, now):
+			_fight(dt, now)
+	else:
+		in_melee = false
+		melee_target = null
+		charging = null
 	_update_posture(dt)
 	if bleeding > 0.0:
 		bleeding -= dt
@@ -180,6 +199,8 @@ func _try_board() -> void:
 func _update_posture(dt: float) -> void:
 	if state == State.PINNED:
 		posture = "prone"
+	elif in_melee or charging != null:
+		posture = "stand"
 	elif squad.prone and not (running and moving):
 		posture = "crouch" if behind_low else "prone"
 	elif (in_cover or behind_low) and not moving:
@@ -230,6 +251,9 @@ func _follow_path(dt: float, fleeing: bool) -> void:
 			state = State.FLED
 			visible = false
 			main.on_fled(self)
+		return
+	if in_melee and not fleeing and not (running and squad.running):
+		moving = false  # locked in a fight: he can't just walk off
 		return
 	var target := path[path_i]
 	var to := target - position
@@ -305,6 +329,126 @@ func _fight(dt: float, now: float) -> void:
 	cooldown = cd
 
 
+# ---------------------------------------------------------------- close combat
+
+func _reach(e: Soldier) -> float:
+	return radius + e.radius + 6.0
+
+
+## A foot soldier of the other side at arm's length, nearest first.
+func _foe_in_reach() -> Soldier:
+	var best: Soldier = null
+	var bd := INF
+	for e in main.soldiers:
+		if e.team == team or e.is_vehicle or not e.is_alive() or e.state == State.EMBARKED:
+			continue
+		var d := position.distance_to(e.position) - _reach(e)
+		if d <= 0.0 and d < bd:
+			bd = d
+			best = e
+	return best
+
+
+## An enemy close enough for assault troops to rush, with a short way to him.
+func _charge_target() -> Soldier:
+	if squad.prone or state != State.READY or board_vehicle != null:
+		return null  # in the Down stance they hold back
+	var best: Soldier = null
+	var bd := CHARGE_RANGE
+	for e in main.soldiers:
+		if e.team == team or e.is_vehicle or not e.is_alive() or e.state == State.EMBARKED \
+				or e.state == State.ROUTING or not e.seen_by[team]:
+			continue
+		var d := position.distance_to(e.position)
+		if d < bd and map.los_clear(position, e.position):
+			bd = d
+			best = e
+	return best
+
+
+## Close combat. Returns true while he's fighting or rushing in (and so not shooting).
+func _melee(dt: float, now: float) -> bool:
+	if is_vehicle:
+		return false
+	melee_cd -= dt
+	swing = maxf(0.0, swing - dt * 4.0)
+	var foe := _foe_in_reach()
+	if foe == null and charger:
+		charge_check -= dt
+		if charging != null and (not is_instance_valid(charging) or not charging.is_alive() \
+				or charging.state == State.ROUTING or position.distance_to(charging.position) > CHARGE_RANGE * 1.4):
+			charging = null
+		if charge_check <= 0.0:
+			charge_check = 0.35
+			var t := charging if charging != null else _charge_target()
+			if t != null:
+				var p := map.find_path(position, t.position)
+				var plen := 0.0
+				var prev := position
+				for q in p:
+					plen += prev.distance_to(q)
+					prev = q
+				if p.size() > 0 and plen < position.distance_to(t.position) * 1.6 + 24.0:
+					if charging == null:
+						charge_fresh = true
+						if path_i < path.size():
+							resume_to = path[path.size() - 1]
+					charging = t
+					path = p
+					path_i = 0
+					running = true
+				elif charging == t:
+					charging = null
+		if charging != null:
+			in_melee = false
+			burst_left = 0
+			return true
+	if foe == null:
+		in_melee = false
+		melee_target = null
+		if charging == null and resume_to != null:
+			go_to(resume_to, squad.running)  # the fight's over: back to what he was doing
+			resume_to = null
+		elif charging == null and running and path_i >= path.size():
+			running = squad.running
+		return false
+	if not in_melee and charging != null:
+		# crashing into the enemy line: a shock to them
+		foe.add_suppression(15.0, now)
+		halt()
+	in_melee = true
+	charging = null
+	melee_target = foe
+	burst_left = 0
+	facing = lerp_angle(facing, (foe.position - position).angle(), minf(1.0, dt * 12.0))
+	if melee_cd <= 0.0:
+		_strike(foe, now)
+	return true
+
+
+func _strike(foe: Soldier, now: float) -> void:
+	var m := melee
+	var p: float = m.hit
+	var sees_it := absf(wrapf((position - foe.position).angle() - foe.facing, -PI, PI)) < 1.6
+	if foe.state == State.READY and sees_it:
+		p *= 1.0 - float(foe.melee.parry)  # he sees it coming and fends it off
+	elif not sees_it:
+		p *= 1.25  # struck from behind
+	if foe.state == State.PINNED:
+		p *= 1.3  # cowering
+	if charge_fresh:
+		p *= 1.3
+		charge_fresh = false
+	if state == State.PINNED:
+		p *= 0.6
+	p = minf(p, 0.95)
+	swing = 1.0
+	melee_cd = float(m.cooldown) * randf_range(0.85, 1.15) * (2.0 if state == State.PINNED else 1.0)
+	last_fire_time = now
+	foe.add_suppression(6.0, now)
+	main.resolve_blow(self, foe, m, randf() < p)
+
+
 func can_breach() -> bool:
 	return weapon.get("blast", 0.0) > 0.0
 
@@ -341,6 +485,8 @@ func pick_target(w: Dictionary, from: Vector2) -> Soldier:
 	for e in main.soldiers:
 		if e.team == team or not e.is_alive() or not e.seen_by[team] or not e.hurt_by(w):
 			continue
+		if e.in_melee and is_instance_valid(e.melee_target) and e.melee_target.team == team:
+			continue  # he's grappling with one of ours: no clear shot
 		var d := from.distance_to(e.position)
 		if d > w.range:
 			continue
@@ -397,7 +543,9 @@ func _draw() -> void:
 	else:
 		draw_set_transform(off + Vector2(3, 4), 0, Vector2(0.85, 0.7) if crouch else Vector2(1, 0.8))
 	draw_circle(Vector2.ZERO, r + 1.0, Color(0, 0, 0, 0.35))
-	draw_set_transform(off, facing, Vector2.ONE)
+	# a blow twists his body into it: a slash with a blade, a jab with a gun butt
+	var fa := facing + sin(swing * PI) * (0.45 if melee.get("blade", false) else 0.8)
+	draw_set_transform(off, fa, Vector2.ONE)
 	if prone:
 		# legs stretched out behind him, shuffling when he crawls
 		var c := sin(walk * 1.5) * r * 0.25 if moving else 0.0
@@ -406,13 +554,13 @@ func _draw() -> void:
 			draw_line(Vector2(-r * 0.6, sgn * r * 0.3), Vector2(-r * 1.9 + k, sgn * r * 0.42), Color(0, 0, 0, 0.35), r * 0.62)
 			draw_line(Vector2(-r * 0.6, sgn * r * 0.3), Vector2(-r * 1.85 + k, sgn * r * 0.4), leg, r * 0.5)
 			draw_circle(Vector2(-r * 1.95 + k, sgn * r * 0.4), r * 0.26, Color(0.12, 0.11, 0.1))  # boots
-		draw_set_transform(off, facing, Vector2(1.1, 0.82))
+		draw_set_transform(off, fa, Vector2(1.1, 0.82))
 	elif crouch:
 		# kneeling: one knee forward, the other foot tucked behind
 		draw_circle(Vector2(r * 0.55, -r * 0.55), r * 0.36, leg)  # knee forward
 		draw_line(Vector2(-r * 0.2, r * 0.45), Vector2(-r * 0.95, r * 0.5), leg.darkened(0.15), r * 0.42)
 		draw_circle(Vector2(-r * 1.05, r * 0.5), r * 0.24, Color(0.12, 0.11, 0.1))  # foot tucked behind
-		draw_set_transform(off, facing, Vector2(0.86, 0.9))
+		draw_set_transform(off, fa, Vector2(0.86, 0.9))
 	elif moving:
 		var sw := sin(walk) * r * 0.45
 		draw_circle(Vector2(sw, -r * 0.38), r * 0.32, leg)
@@ -446,11 +594,19 @@ func _draw_conscript() -> void:
 	var arm: Color = colors.armour
 	var trim: Color = colors.trim
 	var r := radius
-	draw_rect(Rect2(-r - 1.0, -3.0, 4.0, 6.0), arm.darkened(0.2))  # pack and bedroll
-	draw_circle(Vector2.ZERO, r, coat)
+	if not kind.begins_with("raider"):
+		draw_rect(Rect2(-r - 1.0, -3.0, 4.0, 6.0), arm.darkened(0.2))  # pack and bedroll (raiders travel light)
+	draw_circle(Vector2.ZERO, r, coat.darkened(0.25) if kind.begins_with("raider") else coat)
 	draw_arc(Vector2.ZERO, r, 0, TAU, 16, coat.darkened(0.45), 1.0)
 	var heavy := kind == "gunner"
-	if kind == "lancer":
+	var raider := kind.begins_with("raider")
+	if raider:
+		draw_line(Vector2(-r * 0.2, -r * 0.75), Vector2(r * 0.5, r * 0.75), Color(0.22, 0.16, 0.1), 1.6)  # bandolier
+		draw_line(Vector2(0, 3), Vector2(r + 4.0, 3), Color(0.1, 0.09, 0.08), 2.6)  # ripper gun, short and stubby
+		draw_rect(Rect2(r * 0.4, 3.5, 2.5, 3.5), Color(0.15, 0.13, 0.1))  # drum
+		_draw_blade(Vector2(r * 0.35, -r * 0.7), r * (1.5 if kind == "raider_sgt" else 0.9), 1.4 if kind == "raider_sgt" else 1.1,
+				Color(0.62, 0.62, 0.6), Color(0.3, 0.22, 0.14), kind == "raider_sgt")
+	elif kind == "lancer":
 		draw_line(Vector2(-r - 2.0, -3), Vector2(r + 6.0, -3), Color(0.2, 0.22, 0.16), 4.5)  # launcher tube
 		draw_circle(Vector2(r + 7.0, -3), 2.6, Color(0.45, 0.35, 0.2))  # warhead
 	else:
@@ -461,6 +617,8 @@ func _draw_conscript() -> void:
 	draw_circle(Vector2(0.5, 0), r * 0.58, arm)
 	draw_arc(Vector2(0.5, 0), r * 0.58, -1.3, 1.0, 8, arm.lightened(0.35), 1.0)
 	draw_circle(Vector2(r * 0.55, 0), 1.5, Color(0.12, 0.12, 0.12))  # rebreather
+	if kind.begins_with("raider"):
+		draw_line(Vector2(r * 0.15, -r * 0.5), Vector2(r * 0.15, r * 0.5), Color(0.55, 0.5, 0.42), 1.2)  # goggles strap
 	if is_leader:
 		draw_line(Vector2(-2.5, 0), Vector2(2.5, 0), trim, 2.0)  # crest
 
@@ -478,9 +636,17 @@ func _draw_sworn() -> void:
 	draw_circle(Vector2(-r - 1.0, -2.5), 1.3, Color(1.0, 0.55, 0.2))
 	draw_circle(Vector2(-r - 1.0, 2.5), 1.3, Color(1.0, 0.55, 0.2))
 	draw_circle(Vector2.ZERO, r * 0.85, coat)
-	var gun_w := 5.0 if kind == "cannoneer" else 3.5
-	draw_rect(Rect2(1, 1.5, r + 8.0, gun_w), Color(0.13, 0.12, 0.12))
-	draw_rect(Rect2(r + 6.0, 1.0, 3.0, gun_w + 1.0), trim.darkened(0.2))
+	var bladed := kind == "oathblade" or kind == "blade_champion"
+	if bladed:
+		draw_rect(Rect2(1, 2.5, r * 0.8, 3.0), Color(0.13, 0.12, 0.12))  # pistol
+		draw_rect(Rect2(r * 0.8, 2.0, 2.0, 4.0), trim.darkened(0.2))
+		var great := kind == "blade_champion"
+		_draw_blade(Vector2(r * 0.25, -r * 0.75), r * (2.1 if great else 1.7), 2.6 if great else 2.0,
+				Color(0.78, 0.8, 0.84), trim, true, Color(0.55, 0.8, 1.0, 0.8))
+	else:
+		var gun_w := 5.0 if kind == "cannoneer" else 3.5
+		draw_rect(Rect2(1, 1.5, r + 8.0, gun_w), Color(0.13, 0.12, 0.12))
+		draw_rect(Rect2(r + 6.0, 1.0, 3.0, gun_w + 1.0), trim.darkened(0.2))
 	if kind == "breacher":
 		draw_circle(Vector2(r + 9.0, 3.2), 2.2, Color(0.6, 0.85, 1.0))  # fusion glow
 	for s in [-1.0, 1.0]:
@@ -489,6 +655,30 @@ func _draw_sworn() -> void:
 		draw_arc(p, r * 0.45, 0, TAU, 14, trim, 1.3)
 	draw_circle(Vector2(1, 0), r * 0.42, arm)
 	draw_line(Vector2(r * 0.32, -2.2), Vector2(r * 0.32, 2.2), Color(1.0, 0.25, 0.1), 1.8)  # eye lenses
+
+
+## A blade in his off hand: held point-forward ready, swept across in a blow, and
+## carried down by his side when there's no close fight.
+func _draw_blade(hand: Vector2, length: float, width: float, steel: Color, hilt: Color, guard: bool, glow := Color(0, 0, 0, 0)) -> void:
+	var ready := in_melee or charging != null
+	if not ready and glow.a <= 0.0 and swing <= 0.0:
+		# a knife or sabre stays in its sheath at his hip until he needs it
+		draw_line(Vector2(-radius * 0.5, radius * 0.7), Vector2(-radius * 0.5 + length * 0.7, radius * 0.95), hilt.darkened(0.3), width + 1.0)
+		return
+	var a := -0.25 if ready else -0.75  # point forward, or held low and ready
+	if swing > 0.0:
+		a = lerpf(-1.4, 0.9, 1.0 - swing)  # the slash sweeps across in front of him
+	var dir := Vector2.from_angle(a)
+	var tip := hand + dir * length
+	draw_line(hand - dir * 2.5, hand, hilt, width + 0.6)  # grip
+	if guard:
+		draw_line(hand + dir.orthogonal() * 2.2, hand - dir.orthogonal() * 2.2, hilt.lightened(0.2), 1.2)
+	if glow.a > 0.0:
+		draw_line(hand, tip, glow, width + 1.6)  # the edict blade's crackling field
+	draw_line(hand, tip, steel, width)
+	draw_line(hand + dir.orthogonal() * width * 0.25, tip, steel.lightened(0.4), maxf(0.5, width * 0.3))  # the edge catching the light
+	if swing > 0.5:  # the blur of the blow
+		draw_arc(hand, length * 0.85, a - 0.9, a, 8, Color(1, 1, 1, (swing - 0.5) * 0.5), 1.0)
 
 
 var pool_seed := randi()

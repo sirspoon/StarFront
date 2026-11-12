@@ -50,6 +50,9 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - Voice lines: `python3 tools/make_voices.py` (needs `pip install piper-tts` and the Piper voice
   en_GB-alan-medium, see the top of the script); `Sfx.voice()` plays acknowledgements. `--side=sworn
   --test-voice` (with `--autotest`, under xvfb) checks a move and a target order each get a reply.
+- `--shot-melee` waits (after `--shot-time`) for a close fight and centres the screenshot on it;
+  `--debug-assault` prints where the assault squads are and what they're doing every 10 s. Test
+  results also print close-combat blows, melee kills and each assault squad's kills.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

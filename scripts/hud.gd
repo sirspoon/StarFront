@@ -97,7 +97,9 @@ func setup(m: Node) -> void:
 			+ "Wheel: zoom\n\n" \
 			+ "Hold the Ashen Chapel. Sandbags, barricades and\n" \
 			+ "low walls stop most fire from their far side.\n" \
-			+ "Men must stay in contact with their squad."
+			+ "Men must stay in contact with their squad.\n" \
+			+ "Raiders and Oathblades charge enemies who come\n" \
+			+ "   close (not while Down). Up close, blades win."
 	help_panel.add_child(help)
 	if main.touch_mode:
 		help.text = "TOUCH CONTROLS  (? hides)\n" \

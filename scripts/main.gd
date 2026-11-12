@@ -90,6 +90,9 @@ var last_wall_down = null
 var flank_shots := [0, 0]
 var no_flank := "--no-flank" in OS.get_cmdline_user_args()  # test aid: flanking off
 var crossfire_time := [0.0, 0.0]
+var blows := [0, 0]          # close-combat blows struck by each side
+var melee_kills := [0, 0]
+var assault_kills := [0, 0]  # kills by each side's assault squad (any weapon)
 var shots := [0, 0]
 var hits := [0, 0]
 
@@ -720,8 +723,21 @@ func _process(dt: float) -> void:
 		ai.tick(dt)
 	_update_objective(dt)
 	_check_end()
-	if shot_path != "" and time >= shot_time:
+	if shot_path != "" and time >= shot_time and (not "--shot-melee" in OS.get_cmdline_user_args() or _melee_spot() != null):
 		_take_shot()
+
+
+## Test aid: where a close fight is going on (several men locked in melee), or null.
+func _melee_spot():
+	for s in soldiers:
+		if s.is_alive() and s.in_melee and (s.swing > 0.6 or s.charger):
+			var n := 0
+			for o in soldiers:
+				if o.is_alive() and o.in_melee and o.position.distance_to(s.position) < 60.0:
+					n += 1
+			if n >= 4:
+				return s.position
+	return null
 
 
 func _take_shot() -> void:
@@ -747,6 +763,8 @@ func _take_shot() -> void:
 		if a.begins_with("--shot-squad="):  # centre on one of the player's squads (by number)
 			var q: Squad = _player_squads()[int(a.trim_prefix("--shot-squad="))]
 			camera.position = q.center()
+	if "--shot-melee" in OS.get_cmdline_user_args():
+		camera.position = _melee_spot()
 	if "--shot-wall" in OS.get_cmdline_user_args() and last_wall_down != null:
 		camera.position = last_wall_down
 	for a in OS.get_cmdline_user_args():
@@ -853,6 +871,8 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 		p *= 1.0 - map.cover_vs(target.position, shooter.position)
 	if shooter.moving:
 		p *= 0.3 if shooter.running else 0.5  # assaulting: firing on the run
+	if target.charging != null:
+		p *= 0.75  # closing fast: hard to track
 	elif shooter.posture == "prone" and shooter.state != Soldier.State.PINNED:
 		p *= 1.25  # lying flat, braced: a steadier aim
 	if shooter.state == Soldier.State.PINNED:
@@ -944,6 +964,32 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 				_ricochet(end, end - muzzle, w)
 		if randf() < (0.5 if float(w.get("pen", 0)) >= 2.0 else 0.2):
 			decals.add_burn(end, 1.2 + float(w.get("pen", 0)) * 0.25)
+
+
+## A blow in close combat: armour may turn it, otherwise it wounds.
+func resolve_blow(attacker: Soldier, foe: Soldier, m: Dictionary, landed: bool) -> void:
+	blows[attacker.team] += 1
+	var show := attacker.visible or foe.visible
+	var at := foe.position + (attacker.position - foe.position).normalized() * foe.radius
+	if not landed:
+		if m.blade and foe.melee.blade and show and randf() < 0.6:
+			sfx.play("melee_blade", at, 0.0, 0.05)  # blade on blade
+			effects.spark(at)
+		return
+	if show:
+		sfx.play(m.sound, at, 0.0, 0.05)
+	if randf() < foe.armor * (1.0 - float(m.ap)):
+		if show:
+			effects.spark(at)  # glances off his armour
+		foe.morale -= 1.0
+		return
+	var away := (foe.position - attacker.position).normalized()
+	if show:
+		effects.puff(foe.position, Color(foe.colors.blood), 5.0)
+	decals.add_blood(foe.position + away * 2.0, away, 0.8 + float(m.dmg) * 0.2, Color(foe.colors.blood))
+	foe.take_hit(int(m.dmg), attacker)
+	if not foe.is_alive():
+		melee_kills[attacker.team] += 1
 
 
 ## A shot at a spot rather than a soldier: used to blow holes in walls.
@@ -1109,6 +1155,8 @@ func on_vehicle_destroyed(v: Vehicle, killer: Soldier) -> void:
 
 
 func on_death(s: Soldier, killer: Soldier) -> void:
+	if killer != null and killer.charger:
+		assault_kills[killer.team] += 1
 	if s.faction == "sworn" and not s.is_vehicle:
 		sfx.play("sworn_death", s.position, 0.0, 0.04)
 	for o in soldiers:
@@ -1194,9 +1242,9 @@ func _end(winner: int, reason: String) -> void:
 		else:
 			fled[s.team] += 1
 	if autotest:
-		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d cover=%d%%/%d%% blocked=%s flank=%s crossfire=%d%%/%d%% %s" % [
+		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d cover=%d%%/%d%% blocked=%s flank=%s crossfire=%d%%/%d%% blows=%s mkills=%s raider_kills=%d blade_kills=%d %s" % [
 				factions[winner] if winner >= 0 else "draw", int(time), shots, hits,
-				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, flank_shots, int(100 * crossfire_time[0] / maxf(field_time[0], 1)), int(100 * crossfire_time[1] / maxf(field_time[1], 1)), reason])
+				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, flank_shots, int(100 * crossfire_time[0] / maxf(field_time[0], 1)), int(100 * crossfire_time[1] / maxf(field_time[1], 1)), blows, melee_kills, assault_kills[0], assault_kills[1], reason])
 		get_tree().quit()
 		return
 	var head := "DRAW"

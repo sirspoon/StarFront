@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.37 (2026-11-12)
+Close combat and assault squads.
+- New Legion Raider Squad: eight fast trench raiders with short-ranged ripper guns, trench
+  knives and a sergeant with a hook sabre.
+- New Sworn Oathblade Talon: three armoured warriors with pistols and crackling edict blades
+  (a two-handed greatblade for their champion). Few, but deadly up close.
+- Assault troops charge any enemy foot soldier who comes within about 8 cells (if there's a
+  short way to him and they're not in the Down stance). Men charging in are a little harder to
+  hit, and their first blow lands harder. Crashing into the enemy rattles them.
+- Anyone else who ends up at arm's length fights with the butt of his gun. Blades strike faster
+  and land more often, and parry blows they see coming. A blow from behind, or on a man pinned
+  down, lands more easily. Armour can turn a blow; edict blades cut through most of it.
+- Men locked in a fight can't simply walk off (an Assault order lets them break away at a run).
+  Others won't shoot at an enemy grappling with one of their own.
+- New sounds: ripper gun, pistol, blade clashes, gun-butt blows and the edict blade's crackle.
+- The computer's assault squads close in from cover to cover, then rush the last stretch.
+
 ## v0.36 (2026-11-12)
 Less square roof damage.
 - Holes in roofs have ragged, wandering edges with broken slates hanging over them, a dark torn

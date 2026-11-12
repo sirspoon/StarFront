@@ -9,6 +9,7 @@ identical. Re-run after changing anything here:  python3 tools/make_sounds.py
 Needs numpy.
 """
 import os
+import sys
 import wave
 import zlib
 
@@ -362,6 +363,63 @@ def engine_rev(rng):
     return finish(reverb(x, 0.8, 0.15, rng), fade=0.6)
 
 
+def blade_clash(rng):
+    """Steel on steel or steel into armour: a bright, clangy ring of inharmonic
+    partials that dies quickly, a scrape as the edges slide, and a dull impact."""
+    dur = 0.7
+    n = int(dur * SR)
+    t = T(dur)
+    f0 = rng.uniform(1700, 2400)
+    ring = sum(np.sin(2 * np.pi * f0 * r * t + rng.uniform(0, 6)) * env(n, 0.0005, d) * a
+               for r, d, a in [(1.0, 0.16, 1.0), (1.47, 0.11, 0.6), (2.09, 0.08, 0.45), (2.83, 0.05, 0.3)])
+    hit = filt(noise(n, rng), lo=1500, hi=7000) * env(n, 0.0002, 0.006) * 1.4
+    scrape = np.zeros(n)
+    sn = int(rng.uniform(0.08, 0.16) * SR)
+    sc = filt(noise(sn, rng), lo=2500, hi=6500) * np.sin(np.linspace(0, np.pi, sn)) ** 2 * 0.35
+    place(scrape, sc, rng.uniform(0.01, 0.03))
+    thud = chirp(dur, 220, 110, 8) * env(n, 0.001, 0.025) * 0.6
+    x = sat(ring * 0.55 + hit + scrape + thud, 1.6)
+    return finish(reverb(x, 0.6, 0.2, rng, bright=6000), peak=0.8, fade=0.15)
+
+
+def blunt_hit(rng):
+    """A gun butt into a body: a heavy, muffled thump, cloth and kit rattling, and a
+    short grunt of breath forced out."""
+    dur = 0.45
+    n = int(dur * SR)
+    thump = chirp(dur, rng.uniform(130, 160), 55, 8) * env(n, 0.001, 0.05) * 1.6
+    knock = filt(noise(n, rng), lo=120, hi=900) * env(n, 0.0005, 0.025) * 1.4
+    rattle = np.zeros(n)
+    for _ in range(3):
+        cl = int(0.02 * SR)
+        place(rattle, filt(noise(cl, rng), lo=1500, hi=4500) * env(cl, 0.0002, 0.005) * rng.uniform(0.1, 0.25), rng.uniform(0.01, 0.08))
+    bn = int(0.18 * SR)
+    breath = filt(noise(bn, rng), lo=300, hi=1600) * np.sin(np.linspace(0, np.pi, bn)) * 0.25
+    x = thump + knock + rattle
+    place(x, breath, 0.02)
+    x = sat(x / np.max(np.abs(x)), 2.0)
+    return finish(reverb(x, 0.4, 0.12, rng, bright=2500), peak=0.85, fade=0.1)
+
+
+def power_blade(rng):
+    """The Sworn's edict blade: its field cracks and spits as it strikes, over the
+    clash of the blade itself, then a falling electric snarl."""
+    dur = 0.8
+    n = int(dur * SR)
+    t = T(dur)
+    clash = blade_clash(rng)[:n] * 0.6
+    zap = chirp(dur, rng.uniform(1800, 2400), 260, 5) * env(n, 0.001, 0.12) * 0.5
+    buzz = np.sign(np.sin(2 * np.pi * rng.uniform(95, 115) * t)) * filt(noise(n, rng), lo=400, hi=3000) * env(n, 0.002, 0.18) * 0.5
+    crackle = np.zeros(n)
+    for _ in range(9):
+        cl = int(0.006 * SR)
+        place(crackle, filt(noise(cl, rng), lo=2500) * rng.uniform(0.2, 0.6), rng.uniform(0.0, 0.25))
+    x = np.zeros(n)
+    x[: len(clash)] += clash
+    x = sat(x + zap + buzz + crackle, 1.8)
+    return finish(reverb(x, 0.6, 0.2, rng, bright=5000), peak=0.8, fade=0.15)
+
+
 # ---------------------------------------------------------------- make them all
 
 def main():
@@ -382,8 +440,16 @@ def main():
         "lance": (2, lance),
         "engine": (1, engine),
         "engine_rev": (2, engine_rev),
+        "smg": (2, lambda r: burst(r, 4, 0.06, 0.55, tail=1.0)),
+        "pistol": (2, lambda r: burst(r, 2, 0.12, 1.1, explosive=True, tail=1.1)),
+        "melee_blade": (3, blade_clash),
+        "melee_blunt": (3, blunt_hit),
+        "melee_power": (3, power_blade),
     }
+    only = sys.argv[1:]  # e.g. make_sounds.py smg pistol: just those
     for name, (count, fn) in makers.items():
+        if only and name not in only:
+            continue
         for i in range(count):
             rng = np.random.default_rng(zlib.crc32(("%s_%d" % (name, i)).encode()))
             save("%s_%d" % (name, i), fn(rng))

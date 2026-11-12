@@ -441,7 +441,7 @@ func think(main: Node, dt: float) -> void:
 		var main_group: Array = gs[0]
 		for k in range(1, gs.size()):
 			for m in gs[k]:
-				if m.moving or m.state != Soldier.State.READY:
+				if m.moving or m.state != Soldier.State.READY or m.in_melee or m.charging != null:
 					continue
 				var near: Soldier = main_group[0]
 				for o in main_group:
@@ -462,7 +462,8 @@ func think(main: Node, dt: float) -> void:
 		var ahead := map.get_t(map.cell_of(m.position + threat * float(BattleMap.CELL))) if threat != Vector2.ZERO else BattleMap.T.OPEN
 		m.behind_low = ahead == BattleMap.T.LOW
 		m.corner_cover = ahead == BattleMap.T.WALL or ahead == BattleMap.T.WRECK
-		if threat == Vector2.ZERO or m.moving or m.state != Soldier.State.READY or m.burst_left > 0 or cur >= 0.55:
+		if threat == Vector2.ZERO or m.moving or m.state != Soldier.State.READY or m.burst_left > 0 or cur >= 0.55 \
+				or m.in_melee or m.charging != null:
 			continue
 		var best := cell
 		var best_score := cur
