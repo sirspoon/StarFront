@@ -148,6 +148,8 @@ func _ready() -> void:
 			_test_voice()
 		if "--test-grenades" in args:
 			_test_grenades()
+		if "--demo-flame" in args:
+			_demo_flame()
 		if "--test-touch" in args:
 			_test_touch()
 		if "--test-reach" in args:
@@ -258,6 +260,18 @@ func _test_grenades() -> void:
 	await get_tree().create_timer(3.0).timeout
 	var s0: Vector2 = grenades.screens[0].pos if not grenades.screens.is_empty() else spot
 	print("  sight through the smoke: %s (should be false); beside it: %s" % [map.los_clear(s0 - Vector2(0, 120), s0 + Vector2(0, 120)), map.los_clear(s0 + Vector2(120, -120), s0 + Vector2(120, 120))])
+
+
+## Test aid: a flame jet every second at --shot-at (or the map centre), to look at the drawing.
+func _demo_flame() -> void:
+	var at := Vector2(BattleMap.W, BattleMap.H) * BattleMap.CELL * 0.5
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--shot-at="):
+			var xy := a.trim_prefix("--shot-at=").split(",")
+			at = Vector2(float(xy[0]), float(xy[1]))
+	while true:
+		effects.flame(at - Vector2(55, 0), at + Vector2(60, 0), 0.35)
+		await get_tree().create_timer(1.0).timeout
 
 
 func _test_follow() -> void:

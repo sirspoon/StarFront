@@ -122,16 +122,26 @@ func _draw() -> void:
 		var dir := (head - from) / d
 		var side := dir.orthogonal()
 		var fade := 1.0 - maxf(0.0, (k - 0.5) / 0.5)
-		var wide: float = tan(e.cone) * d
-		draw_colored_polygon(PackedVector2Array([from + side * 2.0, head + side * wide, head + dir * 6.0, head - side * wide, from - side * 2.0]),
-				Color(1.0, 0.45, 0.1, 0.55 * fade))
-		draw_colored_polygon(PackedVector2Array([from + side * 1.2, head + side * wide * 0.5, head - side * wide * 0.5, from - side * 1.2]),
-				Color(1.0, 0.85, 0.4, 0.75 * fade))
-		for i in 9:
-			var f := float(i + 1) / 10.0
-			var wob := sin(e.seed + i * 2.3 + e.t * 30.0)
-			var p := from.lerp(head, f) + side * wob * wide * f * 0.6
-			draw_circle(p, 2.0 + f * wide * 0.5, Color(1.0, 0.55 + 0.3 * (1.0 - f), 0.15, 0.5 * fade))
+		var wide: float = tan(e.cone) * d * 0.75
+		# billowing fire: dark red-orange at the edges and the far end, a yellow-white core near the nozzle
+		for layer in 3:
+			var n := 14
+			for i in n:
+				var f := float(i + 1) / float(n)
+				var wob := sin(e.seed + i * 2.3 + layer * 1.7 + e.t * 28.0)
+				var wob2 := cos(e.seed * 0.7 + i * 1.3 + e.t * 21.0)
+				var p := from.lerp(head, f) + side * wob * wide * f * (0.55 - layer * 0.15) + dir * wob2 * 3.0
+				var rad := (1.5 + f * wide * (0.75 - layer * 0.22)) * (1.0 + 0.35 * k)
+				var col: Color
+				match layer:
+					0: col = Color(0.75, 0.18, 0.04, 0.35 * fade)   # smoky red edge
+					1: col = Color(1.0, 0.48, 0.1, 0.45 * fade)     # orange body
+					_: col = Color(1.0, 0.88, 0.5, (0.7 - f * 0.5) * fade)  # hot core, fading out along the jet
+				var soft: Texture2D = get_parent()._dot_tex
+				if soft != null:  # soft-edged puffs that melt into each other
+					draw_texture_rect(soft, Rect2(p - Vector2(rad, rad) * 1.5, Vector2(rad, rad) * 3.0), false, Color(col, minf(1.0, col.a * 1.6)))
+				else:
+					draw_circle(p, rad, col)
 	for e in markers:
 		var k: float = e.t / 0.7
 		var col: Color = e.color

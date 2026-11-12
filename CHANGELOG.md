@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.44 (2026-11-12)
+- The Pyre Warden's flame jet looks like fire now: soft billowing flames with a hot yellow core near
+  the nozzle, orange further out and smoky red at the edges, instead of a flat yellow wedge.
+
 ## v0.43 (2026-11-12)
 Grenade fix, two heavy Sworn warriors, more Legion heavy guns.
 - Grenades no longer blow up the men who threw them. Before, a man with a wall right in front of
