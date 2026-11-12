@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.64 (2026-11-12)
+Fix for the phone crash a few minutes into a battle.
+- Every patch of map repainted after damage (walls hit, shell holes, burnt or crushed bushes) kept two
+  off-screen drawing surfaces alive until the battle ended. In a long fight these piled up until the
+  phone ran out of graphics memory, crashing while it painted the next repair.
+- Now only the most recent repairs stay live (16 on phones, 64 elsewhere); older ones are copied into
+  plain images (about 0.3 ms each, one per frame) and their surfaces freed, so memory stays flat.
+- The crash note (Options, ?debug) now says when a map repair was being painted, with how many are
+  live and stored, and the in-battle note adds the graphics memory in use.
+
 ## v0.63 (2026-11-12)
 Vehicles: new looks, handling, and guns that hit hard.
 - Handling: vehicles gather speed and slow down smoothly (braking to stop on the spot) instead of

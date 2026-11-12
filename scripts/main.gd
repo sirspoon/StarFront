@@ -943,8 +943,9 @@ func _process(dt: float) -> void:
 	var crumb := 5.0 if phone else 20.0
 	if int(time / crumb) != int((time - dt) / crumb):
 		# breadcrumbs in battle too, in case the browser's graphics give out mid-fight
-		Settings.stage("in battle at %d:%02d: %d lights lit, %d tracers, %d ground marks, %d smoke screens, %d fires (%s)" % [int(time) / 60, int(time) % 60,
-				light_fx.active.size(), effects.tracers.size(), decals.small.size() + decals.tracks.size(), grenades.screens.size(), fire_lights.size(), Settings.summary()])
+		Settings.stage("in battle at %d:%02d: %d lights lit, %d tracers, %d ground marks, %d smoke screens, %d fires, %d map patches live / %d stored, graphics memory %d MB (%s)" % [int(time) / 60, int(time) % 60,
+				light_fx.active.size(), effects.tracers.size(), decals.small.size() + decals.tracks.size(), grenades.screens.size(), fire_lights.size(),
+				map_view.patch_order.size(), map_view.patches_stored, int(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0), Settings.summary()])
 	var _p0 := Time.get_ticks_usec()
 	for s in soldiers:
 		s.tick(dt, time)

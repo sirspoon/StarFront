@@ -58,6 +58,10 @@ func setup(m: BattleMap) -> void:
 			_build_occluders(y)
 	tiles_total = all.size()
 	SCALE = Settings.detail()
+	max_live_patches = 16 if Settings.is_phone() else 64
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--patch-cap="):
+			max_live_patches = int(a.get_slice("=", 1))  # test aid
 	use_normals = Settings.on("normals", true)
 	BATCH = Settings.batch()
 	for i in range(0, all.size(), BATCH):
@@ -221,6 +225,13 @@ func _bake(keys: Array, as_patches := false) -> void:
 ## them back into images (as the big tiles are) makes the graphics chip finish all its
 ## work first, which is what stalled the game when a shell hit a wall.
 var patch_vps := {}  # Vector2i patch -> [colour viewport, normal viewport or null]
+var patch_order: Array = []  # patches still shown from live viewports, oldest first
+## Live viewports cost graphics memory and render targets, and every distinct patch
+## damaged in a long battle used to keep its own until the end, which ran phones out
+## of memory after a few minutes. Past this many, the oldest are copied into plain
+## images (one per frame, small enough not to stall) and their viewports freed.
+var max_live_patches := 64
+var patches_stored := 0
 
 
 func _show_patches(jobs: Array) -> void:
@@ -247,6 +258,31 @@ func _show_patches(jobs: Array) -> void:
 			if old != null:
 				old.queue_free()
 		patch_vps[k] = [vp, j[4] if use_normals else null]
+		# the painter's drawing is kept in the viewport; it is not needed again
+		patch_order.erase(k)
+		patch_order.append(k)
+
+
+## Copy the oldest live patch into images and free its viewports.
+func _store_oldest_patch() -> void:
+	var t0 := Time.get_ticks_usec()
+	var k: Vector2i = patch_order.pop_front()
+	var vps: Array = patch_vps.get(k, [])
+	patch_vps.erase(k)
+	var spr: Sprite2D = patches.get(k)
+	if vps.is_empty() or spr == null:
+		return
+	var tex := CanvasTexture.new()
+	tex.diffuse_texture = ImageTexture.create_from_image(vps[0].get_texture().get_image())
+	if vps[1] != null:
+		tex.normal_texture = ImageTexture.create_from_image(vps[1].get_texture().get_image())
+	spr.texture = tex
+	for v in vps:
+		if v != null:
+			v.queue_free()
+	patches_stored += 1
+	if "--perf" in OS.get_cmdline_user_args():
+		print("PERF stored patch %s as an image in %.1f ms (%d live)" % [k, (Time.get_ticks_usec() - t0) / 1000.0, patch_order.size()])
 
 
 func _viewport(size: Vector2i) -> SubViewport:
@@ -294,11 +330,16 @@ func _on_cells_changed(cells: Array) -> void:
 
 
 func _process(_dt: float) -> void:
-	if baking or dirty.is_empty() or not ready_drawn:
+	if baking or not ready_drawn:
+		return
+	if dirty.is_empty():
+		if patch_order.size() > max_live_patches:
+			_store_oldest_patch()
 		return
 	baking = true
 	var keys := dirty.keys().slice(0, 1)  # one small patch at a time, so the work is spread over frames
 	for k in keys:
 		dirty.erase(k)
+	_where = "repairing map patch %s (%d live, %d stored, %d waiting)" % [keys[0], patch_order.size(), patches_stored, dirty.size()]
 	await _bake(keys, true)
 	baking = false
