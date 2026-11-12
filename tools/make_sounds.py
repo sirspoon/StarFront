@@ -501,10 +501,10 @@ def main():
         "melee_blunt": (3, blunt_hit),
         "melee_power": (3, power_blade),
         "smoke": (2, smoke_pop),
-        "heavy_laser": (2, heavy_laser),
+        "heavy_laser": (2, lambda r: heavy_laser(r, 12, 0.08)),
         "flamer": (2, flamer),
         "hail": (2, lambda r: burst(r, 10, 0.05, 1.15, spin=True, tail=1.5)),
-        "heavy_mass": (2, lambda r: burst(r, 4, 0.14, 1.8, explosive=True, tail=1.6)),
+        "heavy_mass": (2, lambda r: burst(r, 10, 0.09, 1.7, explosive=True, tail=1.6)),
     }
     only = sys.argv[1:]  # e.g. make_sounds.py smg pistol: just those
     for name, (count, fn) in makers.items():

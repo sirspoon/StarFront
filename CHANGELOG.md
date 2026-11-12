@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.48 (2026-11-12)
+The Legion's new look, heavy guns that hose, selection while paused.
+- The Legion are redrawn in detail like the Sworn: long greatcoats with their skirts flaring
+  behind, webbing straps and ammunition pouches, a pack with a rolled blanket, sleeves and gloved
+  hands on the weapon, and a steel helmet with a brim over goggles and a rebreather mask whose hose
+  runs back to the pack. Sergeants wear a red sash and a gilded crest; raiders have no packs,
+  darker coats and bandoliers. Weapons redrawn: lumen rifles with wooden stocks and a glowing power
+  cell, the heavy stubber with its ammo box, the lance launcher carried over the shoulder with its
+  warhead showing.
+- Heavy guns now fire long, sustained streams: a dozen (Legion) or ten (Sworn) rounds a burst, a
+  new burst every second or so, five bursts to a load before the loader changes it. Each round is
+  less accurate, but the sheer volume pins men down. Their reach is longer (about 38 cells), a set-up
+  gun covers a wider arc and keeps to targets inside it, and a gun team watching its arc spots men in
+  cover further off, so they find targets far more often. New, longer burst sounds.
+- Selecting soldiers while the game is paused now shows the green selection rings straight away.
+
 ## v0.47 (2026-11-12)
 Tougher troops, clearer heavy guns, new look for the Sworn.
 - Everyone is a little harder to kill: about three hits in ten that would have wounded (from

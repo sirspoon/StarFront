@@ -278,7 +278,7 @@ func _gallery() -> void:
 			s.carrier.passengers.erase(s)
 			s.state = Soldier.State.READY
 			s.carrier = null
-		s.position = Vector2(map.plaza.position * BattleMap.CELL) + Vector2(40 + row[s.team] * 56, 62 - s.team * 36)
+		s.position = Vector2(map.plaza.position * BattleMap.CELL) + Vector2(40 + row[s.team] * 56, 42 - s.team * 34)
 		row[s.team] += 1
 		s.facing = 0.0
 		s.halt()
@@ -779,6 +779,11 @@ func _process(dt: float) -> void:
 	for fl in fire_lights:
 		fl[2] += dt * 9.0
 		fl[0].energy = fl[1] + sin(fl[2]) * 0.12 + randf() * 0.12
+	if paused and started:
+		# soldiers only redraw as they act; while paused, keep their selection rings up to date
+		for s in soldiers:
+			if s.visible:
+				s.queue_redraw()
 	if not started or over or paused:
 		return
 	time += dt
@@ -945,7 +950,10 @@ func _update_spotting() -> void:
 				if o.team != team or not o.is_alive() or o.state == Soldier.State.ROUTING:
 					continue
 				var d2 := o.position.distance_squared_to(s.position)
-				if d2 > sight * sight:
+				var os := sight
+				if o.heavy and o.is_set_up():
+					os = minf(SIGHT, sight * 1.7)  # a gun team watching its arc picks out men in cover further off
+				if d2 > os * os:
 					continue
 				if d2 < 2500.0 or map.los_clear(o.position, s.position):
 					seen = true

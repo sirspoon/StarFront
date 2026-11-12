@@ -70,11 +70,11 @@ var resume_to = null          # where he was going before he charged
 var grenades := {}            # grenades he carries: kind -> how many
 # heavy weapons
 const SETUP_TIME := 2.5       # seconds to set a heavy gun up
-const ARC := 1.0              # once set up it covers this far either side (radians) without moving it
+const ARC := 1.3              # once set up it covers this far either side (radians) without moving it
 var heavy := false            # carries a heavy gun (the loader takes it over if the gunner falls)
 var setup_t := 0.0            # 0..1: how far the gun is set up
 var deploy_dir := 0.0         # the way it was set up facing
-const MAG := 6                # bursts in a load of ammunition
+const MAG := 5                # long bursts in a load of ammunition
 const RELOAD := 3.0           # seconds for the loader to change it...
 const RELOAD_ALONE := 7.5     # ...or for the gunner on his own
 var ammo := MAG               # bursts left in the current load
@@ -597,6 +597,8 @@ func pick_target(w: Dictionary, from: Vector2) -> Soldier:
 		var score := d + (250.0 if e.state == State.ROUTING else 0.0)
 		if squad.facing != Vector2.ZERO and absf(wrapf((e.position - from).angle() - squad.facing.angle(), -PI, PI)) > 1.3:
 			score += 140.0  # prefer targets in the arc the squad is watching
+		if heavy and is_set_up() and absf(wrapf((e.position - from).angle() - deploy_dir, -PI, PI)) > ARC:
+			score += 600.0  # a set-up gun keeps to its arc while there's anything in it
 		if e.is_vehicle:
 			score += -400.0 if anti_tank else 150.0
 		cands.append([score, e])
@@ -693,46 +695,104 @@ func _draw() -> void:
 		draw_circle(Vector2(0, -radius - 6.0), 2.5, Color(1, 1, 1))
 
 
+## A Legion soldier from above: a long greatcoat with its skirts behind him, webbing and
+## pouches, a pack and rolled blanket, sleeves and gloved hands on his weapon, and a steel
+## helmet over a rebreather mask whose hose loops back to the pack. Sergeants wear a
+## red sash and a gilded crest; raiders go without packs, in darker coats with bandoliers.
 func _draw_conscript() -> void:
 	var coat: Color = colors.coat
 	var arm: Color = colors.armour
 	var trim: Color = colors.trim
 	var r := radius
-	if data.get("loader", false):
-		draw_rect(Rect2(-r - 3.0, -4.0, 6.0, 8.0), Color(0.28, 0.26, 0.16))  # power cells for the heavy gun
-		draw_line(Vector2(-r - 3.0, 0), Vector2(-r + 3.0, 0), Color(1.0, 0.55, 0.25, 0.8), 1.0)
-	elif heavy:
-		draw_rect(Rect2(-r - 2.0, -3.5, 5.0, 7.0), Color(0.22, 0.22, 0.17))  # the gun's power pack
-	elif not kind.begins_with("raider"):
-		draw_rect(Rect2(-r - 1.0, -3.0, 4.0, 6.0), arm.darkened(0.2))  # pack and bedroll (raiders travel light)
-	draw_circle(Vector2.ZERO, r, coat.darkened(0.25) if kind.begins_with("raider") else coat)
-	draw_arc(Vector2.ZERO, r, 0, TAU, 16, coat.darkened(0.45), 1.0)
-	var big_gun := heavy
-	var stubber := kind == "gunner"
+	var ld := Vector2(-0.6, -0.8).rotated(-facing)
+	var dark := Color(0.04, 0.04, 0.03, 0.9)
 	var raider := kind.begins_with("raider")
-	if big_gun:
+	var stubber := kind == "gunner"
+	if raider:
+		coat = coat.darkened(0.3)  # raiders' coats are dyed dark for night work
+	var leather := Color(0.3, 0.22, 0.14)
+	var wood := Color(0.36, 0.24, 0.14)
+	var gunmetal := Color(0.2, 0.2, 0.19)
+	# the greatcoat's skirts, flaring out behind him
+	var skirt := PackedVector2Array([Vector2(0, -r * 0.72), Vector2(-r * 0.9, -r * 0.85), Vector2(-r * 1.3, -r * 0.4),
+			Vector2(-r * 1.35, r * 0.4), Vector2(-r * 0.9, r * 0.85), Vector2(0, r * 0.72)])
+	draw_colored_polygon(skirt, coat.darkened(0.18))
+	draw_line(Vector2(-r * 0.6, 0), Vector2(-r * 1.33, 0), coat.darkened(0.45), 0.6)  # the vent at the back
+	# what he carries on his back
+	if data.get("loader", false):
+		_gun(Rect2(-r * 1.45, -r * 0.55, r * 0.75, r * 1.1), Color(0.3, 0.28, 0.18))  # crate of power cells
+		for k in 3:
+			draw_rect(Rect2(-r * 1.35 + k * r * 0.22, -r * 0.4, r * 0.14, r * 0.8), Color(1.0, 0.55, 0.25, 0.75))
+	elif heavy:
+		_gun(Rect2(-r * 1.3, -r * 0.5, r * 0.6, r), Color(0.26, 0.26, 0.2))  # the gun's power pack
+		draw_circle(Vector2(-r, 0), r * 0.15, Color(1.0, 0.55, 0.25))
+	elif not raider:
+		_gun(Rect2(-r * 1.25, -r * 0.5, r * 0.6, r), arm.darkened(0.1))  # pack
+		draw_colored_polygon(_ell(Vector2(-r * 1.3, 0), r * 0.24, r * 0.72, 12), Color(0.42, 0.38, 0.3))  # rolled blanket
+		draw_line(Vector2(-r * 1.3, -r * 0.4), Vector2(-r * 1.3, r * 0.4), Color(0.25, 0.22, 0.17), 0.6)
+	# the body in its coat, with webbing
+	_plate(Vector2.ZERO, r * 0.66, r * 0.9, coat, ld, 0.8)
+	draw_line(Vector2(-r * 0.45, -r * 0.55), Vector2(r * 0.4, -r * 0.55), leather, 0.9)  # shoulder straps
+	draw_line(Vector2(-r * 0.45, r * 0.55), Vector2(r * 0.4, r * 0.55), leather, 0.9)
+	for k in 3:  # ammunition pouches on his belt
+		draw_rect(Rect2(r * 0.2 + k * 0.1, -r * 0.55 + k * r * 0.5, r * 0.28, r * 0.24), leather.darkened(0.15))
+	if raider:
+		draw_line(Vector2(-r * 0.45, -r * 0.7), Vector2(r * 0.45, r * 0.7), leather, 1.6)  # bandolier
+		for k in 4:
+			draw_circle(Vector2(-r * 0.45, -r * 0.7).lerp(Vector2(r * 0.45, r * 0.7), (k + 0.5) / 4.0), 0.6, Color(0.75, 0.6, 0.3))
+	if is_leader and not raider:
+		draw_line(Vector2(-r * 0.5, r * 0.65), Vector2(r * 0.4, -r * 0.7), Color(0.7, 0.12, 0.1), 1.6)  # sergeant's sash
+	# arms: sleeves and gloved hands on the weapon
+	var rear_hand := Vector2(r * 0.25, r * 0.38)
+	var fore_hand := Vector2(r * 0.95, r * 0.32)
+	if kind == "lancer":
+		rear_hand = Vector2(r * 0.2, -r * 0.25)
+		fore_hand = Vector2(r * 0.7, -r * 0.4)
+	elif raider:
+		fore_hand = Vector2(r * 0.35, -r * 0.7)  # the knife hand
+	for pair in [[Vector2(0, r * 0.6), rear_hand], [Vector2(0, -r * 0.6), fore_hand]]:
+		draw_line(pair[0], pair[1], dark, r * 0.36 + 1.2)
+		draw_line(pair[0], pair[1], coat.lightened(0.05), r * 0.36)
+		draw_circle(pair[1], r * 0.19, leather.darkened(0.2))  # glove
+	# the weapon
+	if heavy:
 		_draw_heavy_gun(Color(0.42, 0.44, 0.36), Color(1.0, 0.55, 0.25), 5.5, r + 19.0)
 	elif raider:
-		draw_line(Vector2(-r * 0.2, -r * 0.75), Vector2(r * 0.5, r * 0.75), Color(0.22, 0.16, 0.1), 1.6)  # bandolier
-		draw_line(Vector2(0, 3), Vector2(r + 4.0, 3), Color(0.1, 0.09, 0.08), 2.6)  # ripper gun, short and stubby
-		draw_rect(Rect2(r * 0.4, 3.5, 2.5, 3.5), Color(0.15, 0.13, 0.1))  # drum
-		_draw_blade(Vector2(r * 0.35, -r * 0.7), r * (1.5 if kind == "raider_sgt" else 0.9), 1.4 if kind == "raider_sgt" else 1.1,
-				Color(0.62, 0.62, 0.6), Color(0.3, 0.22, 0.14), kind == "raider_sgt")
+		_gun(Rect2(r * 0.1, r * 0.3, r + 3.0, 2.6), gunmetal)  # ripper gun, short and stubby
+		draw_circle(Vector2(r * 0.65, r * 0.3 + 3.4), 2.0, Color(0.15, 0.13, 0.1))  # drum
+		_draw_blade(fore_hand, r * (1.5 if kind == "raider_sgt" else 0.9), 1.4 if kind == "raider_sgt" else 1.1,
+				Color(0.68, 0.68, 0.66), leather, kind == "raider_sgt")
 	elif kind == "lancer":
-		draw_line(Vector2(-r - 2.0, -3), Vector2(r + 6.0, -3), Color(0.2, 0.22, 0.16), 4.5)  # launcher tube
-		draw_circle(Vector2(r + 7.0, -3), 2.6, Color(0.45, 0.35, 0.2))  # warhead
+		# the lance launcher over his shoulder: a long tube with a sight, the warhead poking out
+		_gun(Rect2(-r * 1.1, -r * 0.62, r * 2.4, 4.0), Color(0.28, 0.3, 0.22))
+		draw_rect(Rect2(r * 0.1, -r * 0.62 - 2.2, 2.2, 2.2), gunmetal)
+		draw_colored_polygon(PackedVector2Array([Vector2(r * 1.3, -r * 0.62 - 1.0), Vector2(r * 1.3 + 5.0, -r * 0.62 + 2.0),
+				Vector2(r * 1.3, -r * 0.62 + 5.0)]), Color(0.5, 0.38, 0.2))
+	elif stubber:
+		_gun(Rect2(r * 0.1, r * 0.2, r + 10.0, 3.2), gunmetal)  # heavy stubber
+		_gun(Rect2(r * 0.3, r * 0.2 + 3.2, 3.5, 3.5), Color(0.34, 0.3, 0.17))  # ammo box
+		draw_rect(Rect2(r + 9.0, r * 0.2 - 0.4, 2.0, 4.0), gunmetal.lightened(0.15))
 	else:
-		draw_line(Vector2(0, 3), Vector2(r + (10.0 if stubber else 9.0), 3), Color(0.1, 0.09, 0.08), 3.5 if stubber else 2.0)
-	if stubber:
-		draw_rect(Rect2(1, 4, 4, 4), Color(0.3, 0.27, 0.15))  # ammo box
-	draw_circle(Vector2(r * 0.6, 3.5), 1.8, coat.darkened(0.2))
-	draw_circle(Vector2(0.5, 0), r * 0.58, arm)
-	draw_arc(Vector2(0.5, 0), r * 0.58, -1.3, 1.0, 8, arm.lightened(0.35), 1.0)
-	draw_circle(Vector2(r * 0.55, 0), 1.5, Color(0.12, 0.12, 0.12))  # rebreather
-	if kind.begins_with("raider"):
-		draw_line(Vector2(r * 0.15, -r * 0.5), Vector2(r * 0.15, r * 0.5), Color(0.55, 0.5, 0.42), 1.2)  # goggles strap
+		# lumen rifle: wooden stock and furniture, a dark barrel, a glowing power cell
+		_gun(Rect2(-r * 0.15, r * 0.28, r * 0.6, 2.4), wood)
+		_gun(Rect2(r * 0.4, r * 0.28 + 0.2, r + 4.5, 2.0), gunmetal)
+		draw_rect(Rect2(r * 0.55, r * 0.28 + 2.2, 2.0, 1.6), Color(1.0, 0.55, 0.25, 0.9))  # power cell
+	# the helmet: a steel dome with a brim, over the rebreather mask and goggles
+	var hc := Vector2(r * 0.15, 0)
+	var hr := r * 0.4
+	draw_line(Vector2(r * 0.55, r * 0.15), Vector2(-r * 0.7, r * 0.35), Color(0.12, 0.12, 0.11), 1.1)  # rebreather hose to the pack
+	draw_circle(hc, hr * 1.12, dark)
+	draw_circle(hc, hr * 1.08, arm.darkened(0.15))  # the brim
+	_plate(hc, hr * 0.86, hr * 0.86, arm, ld, 0.6, 14)
+	draw_line(hc - Vector2(hr * 0.75, 0), hc + Vector2(hr * 0.5, 0), arm.lightened(0.18), 0.7)  # the comb along the top
+	var mask := hc + Vector2(hr * 1.05, 0)
+	draw_circle(mask, hr * 0.42, Color(0.18, 0.18, 0.17))  # the rebreather's snout
+	draw_circle(mask + Vector2(hr * 0.15, 0), hr * 0.2, Color(0.08, 0.08, 0.08))
+	for sgn in [-1.0, 1.0]:  # goggle lenses glinting under the brim
+		draw_circle(hc + Vector2(hr * 0.75, sgn * hr * 0.45), hr * 0.2, Color(0.45, 0.5, 0.45))
+		draw_circle(hc + Vector2(hr * 0.7, sgn * hr * 0.45 - 0.3), hr * 0.08, Color(0.85, 0.9, 0.8))
 	if is_leader:
-		draw_line(Vector2(-2.5, 0), Vector2(2.5, 0), trim, 2.0)  # crest
+		draw_line(hc - Vector2(hr * 0.8, 0), hc + Vector2(hr * 0.6, 0), trim, 1.6)  # gilded crest
 
 
 ## An ellipse (optionally turned by rot) as a polygon.

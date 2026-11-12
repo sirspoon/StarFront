@@ -6,6 +6,8 @@ extends RefCounted
 
 const TEXT := """PROTOTYPE (before 1.0)
 - Tougher troops (more grazes and pinning, fewer quick wipe-outs); clearer heavy guns
+- The Legion redrawn in detail: greatcoats, packs, helmets and rebreathers
+- Heavy guns fire long sustained streams that pin enemy infantry down
 - The Sworn redrawn in detail: power armour, gold-rimmed pauldrons, glowing eyes and exhausts
 - A city map: streets, a chapel square, parks, walled compounds, bushes, hedges and barbed wire
 - Vehicles leave tracks and run down enemy soldiers; blood sprays further and up walls

@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.47"
+const VERSION := "0.48"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -31,10 +31,10 @@ const WEAPONS := {
 		"acc": 0.22, "ap": 0.0, "dmg": 1, "pen": 1, "supp": 5.0, "tracer": Color(1.0, 0.8, 0.45), "width": 1.1},
 	"mass_pistol": {"name": "Mass-reactive pistol", "range": 190.0, "cooldown": 1.5, "burst": 2, "gap": 0.12,
 		"acc": 0.2, "ap": 0.3, "dmg": 2, "pen": 2, "supp": 6.0, "tracer": Color(0.6, 0.85, 1.0), "width": 1.8},
-	"heavy_lumen": {"name": "Heavy lumen gun", "range": 480.0, "cooldown": 2.2, "burst": 5, "gap": 0.12,
-		"acc": 0.19, "ap": 0.55, "dmg": 2, "pen": 3, "vdmg": 1, "supp": 12.0, "tracer": Color(1.0, 0.42, 0.2), "width": 2.2},
-	"heavy_mass_gun": {"name": "Heavy mass-reactive gun", "range": 470.0, "cooldown": 2.6, "burst": 4, "gap": 0.14,
-		"acc": 0.11, "ap": 0.45, "dmg": 2, "pen": 4, "vdmg": 2, "supp": 16.0, "tracer": Color(0.6, 0.85, 1.0), "width": 2.8},
+	"heavy_lumen": {"name": "Heavy lumen gun", "range": 620.0, "cooldown": 1.0, "burst": 12, "gap": 0.08,
+		"acc": 0.085, "ap": 0.55, "dmg": 2, "pen": 3, "vdmg": 1, "supp": 10.0, "tracer": Color(1.0, 0.42, 0.2), "width": 2.2},
+	"heavy_mass_gun": {"name": "Heavy mass-reactive gun", "range": 600.0, "cooldown": 1.1, "burst": 10, "gap": 0.09,
+		"acc": 0.045, "ap": 0.45, "dmg": 2, "pen": 4, "vdmg": 2, "supp": 13.0, "tracer": Color(0.6, 0.85, 1.0), "width": 2.8},
 	"pyre_projector": {"name": "Pyre projector", "range": 115.0, "cooldown": 2.2, "burst": 1, "gap": 0.0,
 		"acc": 0.55, "ap": 0.5, "dmg": 1, "pen": 3, "vdmg": 1, "supp": 28.0, "flame": true, "cone": 0.35,
 		"tracer": Color(1.0, 0.55, 0.15), "width": 4.0},
