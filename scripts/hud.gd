@@ -431,6 +431,15 @@ func show_options() -> void:
 		c.custom_minimum_size = Vector2(420, 44 if main.touch_mode else 28)
 		v.add_child(c)
 		checks[o[0]] = c
+	var prev: String = main.previous_stage
+	if prev != "" and prev != "ran fine" and not prev.begins_with("menu up"):
+		var last := Label.new()  # where the last game got to, if it didn't finish: to track down crashes
+		last.text = "Last game stopped: " + prev
+		last.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		last.custom_minimum_size = Vector2(420, 0)
+		last.add_theme_font_size_override("font_size", 11)
+		last.add_theme_color_override("font_color", Color(0.6, 0.57, 0.5))
+		v.add_child(last)
 	var note := Label.new()
 	note.text = "Applying prepares the battlefield again" + (" and restarts this battle." if main.started else ".")
 	note.add_theme_font_size_override("font_size", 12)

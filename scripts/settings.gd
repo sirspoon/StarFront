@@ -50,7 +50,7 @@ static func _q() -> String:
 
 
 static func is_phone() -> bool:
-	return OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("mobile")
+	return OS.has_feature("web_android") or OS.has_feature("web_ios") or OS.has_feature("mobile") or _q().contains("phonetest")
 
 
 static func safe() -> bool:
@@ -85,10 +85,16 @@ static func detail() -> float:
 static func stage(msg: String) -> void:
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("try{localStorage.setItem('starfront_stage', %s)}catch(e){}" % JSON.stringify(msg))
+	elif OS.has_feature("mobile"):
+		var f := FileAccess.open("user://last_stage.txt", FileAccess.WRITE)  # the app: a file on the phone
+		if f != null:
+			f.store_string(msg)
 
 
 static func last_stage() -> String:
 	if not OS.has_feature("web"):
+		if FileAccess.file_exists("user://last_stage.txt"):
+			return FileAccess.get_file_as_string("user://last_stage.txt")
 		return ""
 	var v = JavaScriptBridge.eval("(function(){try{return localStorage.getItem('starfront_stage')||''}catch(e){return ''}})()", true)
 	return str(v) if v != null else ""

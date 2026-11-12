@@ -51,6 +51,7 @@ var autotest := false
 var dragging := false
 var rdragging := false
 var current_seed := 0
+var phone := Settings.is_phone()
 var previous_stage := ""  # where the last visit got to (web only), shown if it didn't finish
 var ran_ok := false
 var touch_mode := false       # phone / tablet controls
@@ -890,10 +891,11 @@ func _process(dt: float) -> void:
 	if not started or over or paused:
 		return
 	time += dt
-	if int(time / 20.0) != int((time - dt) / 20.0):
+	var crumb := 5.0 if phone else 20.0
+	if int(time / crumb) != int((time - dt) / crumb):
 		# breadcrumbs in battle too, in case the browser's graphics give out mid-fight
-		Settings.stage("in battle at %d:%02d (%d smoke screens, %d grenades in the air, %s)" % [int(time) / 60, int(time) % 60,
-				grenades.screens.size(), grenades.flying.size(), Settings.summary()])
+		Settings.stage("in battle at %d:%02d: %d lights lit, %d tracers, %d ground marks, %d smoke screens, %d fires (%s)" % [int(time) / 60, int(time) % 60,
+				light_fx.active.size(), effects.tracers.size(), decals.small.size() + decals.tracks.size(), grenades.screens.size(), fire_lights.size(), Settings.summary()])
 	var _p0 := Time.get_ticks_usec()
 	for s in soldiers:
 		s.tick(dt, time)
@@ -1321,6 +1323,14 @@ func _ricochet(pos: Vector2, incoming: Vector2, w := {}) -> void:
 func _shot_lights(muzzle: Vector2, end: Vector2, w: Dictionary) -> void:
 	var col: Color = w.tracer
 	var size: float = w.width
+	if phone:
+		# phones: a muzzle flash for every few rounds only, and no travelling light, so a big
+		# firefight doesn't overload the graphics (it crashed the Android app)
+		if randf() < 0.3:
+			light_fx.flash(muzzle, col, 0.9 + size * 0.15, 36.0 + size * 10.0, 0.08)
+		if float(w.get("pen", 0)) >= 2.0 and randf() < 0.4:
+			effects.puff(muzzle, Color(0.42, 0.4, 0.38), 3.0 + size)
+		return
 	light_fx.flash(muzzle, col, 0.9 + size * 0.15, 36.0 + size * 10.0, 0.08)
 	if float(w.get("pen", 0)) >= 2.0:
 		effects.puff(muzzle, Color(0.42, 0.4, 0.38), 3.0 + size)  # gunsmoke from heavy weapons

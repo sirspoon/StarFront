@@ -5,6 +5,7 @@ extends Node2D
 ## firefights can't create an unlimited number.
 
 const POOL := 40
+const PHONE_POOL := 8  # each light means more work drawing the lit map: phones get few
 
 var tex: Texture2D
 var pool: Array[PointLight2D] = []
@@ -16,7 +17,7 @@ var shadows_ok := true
 
 func setup(light_tex: Texture2D) -> void:
 	tex = light_tex
-	for i in POOL:
+	for i in (PHONE_POOL if Settings.is_phone() else POOL):
 		var l := PointLight2D.new()
 		l.texture = tex
 		l.enabled = false
@@ -29,7 +30,7 @@ func setup(light_tex: Texture2D) -> void:
 func _take() -> PointLight2D:
 	# reuse the oldest light if every one is busy
 	var l := pool[next]
-	next = (next + 1) % POOL
+	next = (next + 1) % pool.size()
 	for a in active:
 		if a.light == l:
 			active.erase(a)

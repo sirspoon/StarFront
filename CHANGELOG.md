@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.52 (2026-11-12)
+- Phones: far fewer combat lights, to stop the Android app crashing in heavy firefights. Every round
+  fired used to light up a muzzle flash and a light travelling with it, and with the heavy guns'
+  long bursts all 40 lights were lit at once, each making the phone redraw the lit map. Phones now
+  have 8 lights, a muzzle flash for about one round in three and no travelling lights (explosions,
+  fires and flashes still light up). PCs are unchanged.
+- The Android app now notes what it's doing every 5 seconds of a battle (lights, tracers, marks on
+  the ground). If a game doesn't finish, Options shows where it stopped, to help track down crashes.
+
 ## v0.51 (2026-11-12)
 - Android: back to preparing the battlefield one map tile at a time. Four at once (v0.50) made the
   app crash as the battle map loaded, presumably running out of graphics memory. The menus and

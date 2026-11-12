@@ -78,6 +78,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `--test-restart` (under xvfb, no `--autotest`) starts a battle, restarts it from the battle menu and
   prints whether the same battlefield and side came back. `--shot-options` saves the title screen with
   the Options panel open. Options are saved in `user://settings.cfg` (the address / command line wins).
+- `--phonetest` (or `?phonetest`) makes the game treat this machine as a phone (fewer lights, no shadows,
+  one map tile at a time), to test the phone settings here.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for
