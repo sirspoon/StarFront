@@ -370,7 +370,6 @@ class RoofPiece:
 			for k in 3:  # steps down into the dark
 				var sp := door + din * (1.5 + k * 1.6)
 				draw_line(sp + dacross * 5.0, sp - dacross * 5.0, Color(0.32, 0.32, 0.3, 0.8 - k * 0.25), 0.8)
-			draw_line(door + dacross * 7.5 - din * 0.5, door - dacross * 7.5 - din * 0.5, Color(0.7, 0.7, 0.65), 2.4)  # the lintel
 			for sgn in [-1.0, 1.0]:  # door posts
 				draw_rect(Rect2(door + dacross * sgn * 7.0 - Vector2(1.5, 1.5), Vector2(3, 3)), Color(0.62, 0.62, 0.58))
 			# the roof juts out over the firing slit: a lit concrete ledge, the slit in shade beyond it

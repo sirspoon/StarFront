@@ -1507,6 +1507,29 @@ func _draw_exteriors(area: Rect2i) -> void:
 				var sz := Vector2(3.0, 4.0) if along.x > 0 else Vector2(4.0, 3.0)
 				draw_rect(Rect2(q - sz * 0.5 + Vector2(1, 1.2), sz), Color(0, 0, 0, 0.25))
 				draw_rect(Rect2(q - sz * 0.5, sz), col)
+		elif kind == "bunker":
+			# sloping concrete buttresses braced against the side walls, two to a side
+			var sides := [2, 3] if front < 2 else [0, 1]
+			var rr := Rect2(Vector2(r.position * C), Vector2(r.size * C))
+			for sd in sides:
+				var so: Vector2 = Vector2(dirs[sd])
+				var sl := (rr.size.x if sd < 2 else rr.size.y)
+				for k in 2:
+					var t := sl * (0.27 + k * 0.46)
+					var root := (Vector2(rr.position.x + t, rr.position.y if sd == 0 else rr.end.y) if sd < 2 \
+							else Vector2(rr.position.x if sd == 2 else rr.end.x, rr.position.y + t))
+					var along2 := Vector2(1, 0) if sd < 2 else Vector2(0, 1)
+					var foot := root + so * 13.0
+					var poly := PackedVector2Array([root - along2 * 3.5, root + along2 * 3.5, foot + along2 * 2.5, foot - along2 * 2.5])
+					var sh := PackedVector2Array()
+					for q in poly:
+						sh.append(q + Vector2(3, 4))
+					draw_colored_polygon(sh, Color(0, 0, 0, 0.35))
+					draw_colored_polygon(poly, Color(0.38, 0.38, 0.35))
+					draw_line(root, foot, Color(0.48, 0.48, 0.44), 1.0)  # the sloping top catching the light
+					var pl := poly.duplicate()
+					pl.append(poly[0])
+					draw_polyline(pl, Color(0.15, 0.15, 0.14), 0.7)
 		elif kind == "industry" or kind == "warehouse":
 			# barrels and crates stacked in the yard round the works
 			for k in range(-1, length + 1):

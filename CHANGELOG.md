@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.62 (2026-11-12)
+- Bunkers have two sloping concrete buttresses braced against each side wall.
+- The white lintel line over the bunker doorway is gone.
+
 ## v0.61 (2026-11-12)
 - Bunker roofs: the sandbags along the edges are proper bags now, in two staggered rows like the
   sandbag walls (rounded, seamed, tied off, lit along one edge), with a gap over the doorway.
