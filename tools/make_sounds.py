@@ -232,6 +232,27 @@ def flamer(rng):
     return finish(reverb(x, 0.9, 0.2, rng, bright=3000), peak=0.85, fade=0.5)
 
 
+def beam(rng):
+    """The lumen lance: a capacitor whine winding up, a crack as the beam opens, then a
+    searing, crackling roar held for a second and a half, and a falling whine as it cuts out."""
+    dur = 2.4
+    n = int(dur * SR)
+    t = T(dur)
+    on = np.clip((t - 0.15) / 0.05, 0, 1) * np.clip((1.75 - t) / 0.12, 0, 1)
+    wind = np.sin(2 * np.pi * np.cumsum(300 + 1500 * np.clip(t / 0.18, 0, 1)) / SR) * np.clip(1 - (t - 0.18) / 0.05, 0, 1) * (t < 0.25) * 0.3
+    crack = np.zeros(n)
+    place(crack, filt(noise(int(0.08 * SR), rng), lo=500) * env(int(0.08 * SR), 0.0005, 0.02) * 1.4, 0.15)
+    roar = filt(noise(n, rng), lo=150, hi=2500) * on * 0.9
+    hum = sum(np.sin(2 * np.pi * f * t + rng.uniform(0, 6)) / (i + 1) for i, f in enumerate([95, 190, 285, 570])) * on * 0.5
+    crackle = np.zeros(n)
+    for _ in range(90):
+        cl = int(0.003 * SR)
+        place(crackle, filt(noise(cl, rng), lo=2500) * rng.uniform(0.2, 0.6), rng.uniform(0.17, 1.7))
+    fall = np.sin(2 * np.pi * np.cumsum(np.maximum(60, 900 - 1400 * np.clip(t - 1.75, 0, 1))) / SR) * np.clip((t - 1.72) / 0.03, 0, 1) * np.exp(-np.clip(t - 1.75, 0, None) / 0.25) * 0.3
+    x = sat(wind + crack + roar + hum + crackle + fall, 1.7)
+    return finish(reverb(x, 1.2, 0.3, rng, bright=4000), peak=0.88, fade=0.3)
+
+
 def round_(rng, weight, n):
     """One heavy round firing: crack, blast body, low thump and the bolt's clack."""
     crack = filt(noise(n, rng), lo=2000) * env(n, 0.0002, 0.008) * 1.5
@@ -503,6 +524,7 @@ def main():
         "smoke": (2, smoke_pop),
         "heavy_laser": (2, lambda r: heavy_laser(r, 12, 0.08)),
         "flamer": (2, flamer),
+        "beam": (2, beam),
         "hail": (2, lambda r: burst(r, 10, 0.05, 1.15, spin=True, tail=1.5)),
         "heavy_mass": (2, lambda r: burst(r, 10, 0.09, 1.7, explosive=True, tail=1.6)),
     }

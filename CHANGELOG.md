@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.63 (2026-11-12)
+Vehicles: new looks, handling, and guns that hit hard.
+- Handling: vehicles gather speed and slow down smoothly (braking to stop on the spot) instead of
+  starting and stopping dead; they turn while moving, slowing through a turn and only pivoting on the
+  spot when they need to turn hard; they take corners smoothly; and for a short move to somewhere
+  behind them they back up rather than turning all the way round.
+- Redrawn in detail: tracks with tread plates running round, the drive sprocket and idler at the ends.
+  Legion vehicles: slab-sided riveted olive steel, a sloped glacis catching the light, fenders with
+  jerrycans and a toolbox, spare track links, caged headlamps, the driver's hatch, an engine deck with
+  its grille and twin glowing exhausts; the carrier's two big roof hatches, its ramp and aerial. Sworn
+  vehicles: crimson armour in angled gothic plates, studded skirts edged in gold over the tracks, ribs of
+  gold filigree, a bone-white prow, glowing vents, an oath scroll and the sunburst sigil. Turrets: the
+  Legion's slab-sided with a mantlet, the commander's cupola and periscopes, smoke dischargers and a whip
+  aerial; the Sworn's a faceted gothic dome with a gold rim and red sensor lenses. Hull guns sit in ball
+  mounts (three barrels for the rotor cannon). Damage shows as scorch marks and bright gouges.
+- The Legion tank's main gun is now a lumen lance: a searing beam held for over a second, tracking its
+  target. It burns men in its path, cuts into vehicles, melts through walls (so it can still breach
+  them), and sets alight anything that burns where it lands. It passes over its own side.
+- The Sworn tank's fusion cannon (and any main gun) now fires with a great flash and a cone of fire out of
+  the muzzle, a shockwave ring racing outward, gunsmoke, dust kicked up round the hull, the tank rocking
+  back, and the camera shaking if you're close.
+- Vehicles' machine guns and rotor cannons are on steady mounts: more accurate than infantry's, so
+  they're dangerous to men in the open.
+- In test battles the Legion wins about two in three (much as before).
+
 ## v0.62 (2026-11-12)
 - Bunkers have two sloping concrete buttresses braced against each side wall.
 - The white lintel line over the bunker doorway is gone.

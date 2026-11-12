@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.62"
+const VERSION := "0.63"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -24,6 +24,9 @@ const WEAPONS := {
 	"fusion_carbine": {"name": "Fusion carbine", "range": 210.0, "cooldown": 3.5, "burst": 1, "gap": 0.0,
 		"acc": 0.6, "ap": 0.9, "dmg": 4, "pen": 9, "vdmg": 5, "supp": 20.0,
 		"tracer": Color(0.75, 0.9, 1.0), "width": 4.0},
+	"lumen_lance": {"name": "Lumen lance", "range": 600.0, "cooldown": 8.5, "burst": 1, "gap": 0.0,
+		"acc": 0.9, "ap": 0.9, "dmg": 2, "pen": 9, "vdmg": 1, "supp": 30.0, "beam": 1.3, "wall": 200.0,
+		"tracer": Color(1.0, 0.45, 0.18), "width": 5.0},
 	"siege_cannon": {"name": "Siege cannon", "range": 620.0, "cooldown": 5.0, "burst": 1, "gap": 0.0,
 		"acc": 0.5, "ap": 0.6, "dmg": 3, "pen": 9, "vdmg": 6, "blast": 42.0, "wall": 80.0, "supp": 40.0,
 		"tracer": Color(1.0, 0.9, 0.6), "width": 3.5},
@@ -133,7 +136,7 @@ const VEHICLES := {
 		"weapons": [{"weapon": "heavy_stubber", "mount": Vector2(10, -7)}]},
 	"vigil": {"name": "Vigil Tank", "role": "tank", "hp": 14, "armour": [9, 7, 5], "speed": 36.0,
 		"turn": 1.0, "length": 62.0, "width": 38.0, "capacity": 0,
-		"weapons": [{"weapon": "siege_cannon", "turret": true}, {"weapon": "heavy_stubber", "mount": Vector2(22, 9)}]},
+		"weapons": [{"weapon": "lumen_lance", "turret": true}, {"weapon": "heavy_stubber", "mount": Vector2(22, 9)}]},
 	"pilgrim": {"name": "Pilgrim Carrier", "role": "carrier", "hp": 9, "armour": [6, 5, 4], "speed": 50.0,
 		"turn": 1.5, "length": 52.0, "width": 32.0, "capacity": 6,
 		"weapons": [{"weapon": "rotor_cannon", "mount": Vector2(8, 0)}]},

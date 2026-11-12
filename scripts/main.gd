@@ -885,6 +885,11 @@ func _process(dt: float) -> void:
 			print("PERF worst frame %.0f ms over last 40 frames" % perf_worst)
 			perf_worst = 0.0
 	_camera_keys(dt)
+	if shake_amt > 0.05:
+		camera.offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake_amt
+		shake_amt = move_toward(shake_amt, 0.0, dt * 14.0)
+	elif camera.offset != Vector2.ZERO:
+		camera.offset = Vector2.ZERO
 	if not touch_mode:
 		pointer_world = get_global_mouse_position()
 	# wait for both the time and a few frames, so a slow device still sees the second tap
@@ -981,8 +986,18 @@ func _process(dt: float) -> void:
 	if shot_path != "" and time >= shot_time and (not "--shot-melee" in OS.get_cmdline_user_args() or _melee_spot() != null) \
 			and (not "--shot-heavy" in OS.get_cmdline_user_args() or _heavy_spot() != null) \
 			and (not "--shot-peek" in OS.get_cmdline_user_args() or _peek_spot() != null) \
+			and (not "--shot-beam" in OS.get_cmdline_user_args() or _beam_frames() > 6) \
 			and (not "--shot-flame" in OS.get_cmdline_user_args() or effects.flames.any(func(f): return f.t > 0.12)):
 		_take_shot()
+
+
+var beam_seen := 0
+
+
+## Test aid: how many frames in a row a beam has been firing.
+func _beam_frames() -> int:
+	beam_seen = beam_seen + 1 if not effects.beams.is_empty() else 0
+	return beam_seen
 
 
 ## Test aid: a man leaning right out round cover and firing, or null.
@@ -1047,6 +1062,8 @@ func _take_shot() -> void:
 		camera.position = _melee_spot()
 	if demo_burn_at != null:
 		camera.position = demo_burn_at
+	if "--shot-beam" in OS.get_cmdline_user_args() and not effects.beams.is_empty():
+		camera.position = (effects.beams[0].from + effects.beams[0].to) * 0.5
 	if "--shot-heavy" in OS.get_cmdline_user_args():
 		camera.position = _heavy_spot()
 	if "--shot-peek" in OS.get_cmdline_user_args():
@@ -1169,6 +1186,8 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 		p = minf(0.95, p * 1.6)  # big target, and it can't hide in a crater
 	else:
 		p *= 1.0 - map.cover_vs(target.exposed_pos(), shooter.position)
+	if shooter.is_vehicle and float(w.get("blast", 0.0)) <= 0.0:
+		p *= 1.5  # a vehicle's guns are on steady mounts
 	if shooter.moving:
 		p *= 0.3 if shooter.running else 0.5  # assaulting: firing on the run
 	if target.charging != null:
@@ -1274,6 +1293,105 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 				_ricochet(end, end - muzzle, w)
 		if randf() < (0.5 if float(w.get("pen", 0)) >= 2.0 else 0.2):
 			decals.add_burn(end, 1.2 + float(w.get("pen", 0)) * 0.25)
+
+
+## The Legion tank's lumen lance: a sustained beam. beam_start when it opens up; beam_tick
+## every frame while it holds: the beam runs from the muzzle along the turret's aim until it
+## meets a wall (which it melts) or a vehicle (which it burns into); men in its path are burnt,
+## and anything flammable where it lands catches fire.
+func beam_start(v: Vehicle, sl: Dictionary) -> void:
+	sfx.play("beam", v.position, 2.0, 0.04)
+	sl.beam_acc = 0.0
+	sl.beam_n = 0
+	shake(v.position, 2.0)
+
+
+func beam_tick(v: Vehicle, sl: Dictionary, dt: float) -> void:
+	var w: Dictionary = sl.weapon
+	var from: Vector2 = v._mount_pos(sl)
+	var dir := Vector2.from_angle(v.turret_angle)
+	var far := from + dir * float(w.range)
+	var end := map.first_obstacle(from, far)
+	var hit_vehicle: Vehicle = null
+	var best := from.distance_to(end)
+	for o in soldiers:
+		if o == v or not o.is_alive() or not o.is_vehicle or o.team == v.team:
+			continue  # (the crew lay the beam over their own side's vehicles and men)
+		var k := (o.position - from).dot(dir)
+		if k > 0.0 and k < best and (from + dir * k).distance_to(o.position) < o.radius:
+			best = k
+			hit_vehicle = o
+	if hit_vehicle != null:
+		end = from + dir * (best - hit_vehicle.radius * 0.5)
+	var show := v.visible or effects_visible_at(end)
+	if show:
+		effects.beam(from, end, w.tracer, w.width, v.get_instance_id())
+	sl.beam_acc = float(sl.get("beam_acc", 0.0)) + dt
+	if sl.beam_acc < 0.2:
+		return
+	sl.beam_acc -= 0.2
+	# every fifth of a second: burn what's in the beam
+	if show:
+		light_fx.flash(end, Color(1.0, 0.55, 0.25), 2.4, 110.0, 0.25)
+		effects.spark(end)
+		effects.puff(end, Color(0.35, 0.3, 0.27), 6.0)
+	decals.add_burn(end + Vector2(randf_range(-3, 3), randf_range(-3, 3)), 2.6)
+	sl.beam_n = int(sl.get("beam_n", 0)) + 1
+	if hit_vehicle != null:
+		if sl.beam_n % 2 == 0 and hit_vehicle.receive_hit(w, v.position, v) and show:  # burning into the armour
+			effects.explosion(end, 10.0)
+	elif map.blocks(map.get_t(map.cell_of(end + dir * 4.0))):
+		var fell := map.damage_walls(end + dir * 4.0, 10.0, float(w.wall) * 0.2)
+		walls_destroyed += fell.size()
+		for c in fell:
+			effects.debris(map.center_of(c))
+			last_wall_down = map.center_of(c)
+		if not fell.is_empty():
+			sfx.play("collapse", map.center_of(fell[0]))
+	var length := from.distance_to(end)
+	for s in soldiers.duplicate():
+		if s.is_vehicle or not s.is_alive() or s.state == Soldier.State.EMBARKED or s.team == v.team:
+			continue
+		var k: float = (s.position - from).dot(dir)
+		if k < 0.0 or k > length + 8.0:
+			continue
+		var off: float = (from + dir * k).distance_to(s.position)
+		if off > s.radius + 4.0:
+			if off < 40.0 and s.team != v.team:
+				s.add_suppression(6.0, time)  # the beam sweeping past
+			continue
+		s.add_suppression(float(w.supp) * 0.3, time)
+		if randf() < 0.25 * GameData.LETHALITY and randf() >= s.armor * (1.0 - float(w.ap)):
+			s.take_hit(int(w.dmg), v)
+	for k in 3:  # whatever burns at the far end catches
+		var c := map.cell_of(end + Vector2(randf_range(-10, 10), randf_range(-10, 10)))
+		if map.flammable(c) and randf() < 0.25:
+			ignite(c)
+
+
+## The main gun of a tank going off: a great flash, a shockwave ring, gunsmoke, dust kicked up
+## round the hull, the tank rocking back, and the ground shaking under the camera if it's close.
+func big_gun_fx(v: Vehicle, muzzle: Vector2, dir: Vector2) -> void:
+	v.hull_kick = 1.0
+	if not (v.visible or effects_visible_at(muzzle)):
+		return
+	var col: Color = Color(0.75, 0.9, 1.0) if v.faction == "sworn" else Color(1.0, 0.8, 0.5)
+	effects.muzzle_blast(muzzle, dir, col)
+	light_fx.flash(muzzle, col, 3.5, 260.0, 0.35, true)
+	for k in 3:
+		effects.puff(muzzle + dir * (8.0 + k * 7.0) + dir.orthogonal() * randf_range(-6, 6), Color(0.5, 0.48, 0.45), 10.0 + k * 3.0)
+	_dust_burst(v.position, 1.6)
+	add_smoke(muzzle + dir * 12.0, 5.0, 1.0)
+	shake(muzzle, 5.0)
+
+
+var shake_amt := 0.0
+
+
+## Shake the camera, more the closer the thing is to the middle of the view.
+func shake(at: Vector2, amount: float) -> void:
+	var d := at.distance_to(camera.position)
+	shake_amt = maxf(shake_amt, amount * clampf(1.0 - d / 900.0, 0.0, 1.0))
 
 
 ## Blood sprayed away from a hit (away: the direction the blow or round was travelling),

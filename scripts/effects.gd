@@ -11,6 +11,8 @@ var markers: Array = []  # {pos, color, t}
 var blasts: Array = []   # {pos, r, t}
 var chunks: Array = []   # flying debris {pos, vel, t, size, color}
 var flames: Array = []   # jets of fire {from, to, cone, t, seed}
+var beams: Array = []    # the lumen lance's beam this frame {from, to, color, width, t}
+var blasts_m: Array = [] # a big gun's muzzle blast {pos, dir, color, t}
 const FLAME_TIME := 0.55
 
 
@@ -49,6 +51,16 @@ func debris(pos: Vector2, n: int = 10) -> void:
 	puff(pos + Vector2(randf_range(-8, 8), randf_range(-8, 8)), Color(0.5, 0.46, 0.4), 12.0)
 
 
+func beam(from: Vector2, to: Vector2, color: Color, width: float, key: int = 0) -> void:
+	# one beam per gun: each update replaces the last (so it shows however slow the frames are)
+	beams = beams.filter(func(e): return e.key != key)
+	beams.append({"from": from, "to": to, "color": color, "width": width, "t": 0.0, "key": key})
+
+
+func muzzle_blast(pos: Vector2, dir: Vector2, color: Color) -> void:
+	blasts_m.append({"pos": pos, "dir": dir, "color": color, "t": 0.0})
+
+
 func flame(from: Vector2, to: Vector2, cone: float) -> void:
 	flames.append({"from": from, "to": to, "cone": cone, "t": 0.0, "seed": randf() * 100.0})
 
@@ -60,7 +72,7 @@ func marker(pos: Vector2, color: Color) -> void:
 func _process(dt: float) -> void:
 	if get_parent().paused:
 		return  # freeze tracers and blasts while the game is paused
-	for list in [tracers, puffs, sparks, markers, blasts, chunks, flames]:
+	for list in [tracers, puffs, sparks, markers, blasts, chunks, flames, beams, blasts_m]:
 		for e in list:
 			e.t += dt
 	tracers = tracers.filter(func(e): return e.t < TRACER_TIME)
@@ -70,6 +82,8 @@ func _process(dt: float) -> void:
 	blasts = blasts.filter(func(e): return e.t < 0.8)
 	chunks = chunks.filter(func(e): return e.t < 0.6)
 	flames = flames.filter(func(e): return e.t < FLAME_TIME)
+	beams = beams.filter(func(e): return e.t < 0.15)
+	blasts_m = blasts_m.filter(func(e): return e.t < 0.5)
 	for e in chunks:
 		e.pos += e.vel * dt
 		e.vel *= 1.0 - minf(1.0, dt * 4.0)
@@ -142,6 +156,35 @@ func _draw() -> void:
 					draw_texture_rect(soft, Rect2(p - Vector2(rad, rad) * 1.5, Vector2(rad, rad) * 3.0), false, Color(col, minf(1.0, col.a * 1.6)))
 				else:
 					draw_circle(p, rad, col)
+	for e in beams:
+		# a searing beam: a wide soft glow, a bright core, and a white-hot heart that flickers
+		var from: Vector2 = e.from
+		var to: Vector2 = e.to
+		var col: Color = e.color
+		var wdt: float = e.width * (0.9 + randf() * 0.25)
+		draw_line(from, to, Color(col, 0.18), wdt * 4.5)
+		draw_line(from, to, Color(col, 0.45), wdt * 2.2)
+		draw_line(from, to, col.lightened(0.35), wdt)
+		draw_line(from, to, Color(1.0, 0.97, 0.85), wdt * 0.4)
+		draw_circle(to, wdt * 1.8, Color(col, 0.5))
+		draw_circle(to, wdt, Color(1.0, 0.95, 0.8, 0.9))
+		draw_circle(from, wdt * 1.3, Color(1.0, 0.9, 0.7, 0.9))
+	for e in blasts_m:
+		# the main gun's blast: a cone of fire out of the muzzle, a ring of shock racing outward
+		var k: float = e.t / 0.5
+		var p: Vector2 = e.pos
+		var dir: Vector2 = e.dir
+		var col: Color = e.color
+		var side := dir.orthogonal()
+		if k < 0.35:
+			var f := k / 0.35
+			var reach := 34.0 * (0.6 + f)
+			draw_colored_polygon(PackedVector2Array([p, p + dir * reach + side * reach * 0.45, p + dir * reach * 1.3, p + dir * reach - side * reach * 0.45]),
+					Color(col, 0.8 * (1.0 - f)))
+			draw_circle(p + dir * 6.0, 14.0 * (1.0 - f) + 4.0, Color(1.0, 1.0, 0.92, 1.0 - f))
+			for s in [-1.0, 1.0]:  # side jets from the muzzle brake
+				draw_line(p, p + side * s * 18.0 * (0.5 + f), Color(col, 0.7 * (1.0 - f)), 5.0)
+		draw_arc(p, 20.0 + k * 90.0, 0, TAU, 40, Color(1.0, 0.95, 0.85, 0.45 * (1.0 - k)), 2.0 + 3.0 * (1.0 - k))
 	for e in markers:
 		var k: float = e.t / 0.7
 		var col: Color = e.color

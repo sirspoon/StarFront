@@ -91,6 +91,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   `--demo-burn` sets alight the flammable cells near `--shot-at` (or the first park) and, 45 s later,
   prints how many are still burning and how many burnt away.
 - `--trenches=1` turns on the trench lines option for a test.
+- `--shot-beam` waits until the Legion tank's lumen lance has been firing a few frames and centres on the
+  beam; `--shot-tank --shot-team=0|1 --shot-zoom=5` for a close look at either tank.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for
