@@ -619,6 +619,7 @@ func _build_world(seed_value: int) -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--map="):
 			map.map_type = a.trim_prefix("--map=")  # test aid
+	map.trenches = Settings.on("trenches", false)
 	if map.map_type == "random":
 		map.map_type = "town" if (seed_value % 2) == 0 else "foundry"
 	map.generate(seed_value)
@@ -1195,8 +1196,8 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 	if target.posture == "prone" and not target.is_vehicle:
 		p *= 0.7  # a man lying flat is a small target
 		var tt := map.get_t(map.cell_of(target.position))
-		if tt == BattleMap.T.RUBBLE or tt == BattleMap.T.CRATER:
-			p *= 0.7  # ...and flat in rubble or a crater, very hard to hit
+		if tt == BattleMap.T.RUBBLE or tt == BattleMap.T.CRATER or tt == BattleMap.T.TRENCH:
+			p *= 0.7  # ...and flat in rubble, a crater or a trench, very hard to hit
 	elif target.posture == "crouch":
 		p *= 0.9
 	var hit := randf() < p
@@ -1458,8 +1459,8 @@ func resolve_blow(attacker: Soldier, foe: Soldier, m: Dictionary, landed: bool) 
 			effects.spark(at)  # glances off his armour
 		foe.morale -= 1.0
 		return
-	if randf() > GameData.MELEE_LETHALITY and not foe.grounded():
-		foe.morale -= 3.0 * foe.nerve  # a glancing blow: shaken, not wounded (men on the ground get no such luck)
+	if randf() > (GameData.MELEE_LETHALITY * (2.0 if foe.grounded() else 1.0)):
+		foe.morale -= 3.0 * foe.nerve  # a glancing blow: shaken, not wounded (men on the ground are twice as likely to be hurt)
 		return
 	var away := (foe.position - attacker.position).normalized()
 	if show:

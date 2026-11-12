@@ -579,10 +579,10 @@ func _strike(foe: Soldier, now: float) -> void:
 	var sees_it := absf(wrapf((position - foe.position).angle() - foe.facing, -PI, PI)) < 1.6
 	if foe.grounded():
 		# pinned or lying flat: he can't fend anything off, and assault troops butcher him
-		p *= 1.8 if charger else 1.3
-		if m.blade:
+		p *= 1.5 if charger else 1.25
+		if m.blade and int(m.dmg) >= 2:
 			m = m.duplicate()
-			m.dmg = int(m.dmg) + 1  # a blade finishes a man on the ground
+			m.dmg = int(m.dmg) + 1  # a heavy blade finishes a man on the ground
 	elif foe.state == State.READY and sees_it:
 		p *= 1.0 - float(foe.melee.parry)  # he sees it coming and fends it off
 	elif not sees_it:

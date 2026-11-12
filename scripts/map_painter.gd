@@ -121,6 +121,10 @@ func _draw_all() -> void:
 				_draw_foundation(c)  # a breach worn into a walkable gap
 	for y in range(area.position.y, area.end.y):
 		for x in range(area.position.x, area.end.x):
+			if map.get_t(Vector2i(x, y)) == T.TRENCH:
+				_draw_trench(Vector2i(x, y))
+	for y in range(area.position.y, area.end.y):
+		for x in range(area.position.x, area.end.x):
 			if map.get_t(Vector2i(x, y)) == T.LOW:
 				_draw_low(Vector2i(x, y))
 	for y in range(area.position.y, area.end.y):
@@ -1606,3 +1610,50 @@ func _draw_prop(pr: Dictionary) -> void:
 			if (sd % 5) == 0:
 				draw_circle(m + Vector2(2, -6), 1.2, Color(0.05, 0.05, 0.05))  # shrapnel damage
 			draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+
+
+## A trench: a dug channel with a muddy floor and duckboards, its walls shored with planks;
+## the walls on the lit side catch the light, the others fall into shadow, and the spoil is
+## heaped along the lip.
+func _draw_trench(c: Vector2i) -> void:
+	var o := Vector2(c) * C
+	var tr := func(d: Vector2i) -> bool: return map.get_t(c + d) == T.TRENCH
+	var up: bool = tr.call(Vector2i(0, -1))
+	var dn: bool = tr.call(Vector2i(0, 1))
+	var lf: bool = tr.call(Vector2i(-1, 0))
+	var rt: bool = tr.call(Vector2i(1, 0))
+	# spoil heaped along the lip outside
+	for d in [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]:
+		if not tr.call(d):
+			var lip := o + Vector2(8, 8) + Vector2(d) * 10.0
+			_poly(_blob(lip, 5.0, 0.6, 0.5, c.x * 7 + c.y + d.x * 3 + d.y), Color(0.3, 0.25, 0.19, 0.7))
+	draw_rect(Rect2(o, Vector2(C, C)), Color(0.13, 0.11, 0.09))  # the floor, deep in shadow
+	# the walls: shadowed on the top and left (the light comes from the top left), lit on the others
+	if not up:
+		draw_rect(Rect2(o, Vector2(C, 4)), Color(0.07, 0.06, 0.05))
+	if not lf:
+		draw_rect(Rect2(o, Vector2(4, C)), Color(0.08, 0.07, 0.06))
+	if not dn:
+		draw_rect(Rect2(o + Vector2(0, C - 3), Vector2(C, 3)), Color(0.34, 0.28, 0.21))
+	if not rt:
+		draw_rect(Rect2(o + Vector2(C - 3, 0), Vector2(3, C)), Color(0.3, 0.25, 0.19))
+	# revetment: planks shoring the walls
+	for d in [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]:
+		if tr.call(d):
+			continue
+		var a := o + (Vector2(0, 2) if d.y < 0 else (Vector2(0, C - 2) if d.y > 0 else (Vector2(2, 0) if d.x < 0 else Vector2(C - 2, 0))))
+		var along := Vector2(1, 0) if d.y != 0 else Vector2(0, 1)
+		for k in 3:
+			var q := a + along * (k * 5.5 + 2.0)
+			draw_line(q - along * 2.2, q + along * 2.2, Color(0.3, 0.21, 0.13), 1.1)
+	# duckboards along the floor
+	var vertical := up or dn
+	var mid := o + Vector2(8, 8)
+	for k in 4:
+		var t := (k + 0.5) * 4.0 - 8.0
+		if vertical:
+			draw_line(mid + Vector2(-3.5, t), mid + Vector2(3.5, t), Color(0.32, 0.23, 0.15), 1.6)
+		else:
+			draw_line(mid + Vector2(t, -3.5), mid + Vector2(t, 3.5), Color(0.32, 0.23, 0.15), 1.6)
+	if _h(c.x, c.y, 160) < 0.25:
+		_poly(_blob(mid + Vector2(_h(c.x, c.y, 161) * 6 - 3, _h(c.x, c.y, 162) * 6 - 3), 3.0, 0.6, 0.4, c.x + c.y), Color(0.12, 0.13, 0.12, 0.8))  # a puddle

@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.57"
+const VERSION := "0.58"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -50,8 +50,8 @@ const WEAPONS := {
 ## seconds between blows. Anyone without one fights with the butt of his gun.
 const MELEE := {
 	"gun_butt": {"name": "Gun butt", "cooldown": 1.5, "hit": 0.4, "parry": 0.1, "dmg": 1, "ap": 0.0, "sound": "melee_blunt", "blade": false},
-	"trench_knife": {"name": "Trench knife", "cooldown": 0.75, "hit": 0.6, "parry": 0.25, "dmg": 1, "ap": 0.45, "sound": "melee_blade", "blade": true},
-	"hook_sabre": {"name": "Hook sabre", "cooldown": 0.85, "hit": 0.65, "parry": 0.35, "dmg": 1, "ap": 0.55, "sound": "melee_blade", "blade": true},
+	"trench_knife": {"name": "Trench knife", "cooldown": 0.75, "hit": 0.6, "parry": 0.25, "dmg": 1, "ap": 0.2, "sound": "melee_blade", "blade": true},
+	"hook_sabre": {"name": "Hook sabre", "cooldown": 0.85, "hit": 0.65, "parry": 0.35, "dmg": 1, "ap": 0.3, "sound": "melee_blade", "blade": true},
 	"edict_blade": {"name": "Edict blade", "cooldown": 0.85, "hit": 0.65, "parry": 0.4, "dmg": 2, "ap": 0.8, "sound": "melee_power", "blade": true},
 	"gauntlet": {"name": "Bastion gauntlet", "cooldown": 1.6, "hit": 0.5, "parry": 0.1, "dmg": 2, "ap": 0.7, "sound": "melee_blunt", "blade": false},
 	"edict_greatblade": {"name": "Edict greatblade", "cooldown": 1.0, "hit": 0.7, "parry": 0.45, "dmg": 3, "ap": 0.85, "sound": "melee_power", "blade": true},

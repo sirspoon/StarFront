@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.58 (2026-11-12)
+Defences that defend something, and trenches.
+- Fortifications are now built round what's worth holding: the chapel, and two or three key buildings
+  (warehouses, taverns, offices, works). Each has fighting positions out on its approaches: sandbag
+  rings, arcs and straight walls (often at an angle), all facing outward, with their way in at the back,
+  towards what they defend, and barbed wire strung in front. The chapel is ringed on all sides; other
+  buildings are fortified on the side facing the nearer enemy. Barricades block the streets leading in,
+  each with a gap. The scattered sandbags, barricades and wire in random places are gone.
+- Trench lines (Options: "Trench lines dug across the battlefield", off by default): a zig-zag fire
+  trench across the battlefield in front of each side's start, communication trenches running back
+  from it, and a trench round the chapel square. Men in a trench are in good cover and hard to spot
+  (and very hard to hit lying down in one); moving along one is a little slow. Vehicles can't cross a
+  trench: the streets and causeways left in the lines get them through. Drawn with shored walls,
+  duckboards, puddles and the spoil heaped along the lip; brown in the Cover view.
+- Close combat against men who are pinned or lying Down is a little less one-sided: they still get no
+  chance to fend off blows and are easier to hit, but some blows still glance off, and only heavy
+  blades do extra damage to them. Raiders' knives and sabres cut through armour less easily. (The
+  Raiders were killing the Sworn's pinned men wholesale.)
+- In test battles the Legion now wins a little over half on the Old Town map (it was winning three in
+  four); with trench lines on, the Legion wins about three in four.
+
 ## v0.57 (2026-11-12)
 Heavy industry, statues, a grander chapel, and fires that catch.
 - Heavy industry blocks: a big warehouse (corrugated roof with a strip of skylights down the ridge,

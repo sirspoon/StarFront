@@ -10,15 +10,15 @@ const CELL := 16
 const W := 160
 const H := 100
 
-enum T { OPEN, RUBBLE, CRATER, FLOOR, WALL, WRECK, LOW, WINDOW, BUSH, HEDGE, WIRE }
+enum T { OPEN, RUBBLE, CRATER, FLOOR, WALL, WRECK, LOW, WINDOW, BUSH, HEDGE, WIRE, TRENCH }
 
 ## BUSH hides a man who keeps still (and spoils aim a little); HEDGE blocks sight and is slow
 ## to push through; WIRE (barbed wire) gives no cover and is very slow to cross. Vehicles
 ## flatten all three.
-const COVER := [0.0, 0.35, 0.45, 0.15, 0.0, 0.0, 0.3, 0.0, 0.3, 0.3, 0.0]
-const SPEED := [1.0, 0.7, 0.75, 1.0, 1.0, 1.0, 0.35, 1.0, 0.7, 0.3, 0.22]
+const COVER := [0.0, 0.35, 0.45, 0.15, 0.0, 0.0, 0.3, 0.0, 0.3, 0.3, 0.0, 0.55]
+const SPEED := [1.0, 0.7, 0.75, 1.0, 1.0, 1.0, 0.35, 1.0, 0.7, 0.3, 0.22, 0.85]
 const TERRAIN_NAMES := ["Open ground", "Rubble", "Crater", "Ruin floor", "Wall", "Wreck", "Low cover", "Window",
-		"Bushes", "Hedge", "Barbed wire"]
+		"Bushes", "Hedge", "Barbed wire", "Trench"]
 const WINDOW_COVER := 0.5  # a man firing from just inside a window
 
 ## Low cover: chest-high things troops crouch behind and fire over. It doesn't block
@@ -58,6 +58,7 @@ var parks: Array[Rect2i] = []
 var building_kind: Array[String] = []
 ## "town" (homes, shops, parks...) or "foundry" (mostly warehouses, works and machinery yards).
 var map_type := "town"
+var trenches := false  # dig trench lines across the battlefield (an option)
 ## Big solid objects drawn by the painter, their cells WRECK (blocking): {kind, rect, seed}.
 ## Kinds: "tank" (storage tank), "furnace", "wagon" (rail wagon), "statue".
 var props: Array = []
@@ -415,8 +416,8 @@ func _refresh_vastar(c: Vector2i) -> void:
 	for dx in range(-1, 2):
 		for dy in range(-1, 2):
 			var nt := get_t(c + Vector2i(dx, dy))
-			if clear and (solid(nt) or nt == T.LOW):
-				clear = false  # vehicles drive round low cover
+			if clear and (solid(nt) or nt == T.LOW or nt == T.TRENCH):
+				clear = false  # vehicles drive round low cover and trenches
 	vastar.set_point_solid(c, not clear)
 	if clear:
 		var t := get_t(c)
@@ -447,13 +448,9 @@ func generate(seed_value: int) -> void:
 		_make_scrub()
 	_crumble_walls()
 	_make_windows()
-	for i in 8:
-		_make_sandbags(i < 4)
-	for i in 4:
-		_make_base(i < 2)
-	_make_barricades()
-	for i in 14:
-		_make_wire()
+	_fortify()
+	if trenches:
+		_make_trenches()
 	for i in 30:
 		scorches.append([Vector2(rng.randf_range(0, W * CELL), rng.randf_range(0, H * CELL)),
 				rng.randf_range(20, 60)])
@@ -729,6 +726,156 @@ func _ring(r: Rect2i) -> Array[Vector2i]:
 		out.append(Vector2i(r.position.x, y))
 		out.append(Vector2i(r.end.x - 1, y))
 	return out
+
+
+# ---------------------------------------------------------------- defences
+
+## Defences built round what's worth holding: the chapel, and two or three other key
+## buildings. Each gets fighting positions facing out towards its approaches (their way
+## in at the back, towards what they defend), barbed wire in front of them, and barricades
+## across the streets leading in.
+func _fortify() -> void:
+	_fortify_site(chapel, [0.0, PI, PI * 0.25, -PI * 0.25, PI * 0.75, -PI * 0.75, PI * 0.5, -PI * 0.5])
+	var picks: Array = []
+	for i in range(1, buildings.size()):
+		var k := building_kind[i]
+		if k == "warehouse" or k == "tavern" or k == "office" or (k == "industry" and rng.randf() < 0.5):
+			picks.append(i)
+	picks.sort_custom(func(a, b): return _h(a, 7) < _h(b, 7))
+	for i in picks.slice(0, 3):
+		var r: Rect2i = buildings[i]
+		var east := r.get_center().x > W / 2  # positions face the way the enemy would come
+		_fortify_site(r, [0.0 if east else PI, (0.4 if east else PI - 0.4), (-0.4 if east else PI + 0.4)])
+
+
+func _fortify_site(site: Rect2i, angles: Array) -> void:
+	var c := Vector2(site.get_center())
+	var hw := site.size.x * 0.5
+	var hh := site.size.y * 0.5
+	for a in angles:
+		var dir := Vector2.from_angle(a)
+		var edge := minf(hw / maxf(absf(dir.x), 0.01), hh / maxf(absf(dir.y), 0.01))  # out to the site's edge
+		for attempt in 16:
+			var o := c + dir * (edge + rng.randf_range(4.0, 8.0)) + Vector2(rng.randf_range(-2.5, 2.5), rng.randf_range(-2.5, 2.5))
+			var shape: String = ["ring", "arc", "line"][rng.randi() % 3]
+			if _fighting_position(o, a, shape):
+				break
+	_street_barricades(site)
+
+
+## A sandbagged fighting position at o, its front facing angle `a`: a ring with its way in
+## at the back, an arc open at the back, or a straight wall across the line of approach;
+## with barbed wire strung in front.
+func _fighting_position(o: Vector2, a: float, shape: String) -> bool:
+	var cells: Array = []
+	var rad := rng.randf_range(2.6, 3.4)
+	var n := 40
+	if shape == "line":
+		var across := Vector2.from_angle(a).orthogonal()
+		for k in range(-3, 4):
+			var cc := Vector2i(roundi(o.x + across.x * k), roundi(o.y + across.y * k))
+			if not cells.has(cc):
+				cells.append(cc)
+		rad = 0.0
+	else:
+		for i in n:
+			var ang := i * TAU / n
+			var off := absf(wrapf(ang - a, -PI, PI))
+			if shape == "ring" and off > PI - 0.5:
+				continue  # the way in, at the back
+			if shape == "arc" and off > 1.7:
+				continue  # open at the back
+			var cc := Vector2i(roundi(o.x + cos(ang) * rad), roundi(o.y + sin(ang) * rad))
+			if not cells.has(cc):
+				cells.append(cc)
+	for cc in cells:  # built on open ground or rubble, clear of the streets' far side and the start areas
+		if not in_bounds(cc) or cc.x < 16 or cc.x > W - 17 or not (get_t(cc) == T.OPEN or get_t(cc) == T.RUBBLE):
+			return false
+	for cc in cells:
+		_set_low(cc, LowKind.SANDBAGS)
+	for i in n:  # wire in front
+		var ang := i * TAU / n
+		if absf(wrapf(ang - a, -PI, PI)) > 0.8:
+			continue
+		var wc := Vector2i(roundi(o.x + cos(ang) * (rad + 3.5)), roundi(o.y + sin(ang) * (rad + 3.5)))
+		if in_bounds(wc) and get_t(wc) == T.OPEN and wc.x > 16 and wc.x < W - 17:
+			set_t(wc, T.WIRE)
+	return true
+
+
+## Barricades across the streets leading to a site, a little way out from it, each with a
+## gap to squeeze through.
+func _street_barricades(site: Rect2i) -> void:
+	for rd in roads:
+		var r: Rect2 = rd
+		var rc := Rect2i(Vector2i(r.position / CELL), Vector2i(r.size / CELL))
+		var horiz := r.size.x > r.size.y
+		var spots: Array = []
+		if horiz and rc.position.y < site.end.y + 14 and rc.end.y > site.position.y - 14:
+			spots = [site.position.x - rng.randi_range(6, 10), site.end.x + rng.randi_range(5, 9)]
+		elif not horiz and rc.position.x < site.end.x + 14 and rc.end.x > site.position.x - 14:
+			spots = [site.position.y - rng.randi_range(6, 10), site.end.y + rng.randi_range(5, 9)]
+		for s in spots:
+			var cells: Array = []
+			if horiz:
+				for y in range(rc.position.y, rc.end.y):
+					cells.append(Vector2i(s, y))
+			else:
+				for x in range(rc.position.x, rc.end.x):
+					cells.append(Vector2i(x, s))
+			cells.remove_at(rng.randi_range(0, cells.size() - 1))
+			if _open_run(cells):
+				for cc in cells:
+					_set_low(cc, LowKind.BARRICADE)
+
+
+## Trench lines (an option): a zig-zag fire trench across the battlefield in front of each
+## side's start, communication trenches running back from it, and a trench round the
+## chapel square. Dug only through open ground; the streets cross them, and there are
+## causeways, so vehicles can get through.
+func _make_trenches() -> void:
+	for side in 2:
+		var x0 := 26 if side == 0 else W - 27
+		var pts: Array = []
+		var y := 2
+		var zig := 0
+		while y < H - 2:
+			pts.append(Vector2i(x0 + (2 if zig % 2 == 0 else -1), y))
+			y += rng.randi_range(4, 6)
+			zig += 1
+		for k in range(pts.size() - 1):
+			_dig(pts[k], pts[k + 1], k % 4 == 3)  # every fourth stretch left as a causeway
+		for k in 3:  # communication trenches back towards the start
+			var p: Vector2i = pts[(k + 1) * pts.size() / 4]
+			_dig(p, Vector2i(p.x + (-8 if side == 0 else 8), p.y + rng.randi_range(-3, 3)), false)
+	var ring := plaza.grow(3)
+	for c in _ring(ring):
+		var mid := ring.get_center()
+		if absi(c.x - mid.x) <= 1 or absi(c.y - mid.y) <= 1:
+			continue  # ways through
+		_dig_cell(c)
+
+
+func _dig(a: Vector2i, b: Vector2i, skip: bool) -> void:
+	if skip:
+		return
+	var n := maxi(absi(b.x - a.x), absi(b.y - a.y))
+	for k in n + 1:
+		var c := Vector2i(roundi(lerpf(a.x, b.x, float(k) / maxi(n, 1))), roundi(lerpf(a.y, b.y, float(k) / maxi(n, 1))))
+		_dig_cell(c)
+		if k < n:
+			# keep it joined edge to edge, not corner to corner
+			var nx := Vector2i(roundi(lerpf(a.x, b.x, float(k + 1) / n)), roundi(lerpf(a.y, b.y, float(k + 1) / n)))
+			if nx.x != c.x and nx.y != c.y:
+				_dig_cell(Vector2i(nx.x, c.y))
+
+
+func _dig_cell(c: Vector2i) -> void:
+	if not in_bounds(c) or is_road(c):
+		return
+	var t := get_t(c)
+	if t == T.OPEN or t == T.RUBBLE or t == T.CRATER or t == T.BUSH:
+		set_t(c, T.TRENCH)
 
 
 ## A fortified position: a ring of sandbags (its sides running straight and at angles),

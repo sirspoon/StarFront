@@ -90,6 +90,7 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `--map=town|foundry` picks the battlefield type (otherwise the saved option, default town).
   `--demo-burn` sets alight the flammable cells near `--shot-at` (or the first park) and, 45 s later,
   prints how many are still burning and how many burnt away.
+- `--trenches=1` turns on the trench lines option for a test.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

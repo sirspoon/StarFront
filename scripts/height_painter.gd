@@ -73,7 +73,9 @@ func _draw_all() -> void:
 		for x in range(area.position.x, area.end.x):
 			var c := Vector2i(x, y)
 			var t := map.get_t(c)
-			if t == T.BUSH:  # leafy mounds
+			if t == T.TRENCH:  # dug down into the ground
+				draw_rect(Rect2(Vector2(c) * C, Vector2(C, C)), _hc(GROUND - 0.18))
+			elif t == T.BUSH:  # leafy mounds
 				_poly(_blob(Vector2(c) * C + Vector2(8, 8), 7.0, 1.0, 0.4, x * 13 + y), _hc(0.5))
 				_poly(_blob(Vector2(c) * C + Vector2(7, 7), 4.0, 1.0, 0.4, x * 13 + y + 1), _hc(0.58))
 			elif t == T.HEDGE:

@@ -64,6 +64,8 @@ func _draw() -> void:
 				BattleMap.T.WALL, BattleMap.T.WRECK:
 					draw_rect(r, Color(0.95, 0.95, 1.0, 0.22))
 					draw_rect(r.grow(-0.5), Color(1, 1, 1, 0.75), false, 1.0)
+				BattleMap.T.TRENCH:
+					draw_rect(r, Color(0.75, 0.45, 0.2, 0.4))
 				BattleMap.T.RUBBLE, BattleMap.T.CRATER:
 					draw_rect(r.grow(-2), Color(1.0, 0.85, 0.3, 0.2))
 				BattleMap.T.BUSH:

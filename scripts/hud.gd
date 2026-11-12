@@ -432,7 +432,8 @@ func show_options() -> void:
 	mtype.custom_minimum_size = Vector2(420, 44 if main.touch_mode else 30)
 	v.add_child(mtype)
 	var checks := {}
-	for o in [["shadows", "Wall shadows from fires and explosions", not Settings.is_phone()],
+	for o in [["trenches", "Trench lines dug across the battlefield", false],
+			["shadows", "Wall shadows from fires and explosions", not Settings.is_phone()],
 			["normals", "Raised, lit surfaces (normal maps)", true],
 			["lights", "Combat lights and moonlight", true],
 			["sound", "Sound", true]]:
@@ -481,7 +482,7 @@ func show_cover_key(on: bool) -> void:
 	if cover_key == null:
 		cover_key = Label.new()
 		cover_key.text = "COVER:  green low cover (fire over it)   blue windows   white standing walls   " \
-				+ "yellow rubble/craters   olive bushes/hedges   red wire   (no colour: open, or the wall has collapsed)"
+				+ "yellow rubble/craters   brown trenches   olive bushes/hedges   red wire   (no colour: open, or the wall has collapsed)"
 		cover_key.add_theme_font_size_override("font_size", 12)
 		cover_key.add_theme_color_override("font_color", Color(0.9, 0.88, 0.75))
 		cover_key.add_theme_color_override("font_outline_color", Color(0, 0, 0))
