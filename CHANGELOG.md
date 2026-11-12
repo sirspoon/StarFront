@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.42 (2026-11-12)
+Heavy Gun Team crews.
+- The gunner works the gun; the loader changes the ammunition. A load lasts six bursts, then the
+  loader swaps in a new belt or power cell in about 3 seconds. Without him (dead, pinned, fighting
+  or away from the gun) the gunner takes about 7.5 seconds. The squad card shows "Reloading".
+- The loader stays at the gunner's shoulder instead of finding his own cover.
+- (Replaces the old rule that the gun simply fired slower without its loader.)
+
 ## v0.41 (2026-11-12)
 Heavy Gun Teams.
 - Each side gets a two-man Heavy Gun Team: a gunner and a loader. The Legion's heavy lumen gun

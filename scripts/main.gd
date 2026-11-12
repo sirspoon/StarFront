@@ -1250,6 +1250,8 @@ func _take_over_gun(s: Soldier) -> void:
 	best.heavy = true
 	best.weapon = s.weapon
 	best.setup_t = 0.0
+	best.ammo = s.ammo
+	best.reload_t = s.reload_t
 	best.burst_left = 0
 	if s.team == player_team:
 		log_message("%s: the loader takes over the gun." % s.squad.name)

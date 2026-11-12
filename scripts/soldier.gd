@@ -74,6 +74,11 @@ const ARC := 1.0              # once set up it covers this far either side (radi
 var heavy := false            # carries a heavy gun (the loader takes it over if the gunner falls)
 var setup_t := 0.0            # 0..1: how far the gun is set up
 var deploy_dir := 0.0         # the way it was set up facing
+const MAG := 6                # bursts in a load of ammunition
+const RELOAD := 3.0           # seconds for the loader to change it...
+const RELOAD_ALONE := 7.5     # ...or for the gunner on his own
+var ammo := MAG               # bursts left in the current load
+var reload_t := 0.0           # reloading: seconds of work left (at the loader's pace)
 
 
 func setup(m: Node, sq: Squad, t: int, kind_id: String) -> void:
@@ -254,6 +259,19 @@ func can_brace() -> bool:
 	return false
 
 
+## His loader, if he's beside the gun and free to work it.
+func loader_at_hand() -> Soldier:
+	for m in squad.members:
+		if m != self and m.data.get("loader", false) and not m.heavy and m.state == State.READY and not m.in_melee \
+				and m.position.distance_to(position) < 40.0:
+			return m
+	return null
+
+
+func is_reloading() -> bool:
+	return heavy and reload_t > 0.0
+
+
 func is_set_up() -> bool:
 	return heavy and setup_t >= 1.0
 
@@ -269,7 +287,7 @@ func _update_setup(dt: float) -> void:
 		return
 	if setup_t <= 0.0:
 		deploy_dir = facing
-	var helped := squad.members.any(func(m): return m != self and m.is_effective() and m.position.distance_to(position) < 45.0)
+	var helped := loader_at_hand() != null
 	setup_t = minf(1.0, setup_t + dt / (SETUP_TIME * (1.0 if helped else 1.6)))
 
 
@@ -372,6 +390,17 @@ func _fight(dt: float, now: float) -> void:
 			return
 	if heavy and moving:
 		return  # can't fire a heavy gun on the move
+	if heavy and reload_t > 0.0:
+		# the loader changes the ammunition; on his own the gunner takes far longer
+		var l := loader_at_hand()
+		reload_t -= dt * (1.0 if l != null else RELOAD / RELOAD_ALONE)
+		if l != null:
+			l.facing = (position - l.position).angle()
+			if l.swing <= 0.0 and randf() < dt * 1.5:
+				l.swing = 1.0  # heaving the new belt / power cell into place
+		if reload_t <= 0.0:
+			ammo = MAG
+		return
 	var t := pick_target(weapon, position)
 	if t == null:
 		cooldown = randf_range(0.3, 0.6)
@@ -388,9 +417,11 @@ func _fight(dt: float, now: float) -> void:
 	var cd: float = weapon.cooldown * randf_range(0.85, 1.2)
 	if state == State.PINNED:
 		cd *= 2.5
-	if heavy and not squad.members.any(func(m): return m != self and m.is_effective() and m.position.distance_to(position) < 45.0):
-		cd *= 1.6  # no loader feeding it
 	cooldown = cd
+	if heavy:
+		ammo -= 1
+		if ammo <= 0:
+			reload_t = RELOAD  # that load's spent: change the ammunition
 
 
 # ---------------------------------------------------------------- close combat

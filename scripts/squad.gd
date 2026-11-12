@@ -132,6 +132,8 @@ func status() -> String:
 		return "Running" if running else "Moving"
 	for m in al:
 		if m.heavy:
+			if m.is_reloading():
+				return "Reloading"
 			if m.is_set_up():
 				return "Firing" if m.burst_left > 0 or m.flash > 0.0 else "Set up"
 			if m.setup_t > 0.0:
@@ -466,6 +468,19 @@ func think(main: Node, dt: float) -> void:
 					if o.position.distance_to(m.position) < near.position.distance_to(m.position):
 						near = o
 				m.go_to(near.position + (m.position - near.position).normalized() * COH * 0.5, false)
+	var gunner = null
+	for m in members:
+		if m.heavy and m.is_effective():
+			gunner = m
+	if gunner != null and not gunner.moving:
+		for m in members:
+			if m.data.get("loader", false) and not m.heavy and m.state == Soldier.State.READY and not m.moving and not m.in_melee:
+				var side: Vector2 = Vector2.from_angle(gunner.facing + PI * 0.7) * (gunner.radius + m.radius + 5.0)  # just behind, at his shoulder (not shoving him)
+				var spot: Vector2 = gunner.position + side
+				if not map.walkable(map.cell_of(spot)):
+					spot = gunner.position - side.orthogonal()
+				if m.position.distance_to(spot) > 10.0 and m.position.distance_to(gunner.position) > 32.0 and map.walkable(map.cell_of(spot)):
+					m.go_to(spot, false)
 	var c := center()
 	var threat := facing
 	var enemy: Soldier = main.nearest_seen_enemy(team, c)
@@ -481,7 +496,7 @@ func think(main: Node, dt: float) -> void:
 		m.behind_low = ahead == BattleMap.T.LOW
 		m.corner_cover = ahead == BattleMap.T.WALL or ahead == BattleMap.T.WRECK
 		if threat == Vector2.ZERO or m.moving or m.state != Soldier.State.READY or m.burst_left > 0 or cur >= 0.55 \
-				or m.in_melee or m.charging != null:
+				or m.in_melee or m.charging != null or (gunner != null and m.data.get("loader", false)):
 			continue
 		var best := cell
 		var best_score := cur
