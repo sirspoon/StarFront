@@ -59,7 +59,7 @@ func _draw_all() -> void:
 					draw_rect(Rect2(o + Vector2(3, 3), Vector2(C - 6, C - 6)), _hc(0.58))
 	for y in range(area.position.y, area.end.y):
 		for x in range(area.position.x, area.end.x):
-			if map.get_t(Vector2i(x, y)) == T.WALL:
+			if map.is_wall(map.get_t(Vector2i(x, y))):
 				_wall(Vector2i(x, y))
 
 

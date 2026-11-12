@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.35 (2026-11-12)
+Windows and roofs.
+- Building walls now have windows (the chapel has a row of stained-glass ones). Men can see and
+  fire through a window, and a man standing just inside one is in good cover against fire from
+  outside (a little less than ducking behind solid wall would be, but he can shoot back). Nobody can
+  climb through. Windows weaken a wall a little, and they fall with it.
+- Buildings have roofs (slate, the chapel old lead) drawn over everything inside. A roof fades
+  away while any of your soldiers is inside the building or just outside it, so you can see in.
+  Spotted enemies under a roof show as red markers.
+- Shells and grenades knock holes in roofs: battered slates first, then torn holes with rafters
+  showing. When walls fall away beneath a roof, that part of it collapses.
+
 ## v0.34 (2026-11-12)
 Flanking.
 - Each squad braces against the direction its fight is coming from. Fire from well off that front

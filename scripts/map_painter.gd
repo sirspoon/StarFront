@@ -114,7 +114,7 @@ func _draw_all() -> void:
 	# shadows, then wrecks, then the walls themselves from back to front
 	for y in range(area.position.y, area.end.y):
 		for x in range(area.position.x, area.end.x):
-			if map.get_t(Vector2i(x, y)) == T.WALL:
+			if map.is_wall(map.get_t(Vector2i(x, y))):
 				var h := WALL_H * (0.5 if map.wall_stage(Vector2i(x, y)) == 2 else 1.0)
 				draw_rect(Rect2(Vector2(x, y) * C + Vector2(3, 2), Vector2(C + h * 0.6, C)), Color(0, 0, 0, 0.28))
 	for wk in map.wrecks:
@@ -123,8 +123,10 @@ func _draw_all() -> void:
 			_draw_wreck(rr, wk[1])
 	for y in range(area.position.y, area.end.y):
 		for x in range(area.position.x, area.end.x):
-			if map.get_t(Vector2i(x, y)) == T.WALL:
+			if map.is_wall(map.get_t(Vector2i(x, y))):
 				_draw_wall(Vector2i(x, y))
+				if map.get_t(Vector2i(x, y)) == T.WINDOW:
+					_draw_window(Vector2i(x, y))
 
 
 func _indoors(c: Vector2i) -> bool:
@@ -378,7 +380,7 @@ func _draw_chapel_floor() -> void:
 	for y in range(ch.position.y * 2, ch.end.y * 2):
 		for x in range(ch.position.x * 2, ch.end.x * 2):
 			var c := Vector2i(x / 2, y / 2)
-			if map.get_t(c) != T.FLOOR and map.get_t(c) != T.WALL:
+			if map.get_t(c) != T.FLOOR and not map.is_wall(map.get_t(c)):
 				continue
 			var light := (x / 2 + y / 2) % 2 == 0
 			var col := Color(0.42, 0.4, 0.37) if light else Color(0.3, 0.29, 0.28)
@@ -486,7 +488,7 @@ func _draw_foundation(c: Vector2i) -> void:
 	var wb := _wall_base(c)
 	var linked := func(d: Vector2i) -> bool:
 		var t := map.get_t(c + d)
-		return t == T.WALL or _is_fallen(c + d)
+		return map.is_wall(t) or _is_fallen(c + d)
 	var horiz: bool = linked.call(Vector2i(-1, 0)) or linked.call(Vector2i(1, 0))
 	var vert: bool = linked.call(Vector2i(0, -1)) or linked.call(Vector2i(0, 1))
 	var across := Vector2(0, 1) if horiz and not vert else (Vector2(1, 0) if vert and not horiz else Vector2.ZERO)
@@ -587,7 +589,7 @@ func _low_kind(c: Vector2i) -> int:
 
 
 func _low_linked(c: Vector2i, kind: int) -> bool:
-	return map.get_t(c) == T.LOW and _low_kind(c) == kind or (kind == BattleMap.LowKind.STONE and map.get_t(c) == T.WALL)
+	return map.get_t(c) == T.LOW and _low_kind(c) == kind or (kind == BattleMap.LowKind.STONE and map.is_wall(map.get_t(c)))
 
 
 ## Which way a line of low cover runs through c: true = left to right.
@@ -711,7 +713,7 @@ func _draw_low_wall(c: Vector2i) -> void:
 	var stage := map.wall_stage(c)
 	var base := _wall_base(c).darkened(0.05)
 	var lh := 2.5  # how far its top is raised
-	var below_low := map.get_t(c + Vector2i(0, 1)) == T.LOW or map.get_t(c + Vector2i(0, 1)) == T.WALL
+	var below_low := map.get_t(c + Vector2i(0, 1)) == T.LOW or map.is_wall(map.get_t(c + Vector2i(0, 1)))
 	draw_rect(Rect2(o + Vector2(2, 2), Vector2(C, C)), Color(0, 0, 0, 0.25))
 	var top := o.y - lh
 	# a jagged top outline on all four sides
@@ -723,7 +725,7 @@ func _draw_low_wall(c: Vector2i) -> void:
 		var b: Vector2 = corners[(e + 1) % 4]
 		var linked := false
 		var nb := [c + Vector2i(0, -1), c + Vector2i(1, 0), c + Vector2i(0, 1), c + Vector2i(-1, 0)][e] as Vector2i
-		linked = map.get_t(nb) == T.LOW or map.get_t(nb) == T.WALL
+		linked = map.get_t(nb) == T.LOW or map.is_wall(map.get_t(nb))
 		pts.append(a)
 		if not linked:
 			for k in range(1, 6):
@@ -783,7 +785,7 @@ func _wall_base(c: Vector2i) -> Color:
 
 
 func _is_fallen(c: Vector2i) -> bool:
-	return map.in_bounds(c) and map.get_t(c) != T.WALL and map.fallen[c.y * BattleMap.W + c.x] == 1
+	return map.in_bounds(c) and not map.is_wall(map.get_t(c)) and map.fallen[c.y * BattleMap.W + c.x] == 1
 
 
 ## Points along one edge of a wall's top, from a towards b (b not included).
@@ -821,7 +823,7 @@ func _wall_geom(c: Vector2i) -> Dictionary:
 		poly.append_array(e)
 	var face := PackedVector2Array()
 	var chain := PackedVector2Array()
-	if map.get_t(c + Vector2i(0, 1)) != T.WALL:
+	if not map.is_wall(map.get_t(c + Vector2i(0, 1))):
 		chain = PackedVector2Array(e_bottom)
 		chain.append(bl)
 		for q in chain:
@@ -836,10 +838,10 @@ func _draw_wall(c: Vector2i) -> void:
 	var h := WALL_H * (0.5 if stage == 2 else 1.0)
 	var o := Vector2(c) * C
 	var base := _wall_base(c)
-	var below := map.get_t(c + Vector2i(0, 1)) == T.WALL
-	var above := map.get_t(c + Vector2i(0, -1)) == T.WALL
-	var left := map.get_t(c + Vector2i(-1, 0)) == T.WALL
-	var right := map.get_t(c + Vector2i(1, 0)) == T.WALL
+	var below := map.is_wall(map.get_t(c + Vector2i(0, 1)))
+	var above := map.is_wall(map.get_t(c + Vector2i(0, -1)))
+	var left := map.is_wall(map.get_t(c + Vector2i(-1, 0)))
+	var right := map.is_wall(map.get_t(c + Vector2i(1, 0)))
 	var fu := _is_fallen(c + Vector2i(0, -1))
 	var fr := _is_fallen(c + Vector2i(1, 0))
 	var fd := _is_fallen(c + Vector2i(0, 1))
@@ -932,6 +934,36 @@ func _draw_wall(c: Vector2i) -> void:
 			var q := p + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(6, 12)
 			_crack(p, q, top, rng.randf_range(0.7, 1.1), base)
 		_poly(poly, Color(0.05, 0.04, 0.03, 0.12 * stage))  # soot
+
+
+## A window opening in a wall: a gap through the wall's top, with a stone sill and
+## jambs, shards of glass and lead on the floor beneath.
+func _draw_window(c: Vector2i) -> void:
+	var g := _wall_geom(c)
+	var h: float = g.h
+	var o := Vector2(c) * C - Vector2(0, h)
+	var base := _wall_base(c)
+	var horiz := map.is_wall(map.get_t(c + Vector2i(-1, 0))) or map.is_wall(map.get_t(c + Vector2i(1, 0)))
+	# the opening runs across the wall's thickness
+	var gap := Rect2(o + Vector2(3, 5), Vector2(10, 6)) if horiz else Rect2(o + Vector2(5, 3), Vector2(6, 10))
+	var dark := Color(0.07, 0.07, 0.08)
+	draw_rect(gap.grow(0.8), base.darkened(0.55))   # shadowed reveal
+	draw_rect(gap, dark)
+	var sill := Rect2(gap.position + Vector2(0, gap.size.y - 1.4), Vector2(gap.size.x, 1.4)) if horiz \
+			else Rect2(gap.position + Vector2(gap.size.x - 1.4, 0), Vector2(1.4, gap.size.y))
+	draw_rect(sill, base.lightened(0.15))
+	_seed(c.x, c.y, 160)
+	if map.chapel.grow(1).has_point(c):
+		# what's left of the stained glass: a few coloured shards in the lead
+		for k in 4:
+			var p := gap.position + Vector2(rng.randf() * gap.size.x, rng.randf() * gap.size.y)
+			var col: Color = [Color(0.7, 0.15, 0.12), Color(0.15, 0.3, 0.6), Color(0.75, 0.6, 0.15)][rng.randi() % 3]
+			draw_colored_polygon(PackedVector2Array([p, p + Vector2(1.6, 0.4), p + Vector2(0.5, 1.5)]), Color(col, 0.8))
+	else:
+		for k in 2:  # a broken bar or two
+			var x := gap.position.x + gap.size.x * (0.33 + 0.33 * k) if horiz else gap.position.x
+			if horiz:
+				draw_line(Vector2(x, gap.position.y), Vector2(x, gap.end.y - rng.randf() * 3), Color(0.3, 0.2, 0.15), 0.6)
 
 
 func _draw_wreck(rect: Rect2i, horiz: bool) -> void:

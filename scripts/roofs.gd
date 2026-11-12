@@ -1,0 +1,173 @@
+class_name Roofs
+extends Node2D
+## The buildings' roofs, drawn over everything inside them. A building's roof fades
+## away while any of the player's soldiers is inside it or just outside it, so the
+## player can see in. Roofs are repainted when shells break them or walls fall.
+
+const C := BattleMap.CELL
+
+var main: Node
+var map: BattleMap
+var nodes: Array = []      # one RoofPiece per building
+var alpha: Array = []      # current opacity of each roof
+var check_timer := 0.0
+
+
+func setup(m: Node) -> void:
+	main = m
+	map = m.map
+	z_index = 3  # above soldiers and wrecks, below smoke, fire and shots
+	for i in map.buildings.size():
+		var piece := RoofPiece.new()
+		piece.roofs = self
+		piece.index = i
+		add_child(piece)
+		nodes.append(piece)
+		alpha.append(1.0)
+	map.roof_changed.connect(func(b): nodes[b].queue_redraw())
+
+
+## Is any of the player's soldiers in or right beside building i?
+func player_near(i: int) -> bool:
+	var r: Rect2i = map.buildings[i]
+	var area := Rect2(Vector2(r.position * C), Vector2(r.size * C)).grow(C * 2.0)
+	for s in main.soldiers:
+		if s.team == main.player_team and s.is_alive() and area.has_point(s.position):
+			return true
+	return false
+
+
+var textured := false
+
+
+func _process(dt: float) -> void:
+	if not textured and main.map_view.ready_drawn:
+		textured = true  # the ground textures are ready: repaint with them
+		for n in nodes:
+			n.queue_redraw()
+	check_timer -= dt
+	if check_timer <= 0.0:
+		check_timer = 0.2
+		for i in nodes.size():
+			nodes[i].set_meta("open", player_near(i))
+	for i in nodes.size():
+		var target := 0.0 if nodes[i].get_meta("open", false) else 1.0
+		alpha[i] = move_toward(alpha[i], target, dt * 3.0)
+		nodes[i].modulate.a = alpha[i]
+		nodes[i].visible = alpha[i] > 0.01
+
+
+## Whether a roof hides point p (used to mark spotted enemies under one).
+func hides(p: Vector2) -> bool:
+	var c := map.cell_of(p)
+	if not map.in_bounds(c) or map.roof_at(c) <= 0.0:
+		return false
+	var b := map.building_of[c.y * BattleMap.W + c.x]
+	return b >= 0 and alpha[b] > 0.5
+
+
+class RoofPiece:
+	extends Node2D
+	var roofs: Roofs
+	var index := 0
+
+	func _h(a: int, b: int, k: int) -> float:
+		return float(hash(Vector3i(a, b, k + roofs.map.map_seed)) % 10000) / 10000.0
+
+	func _draw() -> void:
+		var map: BattleMap = roofs.map
+		var r: Rect2i = map.buildings[index]
+		var horiz := r.size.x >= r.size.y  # the ridge runs along the longer side
+		var ridge := (r.position.y + r.size.y * 0.5) * C if horiz else (r.position.x + r.size.x * 0.5) * C
+		var is_chapel := r == map.chapel
+		var slate := Color(0.23, 0.235, 0.245) if not is_chapel else Color(0.31, 0.31, 0.3)  # chapel: old lead
+		slate = slate.lightened((_h(index, 0, 1) - 0.5) * 0.1)
+		var has := func(c: Vector2i) -> bool: return map.in_bounds(c) and map.roof_at(c) > 0.0 and r.has_point(c)
+		# shadow thrown on the ground beyond the eaves
+		for x in range(r.position.x, r.end.x):
+			for y in range(r.position.y, r.end.y):
+				if has.call(Vector2i(x, y)):
+					draw_rect(Rect2(Vector2(x, y) * C + Vector2(5, 6), Vector2(C, C)), Color(0, 0, 0, 0.3))
+		for x in range(r.position.x, r.end.x):
+			for y in range(r.position.y, r.end.y):
+				var c := Vector2i(x, y)
+				if not has.call(c):
+					continue
+				var o := Vector2(c) * C
+				var centre := o + Vector2(C, C) * 0.5
+				# a pitched roof: the side facing the top-left catches the light
+				var lit: bool = (centre.y < ridge) if horiz else (centre.x < ridge)
+				var col := slate.lightened(0.06) if lit else slate.darkened(0.12)
+				col = col.lightened((_h(x, y, 2) - 0.5) * 0.06)
+				draw_rect(Rect2(o, Vector2(C, C)).grow(0.3), col)
+				var mv = roofs.main.map_view
+				if mv.ground_grit != null:  # weathering: the same grit as the ground and walls
+					var g: Texture2D = mv.ground_grit
+					var src := Rect2(Vector2(_h(x, y, 50), _h(x, y, 51)) * (Vector2(g.get_width(), g.get_height()) - Vector2(32, 32)), Vector2(32, 32))
+					draw_texture_rect_region(g, Rect2(o, Vector2(C, C)), src, Color(1, 1, 1, 0.9))
+				# courses of slates, staggered
+				for k in 4:
+					var along := k * 4.0
+					var off := 2.0 if (y * 4 + k) % 2 == 0 else 0.0
+					if horiz:
+						draw_line(o + Vector2(0, along), o + Vector2(C, along), col.darkened(0.35), 0.6)
+						var sx := off
+						while sx < C:
+							draw_line(o + Vector2(sx, along), o + Vector2(sx, along + 4), col.darkened(0.3), 0.4)
+							sx += 4.0
+					else:
+						draw_line(o + Vector2(along, 0), o + Vector2(along, C), col.darkened(0.35), 0.6)
+						var sy := off
+						while sy < C:
+							draw_line(o + Vector2(along, sy), o + Vector2(along + 4, sy), col.darkened(0.3), 0.4)
+							sy += 4.0
+				# moss, soot and slipped slates
+				if _h(x, y, 3) < 0.15:
+					draw_circle(o + Vector2(_h(x, y, 4), _h(x, y, 5)) * C, 2.0 + _h(x, y, 6) * 2.5, Color(0.2, 0.24, 0.16, 0.35))
+				var hp := map.roof_at(c)
+				if hp < 70.0:
+					# battered: slates knocked away showing the dark battens, soot round the damage
+					var n := 2 if hp > 40.0 else 5
+					for k in n:
+						var p := o + Vector2(_h(x, y, 10 + k), _h(x, y, 20 + k)) * (C - 4.0)
+						draw_rect(Rect2(p, Vector2(4, 3)), Color(0.08, 0.07, 0.06))
+						draw_line(p + Vector2(0, 1.5), p + Vector2(4, 1.5), Color(0.3, 0.2, 0.12), 0.5)
+					draw_rect(Rect2(o, Vector2(C, C)), Color(0.04, 0.03, 0.02, 0.25 if hp > 40.0 else 0.4))
+				# edges: clean eaves at the building's edge, torn edges round holes
+				for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					if has.call(c + d):
+						continue
+					var a: Vector2
+					var b: Vector2
+					match d:
+						Vector2i(1, 0):
+							a = o + Vector2(C, 0)
+							b = o + Vector2(C, C)
+						Vector2i(-1, 0):
+							a = o
+							b = o + Vector2(0, C)
+						Vector2i(0, 1):
+							a = o + Vector2(0, C)
+							b = o + Vector2(C, C)
+						_:
+							a = o
+							b = o + Vector2(C, 0)
+					if r.has_point(c + d):
+						# a hole: jagged broken slates and a rafter or two sticking out
+						var pts := PackedVector2Array()
+						var inward := -Vector2(d)
+						for k in 5:
+							pts.append(a.lerp(b, k / 4.0) + inward * (_h(x * 4 + k, y, 30 + d.x * 2 + d.y) * 4.0))
+						pts.append(b)
+						pts.append(a)
+						draw_colored_polygon(pts, Color(0.06, 0.05, 0.05, 0.9))
+						if _h(x, y, 40 + d.x + d.y * 3) < 0.5:
+							var m := a.lerp(b, 0.5)
+							draw_line(m - inward * 2.0, m + Vector2(d) * 6.0, Color(0.32, 0.22, 0.13), 1.6)
+					else:
+						draw_line(a, b, slate.darkened(0.5), 1.4)  # the eave
+				# the ridge cap
+				if horiz and absf(centre.y - ridge) < C * 0.5:
+					draw_rect(Rect2(o.x, ridge - 1.2, C, 2.4), slate.lightened(0.12))
+				elif not horiz and absf(centre.x - ridge) < C * 0.5:
+					draw_rect(Rect2(ridge - 1.2, o.y, 2.4, C), slate.lightened(0.12))

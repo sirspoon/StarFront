@@ -33,6 +33,12 @@ func _draw() -> void:
 			draw_line(fp + Vector2(-6, 6), fp + Vector2(6, -6), Color(1.0, 0.6, 0.2, 0.9), 2.0)
 		if sq.focus != null and is_instance_valid(sq.focus) and sq.focus.is_alive():
 			draw_line(sq.center(), sq.focus.position, Color(1.0, 0.3, 0.2, 0.4), 1.5)
+	# spotted enemies under a roof: a red mark so they can still be targeted
+	if main.roofs != null:
+		for s in main.soldiers:
+			if s.team != main.player_team and s.is_alive() and s.visible and main.roofs.hides(s.position):
+				draw_arc(s.position, s.radius + 4.0, 0, TAU, 20, Color(1.0, 0.3, 0.2, 0.85), 1.6)
+				draw_circle(s.position, 2.0, Color(1.0, 0.3, 0.2, 0.85))
 	for sq in main.squads:
 		if sq.team == main.player_team and (sq.selected or main.paused):
 			_draw_route(sq)

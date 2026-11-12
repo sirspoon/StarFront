@@ -12,6 +12,7 @@ const DecalsScript := preload("res://scripts/decals.gd")
 
 var map: BattleMap
 var map_view: MapView
+var roofs: Roofs
 var effects: Effects
 var light_fx: LightFX
 var sfx: Sfx
@@ -396,6 +397,10 @@ func _build_world(seed_value: int) -> void:
 	map_view.z_index = -10
 	add_child(map_view)
 	map_view.setup(map)
+	if map_view.enabled:
+		roofs = Roofs.new()
+		add_child(roofs)
+		roofs.setup(self)
 	decals = DecalsScript.new()
 	decals.z_index = -5
 	add_child(decals)
@@ -1051,6 +1056,7 @@ func _blast(at: Vector2, w: Dictionary, shooter: Soldier, show: bool) -> void:
 			add_smoke(at, 6.0 + r * 0.15, clampf(r / 30.0, 0.6, 1.5))  # the burst's smoke hangs about
 		light_fx.flash(at, Color(1.0, 0.6, 0.3), 2.4, r * 3.0 + 40.0, 0.6, true)
 	decals.add_scorch(at, r * 0.7)
+	map.damage_roof(at, r, float(w.get("wall", 25.0)) * 1.1)
 	if w.get("wall", 0.0) > 0.0:
 		var hit_wall := map.wall_near(at, r * 0.5 + BattleMap.CELL)
 		var fell := map.damage_walls(at, r, w.wall)
