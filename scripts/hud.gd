@@ -421,6 +421,16 @@ func show_options() -> void:
 	detail.focus_mode = Control.FOCUS_NONE
 	detail.custom_minimum_size = Vector2(420, 44 if main.touch_mode else 30)
 	v.add_child(detail)
+	var mtype := OptionButton.new()
+	for d in [["Battlefield: Old Town (homes, shops, parks)", "town"], ["Battlefield: Foundry District (warehouses, works, machinery)", "foundry"],
+			["Battlefield: either, at random", "random"]]:
+		mtype.add_item(d[0])
+		mtype.set_item_metadata(mtype.item_count - 1, d[1])
+	var curm := str(Settings.saved("map_type", "town"))
+	mtype.select(0 if curm == "town" else (1 if curm == "foundry" else 2))
+	mtype.focus_mode = Control.FOCUS_NONE
+	mtype.custom_minimum_size = Vector2(420, 44 if main.touch_mode else 30)
+	v.add_child(mtype)
 	var checks := {}
 	for o in [["shadows", "Wall shadows from fires and explosions", not Settings.is_phone()],
 			["normals", "Raised, lit surfaces (normal maps)", true],
@@ -451,6 +461,7 @@ func show_options() -> void:
 	v.add_child(row)
 	_menu_button(row, "Apply", func():
 		Settings.save_option("detail", detail.get_item_metadata(detail.selected))
+		Settings.save_option("map_type", mtype.get_item_metadata(mtype.selected))
 		for k in checks:
 			Settings.save_option(k, checks[k].button_pressed)
 		if main.started:

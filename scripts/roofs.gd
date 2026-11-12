@@ -180,13 +180,14 @@ class RoofPiece:
 		var is_chapel := r == map.chapel
 		var kind: String = map.building_kind[index] if index < map.building_kind.size() else "home"
 		var flat := kind == "shop" or kind == "office"  # flat roofs: tar paper or concrete
-		var metal := kind == "industry"  # corrugated iron on the works
+		var metal := kind == "industry" or kind == "warehouse"  # corrugated iron on the works and warehouses
 		var slate := Color(0.23, 0.235, 0.245) if not is_chapel else Color(0.31, 0.31, 0.3)  # chapel: old lead
 		match kind:
 			"tavern": slate = Color(0.3, 0.2, 0.17)  # old clay tiles
 			"shop": slate = Color(0.19, 0.19, 0.2)
 			"office": slate = Color(0.27, 0.26, 0.25)
 			"industry": slate = Color(0.33, 0.3, 0.27)
+			"warehouse": slate = Color(0.3, 0.31, 0.3)
 		slate = slate.lightened((_h(index, 0, 1) - 0.5) * 0.1)
 		var has := func(c: Vector2i) -> bool: return map.in_bounds(c) and map.roof_at(c) > 0.0 and r.has_point(c)
 		# shadow thrown on the ground beyond the eaves
@@ -336,6 +337,21 @@ class RoofPiece:
 			draw_rect(Rect2(p - Vector2(s, s) * 0.5, Vector2(s, s)), Color(0.4, 0.22, 0.16) if not big else Color(0.32, 0.2, 0.15))
 			draw_rect(Rect2(p - Vector2(s, s) * 0.5, Vector2(s, s)), Color(0.12, 0.07, 0.05), false, 0.7)
 			draw_circle(p, s * 0.3, Color(0.04, 0.03, 0.03))  # the flue, sooty
+		if kind == "chapel":
+			_chapel_spire(map, r)
+		if kind == "warehouse":
+			# a long strip of skylights down the ridge
+			var horiz := r.size.x >= r.size.y
+			var n := (r.size.x if horiz else r.size.y) - 4
+			for k in n:
+				var c := Vector2i(r.position.x + 2 + k, r.position.y + r.size.y / 2) if horiz else Vector2i(r.position.x + r.size.x / 2, r.position.y + 2 + k)
+				if not has.call(c) or k % 3 == 2:
+					continue
+				var rr := Rect2(Vector2(c) * C + Vector2(1, 4), Vector2(14, 8)) if horiz else Rect2(Vector2(c) * C + Vector2(4, 1), Vector2(8, 14))
+				draw_rect(rr, Color(0.22, 0.27, 0.3))
+				draw_rect(rr, Color(0.08, 0.08, 0.08), false, 0.7)
+				if _h(index, k, 403) < 0.3:
+					draw_rect(rr.grow(-2), Color(0.03, 0.03, 0.03))
 		if kind == "shop" or kind == "office" or kind == "industry":
 			for k in 3:  # skylights: grimy glass in iron frames
 				var c := Vector2i(r.position.x + 2 + int(_h(index, k, 400) * maxi(1, r.size.x - 4)), r.position.y + 2 + int(_h(k, index, 401) * maxi(1, r.size.y - 4)))
@@ -376,3 +392,65 @@ class RoofPiece:
 		draw_rect(board, Color(0.6, 0.48, 0.25), false, 0.8)
 		draw_string(font, Vector2(-w * 0.5 + 4, 3.5), nm, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.85, 0.75, 0.5))
 		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+
+
+	## The chapel's crown: gilded cresting along the ridge, a pinnacle at each corner, and an
+	## octagonal tower at the west end rising to a spire with a gilded finial, its shadow
+	## thrown long across the roof and the square.
+	func _chapel_spire(map: BattleMap, r: Rect2i) -> void:
+		var gold := Color(0.78, 0.62, 0.3)
+		var lead := Color(0.31, 0.31, 0.3)
+		var rr := Rect2(Vector2(r.position * C), Vector2(r.size * C))
+		var cy := rr.get_center().y
+		# cresting: little gilded trefoils along the ridge
+		var x := rr.position.x + 40.0
+		while x < rr.end.x - 24.0:
+			draw_circle(Vector2(x, cy), 1.6, gold.darkened(0.2))
+			draw_circle(Vector2(x - 1.5, cy - 1.2), 0.9, gold)
+			draw_circle(Vector2(x + 1.5, cy - 1.2), 0.9, gold)
+			x += 10.0
+		# pinnacles at the corners
+		for p in [rr.position + Vector2(6, 6), Vector2(rr.end.x - 6, rr.position.y + 6), Vector2(rr.position.x + 6, rr.end.y - 6), rr.end - Vector2(6, 6)]:
+			_cone(p, 5.0, 6, lead.lightened(0.05), Vector2(10, 14))
+			draw_circle(p, 1.0, gold)
+		# the tower and spire at the west end
+		var tc := Vector2(rr.position.x + 3.2 * C, cy)
+		var tr := 2.7 * C
+		var base := PackedVector2Array()
+		for k in 8:
+			base.append(tc + Vector2.from_angle(k * TAU / 8.0 + PI / 8.0) * tr)
+		draw_colored_polygon(base, Color(0.42, 0.4, 0.37))  # the tower's stone top
+		var bl := base.duplicate()
+		bl.append(base[0])
+		draw_polyline(bl, Color(0.15, 0.14, 0.13), 1.2)
+		for k in 8:  # belfry openings round the tower
+			var q := tc + Vector2.from_angle(k * TAU / 8.0) * tr * 0.92
+			draw_circle(q, 2.0, Color(0.05, 0.05, 0.06))
+		_cone(tc, tr * 0.82, 8, lead, Vector2(70, 90))
+		draw_circle(tc, 3.0, gold.darkened(0.25))  # the finial
+		draw_circle(tc - Vector2(0.8, 0.8), 1.6, gold.lightened(0.2))
+		draw_line(tc - Vector2(4, 0), tc + Vector2(4, 0), gold, 1.2)  # a gilded sunburst cross-piece
+		draw_line(tc - Vector2(0, 4), tc + Vector2(0, 4), gold, 1.2)
+
+
+	## A pointed roof seen from above: facets meeting at the apex, lit from the top left, with a
+	## long shadow (the apex's shadow lands at `throw` from it).
+	func _cone(c: Vector2, rad: float, sides: int, col: Color, throw: Vector2) -> void:
+		var shadow := PackedVector2Array()
+		for k in sides:
+			var a := k * TAU / sides + PI / sides
+			var p := c + Vector2.from_angle(a) * rad
+			if Vector2.from_angle(a).dot(throw.normalized().orthogonal()) > 0.0:
+				shadow.append(p)
+		shadow.append(c + throw)
+		var hull := Geometry2D.convex_hull(PackedVector2Array(shadow + PackedVector2Array([c + Vector2.from_angle(PI / sides) * rad])))
+		draw_colored_polygon(hull, Color(0, 0, 0, 0.3))
+		var light := Vector2(-0.6, -0.8)
+		for k in sides:
+			var a0 := k * TAU / sides + PI / sides
+			var a1 := (k + 1) * TAU / sides + PI / sides
+			var mid := Vector2.from_angle((a0 + a1) * 0.5)
+			var shade := mid.dot(light)
+			var fc := col.lightened(0.25 * shade) if shade > 0.0 else col.darkened(-0.35 * shade)
+			draw_colored_polygon(PackedVector2Array([c, c + Vector2.from_angle(a0) * rad, c + Vector2.from_angle(a1) * rad]), fc)
+			draw_line(c, c + Vector2.from_angle(a0) * rad, col.darkened(0.4), 0.5)

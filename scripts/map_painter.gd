@@ -79,6 +79,7 @@ func _draw_all() -> void:
 	if map.plaza.intersects(area.grow(2)):
 		_draw_plaza()
 	_draw_parks()
+	_draw_rails(area)
 	for s in map.scorches:
 		if _near(s[0], s[1]):
 			_draw_scorch(s[0], s[1])
@@ -146,6 +147,10 @@ func _draw_all() -> void:
 		var rr: Rect2i = wk[0]
 		if rr.intersects(area):
 			_draw_wreck(rr, wk[1])
+	for pr in map.props:
+		var prr: Rect2i = pr.rect
+		if prr.grow(3).intersects(area):
+			_draw_prop(pr)
 	for y in range(area.position.y, area.end.y):
 		for x in range(area.position.x, area.end.x):
 			if map.is_wall(map.get_t(Vector2i(x, y))):
@@ -426,6 +431,14 @@ func _draw_wire(c: Vector2i) -> void:
 func _draw_crushed(c: Vector2i, was: int) -> void:
 	var o := Vector2(c) * C
 	_seed(c.x, c.y, 106)
+	if was == 20:
+		# burnt away: a black scar of ash and charred stumps
+		_poly(_blob(o + Vector2(8, 8), 9.0, 0.9, 0.45, c.x * 5 + c.y), Color(0.05, 0.04, 0.03, 0.7))
+		for k in 5:
+			var p := o + Vector2(rng.randf_range(2, 14), rng.randf_range(2, 14))
+			draw_line(p, p + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(2, 4), Color(0.12, 0.09, 0.07), 1.0)
+			draw_circle(p, 0.8, Color(0.45, 0.42, 0.38, 0.6))  # ash
+		return
 	if was == T.WIRE:
 		for k in 4:
 			var p := o + Vector2(rng.randf_range(2, 14), rng.randf_range(4, 12))
@@ -836,6 +849,8 @@ func _draw_low(c: Vector2i) -> void:
 			_draw_sandbags(c)
 		BattleMap.LowKind.BARRICADE:
 			_draw_barricade(c)
+		BattleMap.LowKind.CRATES:
+			_draw_crate_stack(c)
 		_:
 			_draw_low_wall(c)
 
@@ -991,6 +1006,10 @@ func _draw_low_remains(c: Vector2i) -> void:
 				_poly(_blob(p, rng.randf_range(2.5, 4.0), 0.5, 0.6, c.x * 3 + k), Color(0.38, 0.34, 0.25))
 			for k in 3:
 				_poly(_blob(o + Vector2(rng.randf_range(2, 14), rng.randf_range(2, 14)), rng.randf_range(3, 5), 0.7, 0.5, c.y * 5 + k), Color(0.52, 0.46, 0.34, 0.8))
+		BattleMap.LowKind.CRATES:
+			for k in 6:  # smashed planks and spilled goods
+				var p := o + Vector2(rng.randf_range(1, 15), rng.randf_range(1, 15))
+				draw_line(p, p + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(2, 5), WOOD if k % 2 == 0 else DARK_WOOD, 1.4)
 		BattleMap.LowKind.BARRICADE:
 			for k in 4:
 				var p := o + Vector2(rng.randf_range(1, 15), rng.randf_range(1, 15))
@@ -1362,6 +1381,13 @@ func _draw_furnishing(c: Vector2i, bi: int, kind: String) -> void:
 				_box(m + Vector2(0, 5), Vector2(3.5, 3.5), WOOD.darkened(0.2), 0.0)
 				for k in 3:  # papers strewn about
 					draw_rect(Rect2(m + Vector2(_h(c.x, k, 307) * 14 - 7, _h(k, c.y, 308) * 14 - 7), Vector2(3, 2)), Color(0.78, 0.75, 0.68, 0.8))
+		"warehouse":
+			if roll < 0.2:
+				_box(m, Vector2(12, 12), WOOD.darkened(0.1), _h(c.x, c.y, 309) * 0.2)  # a pallet
+				for k in 3:
+					draw_line(m + Vector2(-6, -4 + k * 4), m + Vector2(6, -4 + k * 4), DARK_WOOD, 0.6)
+			elif roll < 0.3:
+				draw_circle(m, 5.0, Color(0.03, 0.03, 0.03, 0.3))  # oil
 		"industry":
 			if roll > 0.55:
 				if roll < 0.7:
@@ -1448,7 +1474,7 @@ func _draw_exteriors(area: Rect2i) -> void:
 				var sz := Vector2(3.0, 4.0) if along.x > 0 else Vector2(4.0, 3.0)
 				draw_rect(Rect2(q - sz * 0.5 + Vector2(1, 1.2), sz), Color(0, 0, 0, 0.25))
 				draw_rect(Rect2(q - sz * 0.5, sz), col)
-		elif kind == "industry":
+		elif kind == "industry" or kind == "warehouse":
 			# barrels and crates stacked in the yard round the works
 			for k in range(-1, length + 1):
 				for d in [1, 2]:
@@ -1465,3 +1491,118 @@ func _draw_exteriors(area: Rect2i) -> void:
 							_barrel(m + Vector2(3, 2), 3.2, Color(0.3, 0.3, 0.3))
 						else:
 							_crate(m, 9.0, _h(c.x, c.y, 337))
+
+
+# ---------------------------------------------------------------- heavy industry and statues
+
+## Railway sidings: sleepers and two rails, on whatever ground they cross.
+func _draw_rails(area: Rect2i) -> void:
+	for rl in map.rails:
+		var start: Vector2i = rl[0]
+		var n: int = rl[1]
+		var y := (start.y + 0.5) * C
+		var x0 := float(start.x * C)
+		var x1 := float((start.x + n) * C)
+		if not Rect2(x0, y - 16, x1 - x0, 32).intersects(Rect2(Vector2(area.position * C), Vector2(area.size * C)).grow(16)):
+			continue
+		draw_rect(Rect2(x0, y - 9, x1 - x0, 18), Color(0.25, 0.23, 0.2, 0.6))  # ballast
+		var x := x0 + 2.0
+		while x < x1:  # sleepers
+			draw_rect(Rect2(x, y - 8, 3.2, 16), Color(0.22, 0.16, 0.11))
+			x += 6.0
+		for dy in [-5.0, 5.0]:
+			draw_line(Vector2(x0, y + dy + 0.8), Vector2(x1, y + dy + 0.8), Color(0, 0, 0, 0.4), 1.6)
+			draw_line(Vector2(x0, y + dy), Vector2(x1, y + dy), Color(0.42, 0.38, 0.34), 1.4)
+			draw_line(Vector2(x0, y + dy - 0.4), Vector2(x1, y + dy - 0.4), Color(0.62, 0.6, 0.56), 0.4)
+
+
+func _draw_crate_stack(c: Vector2i) -> void:
+	var o := Vector2(c) * C
+	var stage := map.wall_stage(c)
+	draw_rect(Rect2(o + Vector2(2.5, 3.5), Vector2(C, C)), Color(0, 0, 0, 0.32))
+	_seed(c.x, c.y, 150)
+	for k in 2:
+		if stage > 0 and rng.randf() < 0.3 * stage:
+			continue
+		var p := o + Vector2(4 + k * 8, 5 + rng.randf_range(0, 6))
+		if rng.randf() < 0.35:
+			_barrel(p, 3.6, Color(0.35, 0.22, 0.14) if rng.randf() < 0.5 else Color(0.25, 0.3, 0.22))
+		else:
+			_crate(p, 7.5, rng.randf_range(-0.2, 0.2))
+	if rng.randf() < 0.5:
+		_crate(o + Vector2(8, 8), 6.5, rng.randf_range(-0.3, 0.3))  # one stacked on top
+
+
+func _draw_prop(pr: Dictionary) -> void:
+	var r: Rect2i = pr.rect
+	var rr := Rect2(Vector2(r.position * C), Vector2(r.size * C))
+	var m := rr.get_center()
+	var sd: int = pr.seed
+	match pr.kind:
+		"tank":
+			# a storage tank: a riveted drum with a domed top, an access ladder and a pipe
+			var rad := rr.size.x * 0.5 - 1.0
+			draw_circle(m + Vector2(6, 8), rad, Color(0, 0, 0, 0.4))
+			draw_circle(m, rad, Color(0.38, 0.36, 0.33))
+			draw_circle(m - Vector2(rad, rad) * 0.15, rad * 0.8, Color(0.44, 0.42, 0.38))
+			draw_circle(m - Vector2(rad, rad) * 0.3, rad * 0.4, Color(0.52, 0.5, 0.46))
+			draw_arc(m, rad, 0, TAU, 32, Color(0.12, 0.11, 0.1), 1.2)
+			for k in 16:  # rivets round the rim
+				draw_circle(m + Vector2.from_angle(k * TAU / 16.0) * (rad - 2.0), 0.6, Color(0.2, 0.19, 0.18))
+			if (sd % 3) == 0:
+				_poly(_blob(m + Vector2(rad * 0.3, rad * 0.2), rad * 0.35, 0.7, 0.5, sd), Color(0.45, 0.22, 0.1, 0.45))  # rust
+			draw_circle(m, 2.0, Color(0.25, 0.24, 0.22))  # the hatch
+			var ld := m + Vector2(rad, 0)
+			for k in 4:  # ladder rungs
+				draw_line(ld + Vector2(-2, -4 + k * 2.6), ld + Vector2(2, -4 + k * 2.6), Color(0.2, 0.2, 0.2), 0.6)
+		"furnace":
+			# a furnace house: brick walls, a tall stack, a glowing firebox door
+			draw_rect(Rect2(rr.position + Vector2(5, 6), rr.size), Color(0, 0, 0, 0.4))
+			draw_rect(rr, Color(0.36, 0.2, 0.15))
+			for y in range(int(rr.position.y) + 3, int(rr.end.y), 4):  # brick courses
+				draw_line(Vector2(rr.position.x, y), Vector2(rr.end.x, y), Color(0.25, 0.13, 0.1), 0.6)
+			draw_rect(rr, Color(0.12, 0.07, 0.05), false, 1.2)
+			draw_rect(Rect2(rr.position.x + 4, rr.end.y - 6, 9, 5), Color(0.9, 0.45, 0.15))
+			draw_rect(Rect2(rr.position.x + 4, rr.end.y - 6, 9, 5), Color(0.15, 0.08, 0.05), false, 0.8)
+			var st := Vector2(rr.end.x - 9, rr.position.y + 9)
+			draw_circle(st + Vector2(10, 14), 7, Color(0, 0, 0, 0.35))  # the stack's long shadow
+			draw_circle(st, 7, Color(0.3, 0.17, 0.12))
+			draw_circle(st, 4.5, Color(0.05, 0.03, 0.03))
+			draw_arc(st, 7, 0, TAU, 16, Color(0.12, 0.07, 0.05), 1.0)
+		"wagon":
+			# a goods wagon on the rails: a planked box on its frame, doors, a tarpaulin
+			draw_rect(Rect2(rr.position + Vector2(5, 6), rr.size), Color(0, 0, 0, 0.4))
+			var body := rr.grow_individual(-1, 2, -1, 2)
+			draw_rect(body, Color(0.3, 0.22, 0.17))
+			var x := body.position.x + 3
+			while x < body.end.x:
+				draw_line(Vector2(x, body.position.y), Vector2(x, body.end.y), Color(0.2, 0.14, 0.1), 0.6)
+				x += 4.0
+			draw_rect(body, Color(0.1, 0.07, 0.05), false, 1.0)
+			draw_rect(Rect2(body.get_center() - Vector2(8, body.size.y * 0.5), Vector2(16, body.size.y)), Color(0.28, 0.3, 0.24, 0.85))  # tarpaulin
+			draw_line(body.position + Vector2(0, 2), Vector2(body.end.x, body.position.y + 2), Color(0.45, 0.35, 0.25), 0.6)
+		"statue":
+			# a saint on a stepped plinth: robe, head bowed, a sword or a candle held before him
+			draw_rect(Rect2(rr.position + Vector2(6, 8), rr.size), Color(0, 0, 0, 0.4))
+			draw_rect(rr, Color(0.42, 0.41, 0.39))
+			draw_rect(rr.grow(-4), Color(0.48, 0.47, 0.45))
+			draw_rect(rr, Color(0.18, 0.17, 0.16), false, 1.0)
+			draw_rect(rr.grow(-4), Color(0.25, 0.24, 0.23), false, 0.6)
+			var stone := Color(0.55, 0.55, 0.52) if (sd % 2) == 0 else Color(0.36, 0.42, 0.36)  # pale stone or old bronze
+			draw_set_transform(m, 0, Vector2(1.45, 1.45))  # the figure, drawn about its centre
+			m = Vector2.ZERO
+			draw_circle(m + Vector2(8, 11), 7, Color(0, 0, 0, 0.3))
+			var robe := PackedVector2Array([m + Vector2(-6, 5), m + Vector2(-4, -5), m + Vector2(4, -5), m + Vector2(6, 5), m + Vector2(0, 7)])
+			draw_colored_polygon(robe, stone.darkened(0.1))
+			draw_line(m + Vector2(-2, -4), m + Vector2(-3, 5), stone.darkened(0.3), 0.6)  # folds
+			draw_line(m + Vector2(2, -4), m + Vector2(3, 5), stone.darkened(0.3), 0.6)
+			draw_circle(m + Vector2(0, -4), 3.0, stone)  # head
+			draw_circle(m + Vector2(-0.8, -5), 1.2, stone.lightened(0.2))
+			if (sd % 3) == 0:
+				draw_line(m + Vector2(0, -1), m + Vector2(0, 9), Color(0.6, 0.6, 0.58), 1.4)  # a sword, point down
+				draw_line(m + Vector2(-2.5, 0), m + Vector2(2.5, 0), Color(0.6, 0.6, 0.58), 1.0)
+			else:
+				draw_circle(m + Vector2(0, 1), 1.6, Color(0.9, 0.75, 0.4, 0.9))  # a candle flame cupped in his hands
+			if (sd % 5) == 0:
+				draw_circle(m + Vector2(2, -6), 1.2, Color(0.05, 0.05, 0.05))  # shrapnel damage
+			draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)

@@ -24,10 +24,10 @@ const WINDOW_COVER := 0.5  # a man firing from just inside a window
 ## Low cover: chest-high things troops crouch behind and fire over. It doesn't block
 ## sight, infantry can clamber over it slowly, vehicles go round. It soaks up more
 ## punishment than a full wall before it is destroyed.
-enum LowKind { NONE, SANDBAGS, STONE, BARRICADE }
-const LOW_COVER := [0.0, 0.7, 0.65, 0.5]       # cover it gives from fire on its far side
-const LOW_HP := [0.0, 260.0, 220.0, 180.0]
-const LOW_NAMES := ["", "Sandbags", "Low wall", "Barricade"]
+enum LowKind { NONE, SANDBAGS, STONE, BARRICADE, CRATES }
+const LOW_COVER := [0.0, 0.7, 0.65, 0.5, 0.55]       # cover it gives from fire on its far side
+const LOW_HP := [0.0, 260.0, 220.0, 180.0, 150.0]
+const LOW_NAMES := ["", "Sandbags", "Low wall", "Barricade", "Crates"]
 
 var grid := PackedByteArray()
 var astar := AStarGrid2D.new()
@@ -56,11 +56,19 @@ var parks: Array[Rect2i] = []
 ## "tavern", "office" or "industry"; its sign (shops and taverns); and the side facing the
 ## nearest street (0 top, 1 bottom, 2 left, 3 right).
 var building_kind: Array[String] = []
+## "town" (homes, shops, parks...) or "foundry" (mostly warehouses, works and machinery yards).
+var map_type := "town"
+## Big solid objects drawn by the painter, their cells WRECK (blocking): {kind, rect, seed}.
+## Kinds: "tank" (storage tank), "furnace", "wagon" (rail wagon), "statue".
+var props: Array = []
+## Railway sidings, drawn on the ground: [start cell, length in cells, horizontal].
+var rails: Array = []
 var building_name: Array[String] = []
 var building_front: Array[int] = []
 const SHOP_NAMES := ["CANDLE & CENSER", "RELIC MENDER", "BREAD OF VELL", "PAWN & SCRIP", "APOTHECARY",
 		"TAILOR OF ASH ROW", "LAMP OIL", "VOTIVE GOODS", "SALVAGE", "RATION HALL", "IRONMONGER", "BOOKBINDER"]
 const TAVERN_NAMES := ["THE DROWNED SAINT", "THE LAST CANDLE", "THE IRON PEW", "THE ASHEN LAMB"]
+const WAREHOUSE_NAMES := ["DEPOT 4", "BONDED STORES", "GRAIN STORE", "WAREHOUSE 12", "RAILWAY GOODS"]
 const WORKS_NAMES := ["VELL IRONWORKS", "TALLOW & LYE", "RECLAMATION WORKS", "PUMP STATION 3", "GAS WORKS"]
 var crushed := PackedByteArray()  # the T a cell was before a vehicle or blast flattened it (bush, hedge, wire)
 
@@ -485,14 +493,18 @@ func _make_city() -> void:
 			if r.size.x >= 6 and r.size.y >= 6:
 				blocks.append(r)
 	blocks.sort_custom(func(p, q): return _h(p.position.x, p.position.y) < _h(q.position.x, q.position.y))
-	var kinds := ["park", "compound"]  # at least one of each
+	var kinds := ["park", "compound"] if map_type == "town" else ["industrial", "industrial", "compound"]  # at least these
+	var mix := ["built", "built", "built", "park", "compound", "lot", "built", "built", "park", "compound", "lot", "industrial"] if map_type == "town" \
+			else ["industrial", "industrial", "industrial", "compound", "compound", "built", "lot", "industrial"]
 	for i in blocks.size():
 		var b := blocks[i]
 		if b.intersects(plaza):
 			_make_square(b)
 			continue
-		var kind: String = kinds.pop_front() if not kinds.is_empty() else ["built", "built", "built", "park", "compound", "lot"][rng.randi() % 6]
+		var kind: String = kinds.pop_front() if not kinds.is_empty() else mix[rng.randi() % mix.size()]
 		match kind:
+			"industrial":
+				_make_industrial(b)
 			"built":
 				_make_built_block(b)
 			"park":
@@ -518,6 +530,11 @@ func is_road(c: Vector2i) -> bool:
 
 ## The chapel's block: the square round it, with the rest of the block built up.
 func _make_square(b: Rect2i) -> void:
+	# saints on plinths flanking the chapel's west and east doors
+	var cy := chapel.get_center().y
+	for x in [chapel.position.x - 3, chapel.end.x + 1]:
+		for dy in [-4, 3]:
+			_make_statue(Vector2i(x, cy + dy))
 	for side in 2:  # a building or two on the far edges of the block, clear of the square
 		var strip := Rect2i(b.position.x, b.position.y, b.size.x, plaza.position.y - b.position.y - 2) if side == 0 \
 				else Rect2i(b.position.x, plaza.end.y + 2, b.size.x, b.end.y - plaza.end.y - 2)
@@ -565,6 +582,11 @@ func _make_park(b: Rect2i) -> void:
 			set_t(gc, T.OPEN)
 			low_kind[gc.y * W + gc.x] = 0
 	var inner := r.grow(-2)
+	# a statue (or two) by the paths' crossing
+	var pc := r.get_center()
+	_make_statue(pc + Vector2i(2, 2))
+	if rng.randf() < 0.5:
+		_make_statue(pc - Vector2i(3, 3))
 	for i in int(inner.get_area() / 20):  # clumps of bushes
 		var o := Vector2(inner.position) + Vector2(inner.size) * Vector2(rng.randf(), rng.randf())
 		var rad := rng.randf_range(0.8, 1.8)
@@ -613,6 +635,88 @@ func _make_compound(b: Rect2i) -> void:
 		var bx := inner.position.x + rng.randi_range(0, inner.size.x - w)
 		var by := inner.position.y + rng.randi_range(0, inner.size.y - h)
 		_make_ruin(Rect2i(bx, by, w, h), "industry")  # behind a compound's walls: works
+
+
+## A statue on a plinth (2x2 cells, solid): a saint, a soldier or a robed figure.
+func _make_statue(c: Vector2i) -> void:
+	var r := Rect2i(c, Vector2i(2, 2))
+	for x in range(r.position.x, r.end.x):
+		for y in range(r.position.y, r.end.y):
+			if get_t(Vector2i(x, y)) != T.OPEN:
+				return
+	_place_prop("statue", r)
+
+
+func _place_prop(kind: String, r: Rect2i) -> void:
+	for x in range(r.position.x, r.end.x):
+		for y in range(r.position.y, r.end.y):
+			set_t(Vector2i(x, y), T.WRECK)
+	props.append({"kind": kind, "rect": r, "seed": rng.randi()})
+
+
+func _all_open(r: Rect2i) -> bool:
+	for x in range(r.position.x, r.end.x):
+		for y in range(r.position.y, r.end.y):
+			if not in_bounds(Vector2i(x, y)) or get_t(Vector2i(x, y)) != T.OPEN:
+				return false
+	return true
+
+
+## Heavy industry: a big warehouse (aisles of stacked crates inside), and a yard of storage
+## tanks, a furnace house, crate stacks and a railway siding with a wagon on it.
+func _make_industrial(b: Rect2i) -> void:
+	var r := b.grow(-1)
+	# the warehouse along one long side of the block
+	var top := rng.randf() < 0.5
+	var depth := mini(rng.randi_range(9, 13), r.size.y - 6)
+	var wlen := mini(rng.randi_range(14, 24), r.size.x)
+	if depth >= 7 and wlen >= 10:
+		var wx := r.position.x + rng.randi_range(0, r.size.x - wlen)
+		var wr := Rect2i(wx, r.position.y if top else r.end.y - depth, wlen, depth)
+		if not _overlaps(wr.grow(1)) and not wr.intersects(plaza):
+			_make_ruin(wr, "warehouse")
+			for y in range(wr.position.y + 2, wr.end.y - 2, 3):  # aisles of stacked crates
+				for x in range(wr.position.x + 2, wr.end.x - 2):
+					var c := Vector2i(x, y)
+					if get_t(c) == T.FLOOR and rng.randf() < 0.55 and (x - wr.position.x) % 6 != 0:
+						_set_low(c, LowKind.CRATES)
+	# the yard
+	var yard := Rect2i(r.position.x, r.end.y - (r.size.y - depth - 1) if top else r.position.y, r.size.x, r.size.y - depth - 1)
+	if yard.size.y < 4:
+		return
+	# a railway siding running along the yard, with a wagon standing on it
+	var ry := yard.position.y + yard.size.y / 2
+	rails.append([Vector2i(yard.position.x, ry), yard.size.x, true])
+	var wagon := Rect2i(yard.position.x + rng.randi_range(1, maxi(1, yard.size.x - 8)), ry - 1, 6, 2)
+	if _all_open(wagon):
+		_place_prop("wagon", wagon)
+	var tanks := rng.randi_range(2, 4)
+	for i in 14:  # storage tanks (several tries to find room for each)
+		if tanks <= 0:
+			break
+		var d := rng.randi_range(3, 5)
+		var tr := Rect2i(yard.position.x + rng.randi_range(0, maxi(0, yard.size.x - d)), yard.position.y + rng.randi_range(0, maxi(0, yard.size.y - d)), d, d)
+		if tr.position.y <= ry + 1 and tr.end.y >= ry - 1:
+			continue  # not on the rails
+		if _all_open(tr.grow(1)):
+			_place_prop("tank", tr)
+			tanks -= 1
+	var furnaces := rng.randi_range(1, 2)
+	for i in 10:  # furnace houses with their stacks
+		if furnaces <= 0:
+			break
+		var fr := Rect2i(yard.position.x + rng.randi_range(0, maxi(0, yard.size.x - 4)), yard.position.y + rng.randi_range(0, maxi(0, yard.size.y - 3)), 4, 3)
+		if (fr.position.y > ry + 1 or fr.end.y < ry - 1) and _all_open(fr.grow(1)):
+			_place_prop("furnace", fr)
+			furnaces -= 1
+	for i in rng.randi_range(3, 6):  # stacks of crates: cover in the yard
+		var o := Vector2i(yard.position.x + rng.randi_range(0, yard.size.x - 3), yard.position.y + rng.randi_range(0, yard.size.y - 2))
+		var cells: Array = [o, o + Vector2i(1, 0)]
+		if rng.randf() < 0.5:
+			cells.append(o + Vector2i(0, 1))
+		for c in cells:
+			if get_t(c) == T.OPEN and absi(c.y - ry) > 0:
+				_set_low(c, LowKind.CRATES)
 
 
 ## The cells round the edge of r.
@@ -705,6 +809,31 @@ func _make_scrub() -> void:
 				if get_t(c) == T.OPEN and not is_road(c) and Vector2(c).distance_to(o) <= rad and rng.randf() < 0.75:
 					set_t(c, T.BUSH)
 		return
+
+
+## Can fire take hold here (a flamer's jet)? Bushes, hedges, wooden barricades, crates,
+## and the furnishings of rooms.
+func flammable(c: Vector2i) -> bool:
+	var t := get_t(c)
+	if t == T.BUSH or t == T.HEDGE:
+		return true
+	if t == T.LOW:
+		var k := low_kind[c.y * W + c.x]
+		return k == LowKind.BARRICADE or k == LowKind.CRATES
+	return t == T.FLOOR and building_of.size() > 0 and building_of[c.y * W + c.x] > 0
+
+
+## A fire here has burnt out: bushes and hedges are gone (charred), crates and barricades burnt
+## to nothing.
+func burn_out(c: Vector2i) -> void:
+	var t := get_t(c)
+	if t == T.BUSH or t == T.HEDGE:
+		crushed[c.y * W + c.x] = 20  # burnt
+		set_t(c, T.OPEN)
+		_refresh_cells([c])
+		cells_changed.emit([c])
+	elif t == T.LOW:
+		chip_low(c, 9999.0)
 
 
 ## Flatten every bush, hedge and wire cell under a footprint (cells), repainting once.
@@ -938,6 +1067,7 @@ func _note_building(kind: String) -> void:
 	building_kind.append(kind)
 	var nm := ""
 	match kind:
+		"warehouse": nm = WAREHOUSE_NAMES[rng.randi() % WAREHOUSE_NAMES.size()]
 		"shop": nm = SHOP_NAMES[rng.randi() % SHOP_NAMES.size()]
 		"tavern": nm = TAVERN_NAMES[rng.randi() % TAVERN_NAMES.size()]
 		"industry": nm = WORKS_NAMES[rng.randi() % WORKS_NAMES.size()]

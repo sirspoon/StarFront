@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.57 (2026-11-12)
+Heavy industry, statues, a grander chapel, and fires that catch.
+- Heavy industry blocks: a big warehouse (corrugated roof with a strip of skylights down the ridge,
+  aisles of stacked crates inside you can take cover behind) and a yard with storage tanks, brick
+  furnace houses with tall stacks, crate stacks (cover) and a railway siding with a goods wagon on it.
+  Tanks, furnaces and wagons are solid: they block movement and sight like a wall.
+- A choice of battlefield (Options): Old Town (homes, shops, taverns, parks; the odd industrial
+  block), Foundry District (mostly warehouses, works compounds and machinery yards), or either at
+  random.
+- Statues of saints on stepped plinths (pale stone or old bronze, with a sword or a cupped candle):
+  four flanking the chapel's west and east doors, and one or two in each park. They're solid too.
+- The chapel's roof: an octagonal tower at the west end rising to a lead spire with a gilded finial,
+  throwing a long shadow, gilded cresting along the ridge, and pinnacles at the corners.
+- The Pyre Warden's flames set things alight: bushes, hedges, crates, wooden barricades and the
+  furnishings of rooms catch and burn for 20-35 seconds (fire, smoke and firelight), occasionally
+  spreading to a neighbour, then go out. Bushes and hedges burn away to charred stumps and ash,
+  crates and barricades are destroyed, rooms are left scorched. Anyone standing in a fire is
+  frightened, and now and then burnt.
+- Maps from a given seed are laid out a little differently again.
+- In test battles on the Old Town map the Legion now wins about three in four (it was a little over half).
+
 ## v0.56 (2026-11-12)
 A town people lived in.
 - Every building was something before the war: a home, a shop, a tavern, an office or an industrial

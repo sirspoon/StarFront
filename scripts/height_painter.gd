@@ -39,6 +39,16 @@ func _draw_all() -> void:
 				_mound(c)
 			elif t == T.FLOOR and _is_fallen(c):
 				draw_rect(Rect2(Vector2(c) * C, Vector2(C, C)), _hc(GROUND + 0.06))
+	for pr in map.props:
+		var prr: Rect2i = pr.rect
+		if not prr.grow(2).intersects(area):
+			continue
+		var pb := Rect2(Vector2(prr.position * C), Vector2(prr.size * C))
+		if pr.kind == "tank":
+			draw_circle(pb.get_center(), pb.size.x * 0.5 - 1.0, _hc(0.8))
+			draw_circle(pb.get_center(), pb.size.x * 0.3, _hc(0.92))
+		else:
+			draw_rect(pb.grow(-1), _hc(0.7))
 	for wk in map.wrecks:
 		var rr: Rect2i = wk[0]
 		if rr.intersects(area):
@@ -52,7 +62,9 @@ func _draw_all() -> void:
 			if map.get_t(c) == T.LOW:
 				# waist-high: a rounded ridge for bags and barricades, a flat top for low walls
 				var o := Vector2(c) * C
-				if _low_kind(c) == BattleMap.LowKind.STONE:
+				if _low_kind(c) == BattleMap.LowKind.CRATES:
+					draw_rect(Rect2(o + Vector2(2, 2), Vector2(C - 4, C - 4)), _hc(0.6))
+				elif _low_kind(c) == BattleMap.LowKind.STONE:
 					draw_rect(Rect2(o - Vector2(0, 2.5), Vector2(C, C)), _hc(0.62))
 				else:
 					draw_rect(Rect2(o + Vector2(1, 1), Vector2(C - 2, C - 2)), _hc(0.5))

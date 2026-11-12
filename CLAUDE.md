@@ -87,6 +87,9 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `--shot-peek` waits for a man leaning right out round cover and firing, and centres on him. Test results
   print `peeks=[legion, sworn]`: how often men leaned out to shoot.
 - `--shot-noroofs` hides the roofs for a screenshot, to see the buildings' furnishings.
+- `--map=town|foundry` picks the battlefield type (otherwise the saved option, default town).
+  `--demo-burn` sets alight the flammable cells near `--shot-at` (or the first park) and, 45 s later,
+  prints how many are still burning and how many burnt away.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

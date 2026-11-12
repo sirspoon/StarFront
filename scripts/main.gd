@@ -172,6 +172,8 @@ func _ready() -> void:
 			_test_grenades()
 		if "--demo-flame" in args:
 			_demo_flame()
+		if "--demo-burn" in args:
+			_demo_burn.call_deferred()
 		if "--gallery" in args:
 			_gallery()
 		if "--test-mass" in args:
@@ -399,6 +401,34 @@ func _gallery() -> void:
 	paused = true
 
 
+## Test aid: set alight everything that will burn near --shot-at (or the map centre).
+func _demo_burn() -> void:
+	var at := Vector2(BattleMap.W, BattleMap.H) * BattleMap.CELL * 0.5
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--shot-at="):
+			var xy := a.trim_prefix("--shot-at=").split(",")
+			at = Vector2(float(xy[0]), float(xy[1]))
+	if not "--shot-at" in " ".join(OS.get_cmdline_user_args()) and not map.parks.is_empty():
+		at = Vector2(map.parks[0].get_center() * BattleMap.CELL)  # a park: bushes and hedges to burn
+	demo_burn_at = at
+	var c0 := map.cell_of(at)
+	var n := 0
+	for r in range(0, 30):
+		for dx in range(-r, r + 1):
+			for dy in [-r, r]:
+				for c in [c0 + Vector2i(dx, dy), c0 + Vector2i(dy, dx)]:
+					if n < 14 and map.flammable(c) and not burning.has(c):
+						ignite(c)
+						n += 1
+	print("demo burn: %d cells alight" % n)
+	await get_tree().create_timer(45.0).timeout
+	var charred := 0
+	for i in map.crushed.size():
+		if map.crushed[i] == 20:
+			charred += 1
+	print("demo burn after 45 s: %d still burning, %d cells burnt away" % [burning.size(), charred])
+
+
 ## Test aid: a flame jet every second at --shot-at (or the map centre), to look at the drawing.
 func _demo_flame() -> void:
 	var at := Vector2(BattleMap.W, BattleMap.H) * BattleMap.CELL * 0.5
@@ -585,6 +615,12 @@ func _build_world(seed_value: int) -> void:
 	add_child(moon)
 	map = BattleMap.new()
 	add_child(map)
+	map.map_type = str(Settings.saved("map_type", "town"))
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--map="):
+			map.map_type = a.trim_prefix("--map=")  # test aid
+	if map.map_type == "random":
+		map.map_type = "town" if (seed_value % 2) == 0 else "foundry"
 	map.generate(seed_value)
 	map_view = MapView.new()
 	map_view.z_index = -10
@@ -938,6 +974,7 @@ func _process(dt: float) -> void:
 				crossfire_time[s.team] += dt
 	for ai in ais:
 		ai.tick(dt)
+	_update_burning(dt)
 	_update_objective(dt)
 	_check_end()
 	if shot_path != "" and time >= shot_time and (not "--shot-melee" in OS.get_cmdline_user_args() or _melee_spot() != null) \
@@ -1007,6 +1044,8 @@ func _take_shot() -> void:
 				q.selected = true
 	if "--shot-melee" in OS.get_cmdline_user_args():
 		camera.position = _melee_spot()
+	if demo_burn_at != null:
+		camera.position = demo_burn_at
 	if "--shot-heavy" in OS.get_cmdline_user_args():
 		camera.position = _heavy_spot()
 	if "--shot-peek" in OS.get_cmdline_user_args():
@@ -1262,6 +1301,16 @@ func resolve_flame(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vec
 		light_fx.flash(muzzle.lerp(end, 0.5), Color(1.0, 0.55, 0.2), 2.2, 160.0, 0.5)
 	for k in 3:
 		decals.add_burn(muzzle.lerp(end, 0.45 + k * 0.25) + Vector2(randf_range(-5, 5), randf_range(-5, 5)), 2.0)
+	# anything that burns in the jet's path may catch: bushes, hedges, crates, barricades, furniture
+	var steps := int(muzzle.distance_to(end) / 8.0)
+	var lit := {}
+	for k in range(2, steps + 1):
+		var p := muzzle.lerp(end, float(k) / steps)
+		for off in [Vector2.ZERO, (end - muzzle).normalized().orthogonal() * 8.0 * float(k) / steps, -(end - muzzle).normalized().orthogonal() * 8.0 * float(k) / steps]:
+			var c := map.cell_of(p + off)
+			if not lit.has(c) and map.flammable(c) and randf() < 0.3:
+				lit[c] = true
+				ignite(c)
 	for e in soldiers.duplicate():
 		if e.team == shooter.team or not e.is_alive() or e.state == Soldier.State.EMBARKED:
 			continue
@@ -1287,6 +1336,109 @@ func resolve_flame(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vec
 			if randf() < e.armor * (1.0 - float(w.ap)):
 				continue  # his armour shrugs it off
 			e.take_hit(int(w.dmg), shooter)
+
+
+var burning := {}       # cell -> {t: seconds left, nodes: [fire, smoke], light}
+var burn_timer := 0.0
+var demo_burn_at = null  # test aid
+const MAX_BURNING := 24
+
+
+## Set a cell alight (bushes, hedges, crates, barricades, furniture): it burns for half a
+## minute or so, may spread to its neighbours, frightens anyone in it, then goes out.
+func ignite(c: Vector2i) -> void:
+	if burning.has(c) or burning.size() >= (8 if phone else MAX_BURNING) or not map.flammable(c):
+		return
+	var p := map.center_of(c)
+	var entry := {"t": randf_range(18.0, 35.0), "nodes": [], "light": null}
+	if map_view.enabled:
+		entry.nodes = _small_fire(p)
+		if not phone and burning.values().filter(func(e): return e.light != null).size() < 6:
+			var l := PointLight2D.new()
+			l.texture = _light_tex if _light_tex != null else _soft_dot(256)
+			l.color = Color(1.0, 0.55, 0.25)
+			l.energy = 1.1
+			l.texture_scale = 0.8
+			l.position = p
+			l.enabled = Settings.on("lights", true)
+			l.height = 24.0
+			add_child(l)
+			entry.light = l
+	burning[c] = entry
+
+
+func _small_fire(p: Vector2) -> Array:
+	if _dot_tex == null:
+		_dot_tex = _soft_dot(64)
+		_light_tex = _soft_dot(256)
+	var fire := SimpleParticles.new()
+	fire.texture = _dot_tex
+	fire.position = p
+	fire.amount = 16
+	fire.lifetime = 0.6
+	fire.emission_radius = 6.0
+	fire.direction = Vector2(0, -1)
+	fire.spread = 30.0
+	fire.gravity = Vector2(0, -50)
+	fire.velocity_min = 8.0
+	fire.velocity_max = 22.0
+	fire.scale_min = 0.12
+	fire.scale_max = 0.26
+	fire.color_ramp = _ramp([Color(1, 0.95, 0.6, 0.9), Color(1, 0.5, 0.15, 0.8), Color(0.5, 0.1, 0.05, 0)])
+	fire.z_index = 4
+	fire.emitting = true
+	add_child(fire)
+	var smoke := SimpleParticles.new()
+	smoke.texture = _dot_tex
+	smoke.position = p
+	smoke.amount = 14
+	smoke.lifetime = 3.5
+	smoke.emission_radius = 5.0
+	smoke.direction = Vector2(0.4, -1)
+	smoke.spread = 20.0
+	smoke.gravity = Vector2(8, -6)
+	smoke.velocity_min = 8.0
+	smoke.velocity_max = 16.0
+	smoke.scale_min = 0.3
+	smoke.scale_max = 0.6
+	smoke.color_ramp = _ramp([Color(0.15, 0.13, 0.12, 0.0), Color(0.15, 0.13, 0.12, 0.45), Color(0.3, 0.29, 0.28, 0)])
+	smoke.z_index = 5
+	smoke.emitting = true
+	add_child(smoke)
+	return [fire, smoke]
+
+
+func _update_burning(dt: float) -> void:
+	burn_timer -= dt
+	if burn_timer > 0.0 or burning.is_empty():
+		return
+	burn_timer = 0.5
+	for c in burning.keys():
+		var e: Dictionary = burning[c]
+		e.t -= 0.5
+		var p := map.center_of(c)
+		if e.light != null:
+			e.light.energy = 0.9 + randf() * 0.4
+		for s in soldiers:  # men caught in the flames
+			if s.is_alive() and not s.is_vehicle and s.state != Soldier.State.EMBARKED and s.position.distance_to(p) < 12.0:
+				s.add_suppression(10.0, time)
+				if randf() < 0.04 * GameData.LETHALITY:
+					s.take_hit(1, null)
+		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:  # it spreads, slowly
+			var n: Vector2i = c + d
+			var t := map.get_t(n)
+			if (t == BattleMap.T.BUSH or t == BattleMap.T.HEDGE or t == BattleMap.T.LOW) and randf() < 0.004:
+				ignite(n)
+		if e.t <= 0.0:
+			burning.erase(c)
+			for nd in e.nodes:
+				nd.emitting = false
+				get_tree().create_timer(4.0).timeout.connect(nd.queue_free)
+			if e.light != null:
+				e.light.queue_free()
+			if map.get_t(c) == BattleMap.T.FLOOR:
+				decals.add_scorch(p, 9.0)  # the room's furnishings burnt black
+			map.burn_out(c)
 
 
 ## A blow in close combat: armour may turn it, otherwise it wounds.
