@@ -352,6 +352,26 @@ class RoofPiece:
 					var q := a.lerp(b, (k + 0.5) / n) + inward
 					draw_circle(q + Vector2(0.8, 1.0), 3.2, Color(0, 0, 0, 0.35))
 					draw_circle(q, 3.2, Color(0.47, 0.42, 0.31).lightened((_h(index, k + edge * 10, 410) - 0.5) * 0.15))
+			# the roof juts out over the firing slit: a dark band of shade along the front, under a lit lip
+			var fr: int = map.building_front[index]
+			var band: Rect2
+			var lip: Rect2
+			match fr:
+				0:
+					band = Rect2(rr.position.x, rr.position.y - 6, rr.size.x, 7)
+					lip = Rect2(rr.position.x, rr.position.y, rr.size.x, 3)
+				1:
+					band = Rect2(rr.position.x, rr.end.y - 1, rr.size.x, 7)
+					lip = Rect2(rr.position.x, rr.end.y - 3, rr.size.x, 3)
+				2:
+					band = Rect2(rr.position.x - 6, rr.position.y, 7, rr.size.y)
+					lip = Rect2(rr.position.x, rr.position.y, 3, rr.size.y)
+				_:
+					band = Rect2(rr.end.x - 1, rr.position.y, 7, rr.size.y)
+					lip = Rect2(rr.end.x - 3, rr.position.y, 3, rr.size.y)
+			draw_rect(band, Color(0.01, 0.01, 0.01, 0.9))  # the slit in deep shade under the overhang
+			draw_rect(lip, Color(0.55, 0.55, 0.5))
+			draw_rect(lip, Color(0.15, 0.15, 0.14), false, 0.6)
 			var cp := rr.get_center()
 			draw_circle(cp + Vector2(2, 3), 5.0, Color(0, 0, 0, 0.4))
 			draw_circle(cp, 5.0, Color(0.28, 0.29, 0.26))
@@ -385,31 +405,34 @@ class RoofPiece:
 		var nm: String = map.building_name[index] if index < map.building_name.size() else ""
 		if nm == "":
 			return
-		# the sign over the front
+		# a small sign board on an iron bracket, jutting out over the street from the front wall
 		var front: int = map.building_front[index]
-		var font := ThemeDB.fallback_font
-		var fs := 9
-		var w := font.get_string_size(nm, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 8.0
 		var rc := Vector2(r.position * C) + Vector2(r.size * C) * 0.5
-		var pos: Vector2
-		var rot := 0.0
+		var off := (r.size.x if front < 2 else r.size.y) * C * (0.2 + _h(index, 0, 420) * 0.3)
+		var at: Vector2
+		var outd: Vector2
 		match front:
-			0: pos = Vector2(rc.x, r.position.y * C + 6)
-			1: pos = Vector2(rc.x, r.end.y * C - 6)
+			0:
+				at = Vector2(rc.x - off, r.position.y * C)
+				outd = Vector2(0, -1)
+			1:
+				at = Vector2(rc.x + off, r.end.y * C)
+				outd = Vector2(0, 1)
 			2:
-				pos = Vector2(r.position.x * C + 6, rc.y)
-				rot = -PI * 0.5
+				at = Vector2(r.position.x * C, rc.y - off)
+				outd = Vector2(-1, 0)
 			_:
-				pos = Vector2(r.end.x * C - 6, rc.y)
-				rot = PI * 0.5
-		draw_set_transform(pos, rot, Vector2.ONE)
-		var board := Rect2(Vector2(-w * 0.5, -6), Vector2(w, 12))
-		draw_rect(Rect2(board.position + Vector2(2, 2), board.size), Color(0, 0, 0, 0.4))
-		var paint := Color(0.22, 0.12, 0.1) if kind == "tavern" else (Color(0.12, 0.16, 0.14) if kind == "shop" else Color(0.2, 0.2, 0.22))
+				at = Vector2(r.end.x * C, rc.y + off)
+				outd = Vector2(1, 0)
+		var tip := at + outd * 9.0
+		draw_line(at + Vector2(1, 1.5), tip + Vector2(1, 1.5), Color(0, 0, 0, 0.4), 1.2)
+		draw_line(at, tip, Color(0.15, 0.13, 0.12), 1.0)  # the bracket
+		var board := Rect2(at + outd * 3.0 - outd.orthogonal().abs() * 3.5, outd.abs() * 5.0 + outd.orthogonal().abs() * 7.0)
+		board.position = board.position.min(board.end)
+		var paint := Color(0.25, 0.15, 0.12) if kind == "tavern" else (Color(0.16, 0.2, 0.17) if kind == "shop" else Color(0.22, 0.22, 0.24))
+		draw_rect(Rect2(board.position + Vector2(1.5, 2), board.size), Color(0, 0, 0, 0.35))
 		draw_rect(board, paint)
-		draw_rect(board, Color(0.6, 0.48, 0.25), false, 0.8)
-		draw_string(font, Vector2(-w * 0.5 + 4, 3.5), nm, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.85, 0.75, 0.5))
-		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+		draw_rect(board, Color(0.55, 0.45, 0.28), false, 0.6)
 
 
 	## The chapel's crown: gilded cresting along the ridge, a pinnacle at each corner, and an

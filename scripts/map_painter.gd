@@ -1450,17 +1450,30 @@ func _draw_exteriors(area: Rect2i) -> void:
 				else (Vector2i(r.position.x - 1, r.position.y) if front == 2 else Vector2i(r.end.x, r.position.y)))
 		var length := r.size.x if front < 2 else r.size.y
 		if kind == "shop" or kind == "tavern":
-			# an awning over the shop front, faded stripes, torn here and there
-			var stripe_a := Color(0.5, 0.16, 0.12) if _h(bi, 0, 330) < 0.5 else Color(0.2, 0.3, 0.22)
+			# an awning over the shop front: faded, dirty canvas, or corrugated tin streaked with rust
+			var metal_aw := _h(bi, 2, 330) < 0.35
+			var canvas: Color = [Color(0.33, 0.24, 0.2), Color(0.26, 0.28, 0.22), Color(0.3, 0.29, 0.26), Color(0.25, 0.24, 0.27)][int(_h(bi, 0, 330) * 4.0) % 4]
 			for k in range(2, length - 2):
 				var c: Vector2i = start + along * k
 				if not area.has_point(c) or map.get_t(c) != T.OPEN or _h(c.x, c.y, 331) < 0.12:
 					continue
 				var rr := Rect2(Vector2(c) * C, Vector2(C, C))
 				draw_rect(Rect2(rr.position + Vector2(2, 3), rr.size), Color(0, 0, 0, 0.3))
-				for s in 4:
-					var sr := Rect2(rr.position + Vector2(along) * s * 4.0, Vector2(4, C) if along.x > 0 else Vector2(C, 4))
-					draw_rect(sr, stripe_a if s % 2 == 0 else Color(0.72, 0.68, 0.58))
+				if metal_aw:
+					draw_rect(rr, Color(0.33, 0.33, 0.32))
+					for s in 8:  # the corrugations run out from the wall
+						var p0 := rr.position + Vector2(along) * (s * 2.0 + 1.0)
+						var p1 := p0 + (Vector2(0, C) if along.x > 0 else Vector2(C, 0))
+						draw_line(p0, p1, Color(0.42, 0.42, 0.4) if s % 2 == 0 else Color(0.24, 0.24, 0.23), 0.7)
+					if _h(c.x, c.y, 338) < 0.5:
+						draw_circle(rr.position + Vector2(_h(c.x, c.y, 339), _h(c.x, c.y, 340)) * C, 3.5, Color(0.42, 0.22, 0.1, 0.5))  # rust
+				else:
+					draw_rect(rr, canvas)
+					for s in 3:  # sagging folds between the frame's ribs
+						var p0 := rr.position + Vector2(along) * (s * 5.0 + 2.5)
+						var p1 := p0 + (Vector2(0, C) if along.x > 0 else Vector2(C, 0))
+						draw_line(p0, p1, canvas.darkened(0.25), 1.0)
+					draw_rect(rr, Color(0.05, 0.04, 0.03, 0.15 + _h(c.x, c.y, 341) * 0.2))  # grime
 				var edge := Vector2(c) * C + (Vector2(0, C) if front == 0 else (Vector2.ZERO if front == 1 else (Vector2(C, 0) if front == 2 else Vector2.ZERO)))
 				if front == 0 or front == 3:
 					edge = Vector2(c) * C + (Vector2(0, 0) if front == 0 else Vector2(C, 0))

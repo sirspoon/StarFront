@@ -836,6 +836,7 @@ func _make_bunker(site: Rect2i, side: int) -> void:
 			continue
 		buildings.append(r)
 		_note_building("bunker")
+		building_front[building_front.size() - 1] = [3, 1, 2, 0][side]  # its front is the slit side
 		_fill_room(r)
 		for x in range(r.position.x, r.end.x):
 			for y in range(r.position.y, r.end.y):
@@ -845,7 +846,15 @@ func _make_bunker(site: Rect2i, side: int) -> void:
 		var back := _side_cells(r, [2, 0, 3, 1][side])
 		for k in front.size():
 			set_t(front[k], T.WINDOW)
-		set_t(back[back.size() / 2], T.FLOOR)
+		var door: Vector2i = back[back.size() / 2]
+		set_t(door, T.FLOOR)
+		# a short sandbag blast wall a step outside the doorway, open at both ends
+		var outward: Vector2i = -out
+		var across := Vector2i(out.y, out.x)
+		for k in range(-1, 2):
+			var bc: Vector2i = door + outward * 2 + across * k
+			if in_bounds(bc) and (get_t(bc) == T.OPEN or get_t(bc) == T.RUBBLE):
+				_set_low(bc, LowKind.SANDBAGS)
 		return
 
 

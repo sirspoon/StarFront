@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.60 (2026-11-12)
+- Bunkers show which way they face with their roof on: the roof juts out over the firing slit, so
+  there's a deep band of shade along the front under a pale concrete lip, and a short sandbag blast
+  wall stands a step outside the doorway at the back (open at both ends).
+- Awnings over shops and taverns are no longer striped: faded, grimy canvas in dull colours with
+  sagging folds, or (about a third of them) corrugated tin streaked with rust.
+- The painted name boards on the roofs are gone (lettering seen at an angle from straight above didn't
+  work); instead a small sign board on an iron bracket juts out over the street from the front wall.
+
 ## v0.59 (2026-11-12)
 Bunkers.
 - Small concrete bunkers out on the approaches of the defended places: two by the chapel (east and
