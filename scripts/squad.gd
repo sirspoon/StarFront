@@ -19,6 +19,7 @@ var front := Vector2.ZERO   # the direction the squad is braced against (where i
 var fire_log: Array = []     # recent incoming fire: [time, direction]
 var queue: Array = []   # orders still to come: {kind: "move"/"line", a, b, face, run}
 var current = null      # the order being carried out now (for drawing the route), or null
+var grenade_order = null  # a throw the squad has been told to make (see Grenades), or null
 
 ## Squad coherency, as in Epik: every soldier must be within this distance of
 ## another, forming one connected group. Stragglers make their way back.
@@ -53,6 +54,15 @@ func present() -> Array:
 
 func alive() -> Array:
 	return members.filter(func(m): return m.is_alive())
+
+
+## How many grenades of a kind the squad has left among its men on the field.
+func grenade_count(kind: String) -> int:
+	var n := 0
+	for m in members:
+		if m.is_alive() and m.state != Soldier.State.EMBARKED:
+			n += int(m.grenades.get(kind, 0))
+	return n
 
 
 func effective() -> Array:
@@ -300,8 +310,10 @@ func in_crossfire(now: float) -> bool:
 	return same >= 3 and other >= 3
 
 
-func order_move(map: BattleMap, pos: Vector2, run: bool, from_queue := false) -> void:
+func order_move(map: BattleMap, pos: Vector2, run: bool, from_queue := false, keep_grenades := false) -> void:
 	front = Vector2.ZERO  # on the move: they'll brace against whatever they meet next
+	if not from_queue and not keep_grenades:
+		grenade_order = null  # a new order replaces a throw that hasn't happened yet
 	if not from_queue:
 		queue.clear()
 		current = null
@@ -517,6 +529,7 @@ func set_prone(on: bool) -> void:
 
 
 func halt() -> void:
+	grenade_order = null
 	queue.clear()
 	current = null
 	focus = null

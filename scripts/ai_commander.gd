@@ -70,6 +70,8 @@ func _think(sq: Squad) -> void:
 	if ready.is_empty():
 		return
 	var c := sq.center()
+	if sq.grenade_order != null or _grenade(sq, ready):
+		return  # busy throwing
 	if ready.any(func(m): return m.charger):
 		_think_assault(sq, ready, c)
 		return
@@ -148,3 +150,30 @@ func debug(dt: float) -> void:
 				st.append("%s%s%s" % [["R", "P", "X", "D", "F", "E"][m.state], "M" if m.in_melee else "", "C" if m.charging != null else ""])
 			var e: Soldier = main.nearest_seen_enemy(team, sq.center())
 			print("t=%d %s at %s run=%s enemy_d=%d %s" % [main.time, sq.name, sq.center().round(), sq.running, -1 if e == null else int(e.position.distance_to(sq.center())), " ".join(st)])
+
+
+## Throw a grenade when it's worth it: a tank-breaker at armour in reach, now and then a
+## frag at enemy infantry close by (more often if they're dug in or lying low).
+func _grenade(sq: Squad, ready: Array) -> bool:
+	if "--no-ai-grenades" in OS.get_cmdline_user_args():
+		return false
+	var reach := GameData.THROW_RANGE * 0.9
+	for e in main.soldiers:
+		if e.team == team or not e.is_alive() or not e.seen_by[team] or e.state == Soldier.State.EMBARKED:
+			continue
+		var near := false
+		for m in ready:
+			if m.position.distance_to(e.position) < reach and main.map.los_clear(m.position, e.position):
+				near = true
+				break
+		if not near:
+			continue
+		if e.is_vehicle and sq.grenade_count("ap") > 0:
+			main.grenades.order(sq, e.position)
+			return true
+		if not e.is_vehicle and sq.grenade_count("he") > 0:
+			var cover: float = main.map.cell_cover(main.map.cell_of(e.position))
+			if randf() < (0.5 if cover > 0.2 or e.grounded() else 0.2):
+				main.grenades.order(sq, e.position)
+				return true
+	return false

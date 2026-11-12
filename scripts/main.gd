@@ -14,6 +14,9 @@ var map: BattleMap
 var map_view: MapView
 var roofs: Roofs
 var effects: Effects
+var grenades: Grenades
+var grenade_mode := false  # the next click / tap picks where to throw grenades
+var grenades_thrown := [0, 0]
 var light_fx: LightFX
 var sfx: Sfx
 var fire_sound_at := {}  # shooter+weapon -> time its burst sound last started
@@ -138,6 +141,8 @@ func _ready() -> void:
 			_test_follow()
 		if "--test-voice" in args:
 			_test_voice()
+		if "--test-grenades" in args:
+			_test_grenades()
 		if "--test-touch" in args:
 			_test_touch()
 		if "--test-reach" in args:
@@ -225,6 +230,31 @@ func _test_carrier() -> void:
 
 ## Test aid: during a real battle, order the player's squads to move every few
 ## seconds and report any soldier who didn't go, and why.
+## Test aid: a squad told to lay smoke out of its reach moves up and throws two grenades;
+## the screen then blocks sight through it.
+func _test_grenades() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var sq: Squad = null
+	for q in _player_squads():
+		if q.vehicle() == null and q.carrier() == null and q.grenade_count("smoke") > 0:
+			sq = q
+			break
+	var c := sq.center()
+	var spot := c + Vector2(260, 0)
+	while not map.walkable(map.cell_of(spot)):
+		spot += Vector2(0, 16)
+	var before := sq.grenade_count("smoke")
+	print("grenade test: %s at %s, smoke %d, ordered at %s: %s" % [sq.name, c.round(), before, spot.round(), grenades.order(sq, spot)])
+	for i in 12:
+		await get_tree().create_timer(2.0).timeout
+		if grenades.screens.size() >= 2:
+			break
+	print("  after: squad at %s, smoke left %d, screens %d, order done %s" % [sq.center().round(), sq.grenade_count("smoke"), grenades.screens.size(), sq.grenade_order == null])
+	await get_tree().create_timer(3.0).timeout
+	var s0: Vector2 = grenades.screens[0].pos if not grenades.screens.is_empty() else spot
+	print("  sight through the smoke: %s (should be false); beside it: %s" % [map.los_clear(s0 - Vector2(0, 120), s0 + Vector2(0, 120)), map.los_clear(s0 + Vector2(120, -120), s0 + Vector2(120, 120))])
+
+
 func _test_follow() -> void:
 	ais = ais.filter(func(ai): return ai.team != 0)
 	if "--no-enemy" in OS.get_cmdline_user_args():
@@ -416,6 +446,9 @@ func _build_world(seed_value: int) -> void:
 	effects = Effects.new()
 	effects.z_index = 6
 	add_child(effects)
+	grenades = Grenades.new()
+	add_child(grenades)
+	grenades.setup(self)
 	overlay = OverlayScript.new()
 	overlay.main = self
 	overlay.z_index = 10
@@ -1242,9 +1275,9 @@ func _end(winner: int, reason: String) -> void:
 		else:
 			fled[s.team] += 1
 	if autotest:
-		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d cover=%d%%/%d%% blocked=%s flank=%s crossfire=%d%%/%d%% blows=%s mkills=%s raider_kills=%d blade_kills=%d %s" % [
+		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d cover=%d%%/%d%% blocked=%s flank=%s crossfire=%d%%/%d%% blows=%s mkills=%s raider_kills=%d blade_kills=%d grenades=%s %s" % [
 				factions[winner] if winner >= 0 else "draw", int(time), shots, hits,
-				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, flank_shots, int(100 * crossfire_time[0] / maxf(field_time[0], 1)), int(100 * crossfire_time[1] / maxf(field_time[1], 1)), blows, melee_kills, assault_kills[0], assault_kills[1], reason])
+				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, flank_shots, int(100 * crossfire_time[0] / maxf(field_time[0], 1)), int(100 * crossfire_time[1] / maxf(field_time[1], 1)), blows, melee_kills, assault_kills[0], assault_kills[1], grenades_thrown, reason])
 		get_tree().quit()
 		return
 	var head := "DRAW"
@@ -1315,7 +1348,9 @@ func _unhandled_input(e: InputEvent) -> void:
 			MOUSE_BUTTON_LEFT:
 				if not started or over:
 					return
-				if mb.pressed and face_mode:
+				if mb.pressed and grenade_mode:
+					_order_grenade(wp)
+				elif mb.pressed and face_mode:
 					_order_face(wp)
 					face_mode = false
 					hud.sync_touch("Face", false)
@@ -1365,6 +1400,9 @@ func _unhandled_input(e: InputEvent) -> void:
 			for sq in _player_squads():
 				if sq.selected:
 					sq.halt()
+		elif k == KEY_T:
+			grenade_mode = not grenade_mode
+			hud.sync_touch("Grenade", grenade_mode)
 		elif k >= KEY_1 and k <= KEY_9:
 			var mine := _player_squads()
 			var i := k - KEY_1
@@ -1472,6 +1510,21 @@ func _plan(kind: String, a: Vector2, b: Vector2, final: bool, face_override := V
 
 
 ## The selected squads answer an order (only the Sworn have voices so far).
+## Grenades at a picked spot: each selected squad throws what suits it (see Grenades).
+func _order_grenade(wp: Vector2) -> void:
+	grenade_mode = false
+	hud.sync_touch("Grenade", false)
+	var any := false
+	for sq in _player_squads():
+		if sq.selected:
+			var msg := grenades.order(sq, wp)
+			if msg != "":
+				log_message(msg)
+				any = any or sq.grenade_order != null
+	if any:
+		_acknowledge("attack")
+
+
 func _acknowledge(kind: String) -> void:
 	if _player_squads().any(func(q): return q.selected and q.faction == "sworn" and (not q.alive().is_empty() or q.carrier() != null)):
 		sfx.voice("sworn_" + kind)
@@ -1809,6 +1862,9 @@ func _pinch_begin() -> void:
 func _tap(wp: Vector2, screen := Vector2.ZERO) -> void:
 	if not started or over:
 		return
+	if grenade_mode:
+		_order_grenade(wp)
+		return
 	if face_mode:
 		_order_face(wp)
 		face_mode = false
@@ -1951,6 +2007,8 @@ func touch_button(key: String, on: bool) -> void:
 				hud.sync_touch("Assault", false)
 		"Face":
 			face_mode = on
+		"Grenade":
+			grenade_mode = on
 		"Pick":
 			pick_mode = on
 			if not on:

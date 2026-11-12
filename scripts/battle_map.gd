@@ -178,8 +178,18 @@ func cover_vs(target_pos: Vector2, shooter_pos: Vector2) -> float:
 
 
 ## True if nothing solid lies between a and b.
+var smoke_screens: Array = []  # [centre, radius] of smoke screens, which block sight (set by Grenades)
+
+
 func los_clear(a: Vector2, b: Vector2) -> bool:
 	var d := b - a
+	if not smoke_screens.is_empty() and d.length_squared() > 40.0 * 40.0:
+		var l2 := d.length_squared()
+		for s in smoke_screens:
+			var c: Vector2 = s[0]
+			var k := clampf((c - a).dot(d) / l2, 0.0, 1.0)
+			if (a + d * k).distance_squared_to(c) < float(s[1]) * float(s[1]):
+				return false  # the smoke is in the way
 	var steps := int(d.length() / 6.0)
 	if steps < 2:
 		return true

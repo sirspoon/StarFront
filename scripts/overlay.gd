@@ -33,6 +33,29 @@ func _draw() -> void:
 			draw_line(fp + Vector2(-6, 6), fp + Vector2(6, -6), Color(1.0, 0.6, 0.2, 0.9), 2.0)
 		if sq.focus != null and is_instance_valid(sq.focus) and sq.focus.is_alive():
 			draw_line(sq.center(), sq.focus.position, Color(1.0, 0.3, 0.2, 0.4), 1.5)
+		if sq.grenade_order != null:
+			var go: Dictionary = sq.grenade_order
+			var gp: Vector2 = go.target.position if go.target != null and is_instance_valid(go.target) else go.point
+			draw_dashed_line(sq.center(), gp, _grenade_col(go.kind, 0.5), 1.5, 5.0)
+			draw_arc(gp, 9.0, 0, TAU, 16, _grenade_col(go.kind, 0.9), 1.5)
+	# picking where to throw: how far each selected squad can throw, and what would go there
+	if main.grenade_mode and main.started:
+		var p: Vector2 = main.pointer_world
+		for sq in main._player_squads():
+			if not sq.selected or sq.vehicle() != null or sq.effective().is_empty():
+				continue
+			for m in sq.effective():
+				if not m.grenades.is_empty() and m.grenades.values().any(func(n): return n > 0):
+					draw_arc(m.position, GameData.THROW_RANGE, 0, TAU, 48, Color(1.0, 0.85, 0.4, 0.12), 1.0)
+			if not main.touch_mode:
+				var c: Array = main.grenades.choose(sq, p)
+				if c[1] != null or c[0] == "smoke":
+					var rr: float = GameData.GRENADES.smoke.r if c[0] == "smoke" else GameData.GRENADES[c[0]].blast
+					draw_arc(p, rr, 0, TAU, 32, _grenade_col(c[0], 0.8), 1.5)
+					draw_string(ThemeDB.fallback_font, p + Vector2(12, -10), {"he": "FRAG", "ap": "TANK-BREAKER", "smoke": "SMOKE"}[c[0]],
+							HORIZONTAL_ALIGNMENT_LEFT, -1, 11, _grenade_col(c[0], 0.95))
+				else:
+					draw_string(ThemeDB.fallback_font, p + Vector2(12, -10), c[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 0.5, 0.4, 0.9))
 	# spotted enemies under a roof: a red mark so they can still be targeted
 	if main.roofs != null:
 		for s in main.soldiers:
@@ -175,3 +198,7 @@ func _dashed(a: Vector2, b: Vector2, col: Color) -> void:
 	while t < d:
 		draw_line(a + dir * t, a + dir * minf(t + 6.0, d), col, 1.2)
 		t += 11.0
+
+
+func _grenade_col(kind: String, a: float) -> Color:
+	return Color({"he": Color(1.0, 0.45, 0.25), "ap": Color(1.0, 0.8, 0.3), "smoke": Color(0.8, 0.85, 0.9)}[kind], a)

@@ -91,6 +91,8 @@ func setup(m: Node) -> void:
 			+ "Right click an enemy: focus fire   your carrier: board\n" \
 			+ "Right click a wall (tank / lance team): shell it\n" \
 			+ "R assault   G get down   H halt   U unload\n" \
+			+ "T then click: grenades. At armour: tank-breakers,\n" \
+			+ "   at infantry: frags, at open ground: smoke screen\n" \
 			+ "Alt + click: pick single soldiers   1-9: squads\n" \
 			+ "Space: pause (orders still work)\n" \
 			+ "WASD / arrows / screen edge / middle-drag: scroll\n" \
@@ -99,7 +101,8 @@ func setup(m: Node) -> void:
 			+ "low walls stop most fire from their far side.\n" \
 			+ "Men must stay in contact with their squad.\n" \
 			+ "Raiders and Oathblades charge enemies who come\n" \
-			+ "   close (not while Down). Up close, blades win."
+			+ "   close (not while Down). Up close, blades win,\n" \
+			+ "   and anyone pinned or lying Down is easy meat."
 	help_panel.add_child(help)
 	if main.touch_mode:
 		help.text = "TOUCH CONTROLS  (? hides)\n" \
@@ -116,7 +119,9 @@ func setup(m: Node) -> void:
 				+ "First order after selecting replaces old orders\n" \
 				+ "Tap an enemy: focus fire   Double-tap your carrier: board\n" \
 				+ "Double-tap a wall (tank / lance team): shell it\n" \
-				+ "Face, then tap: look that way   Pause: orders still work\n\n" \
+				+ "Face, then tap: look that way   Pause: orders still work\n" \
+				+ "Grenade, then tap: tank-breakers at armour, frags at\n" \
+				+ "   infantry, smoke screen on open ground\n\n" \
 				+ "Hold the Ashen Chapel. Sandbags, barricades and\n" \
 				+ "low walls stop most fire from their far side.\n" \
 				+ "Men must stay in contact with their squad."
@@ -146,10 +151,10 @@ func _build_touch_bar() -> void:
 	touch_bar = HBoxContainer.new()
 	touch_bar.add_theme_constant_override("separation", 6)
 	panel.add_child(touch_bar)
-	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Pick", true], ["Halt", false], ["Unload", false],
+	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Grenade", true], ["Pick", true], ["Halt", false], ["Unload", false],
 			["Squads", true], ["Pause", true], ["?", false]]:
 		var b := Button.new()
-		var hints := {"Assault": "R", "Down": "G", "Pick": "Alt", "Halt": "H", "Unload": "U", "Pause": "Space", "?": "F1"}
+		var hints := {"Assault": "R", "Down": "G", "Pick": "Alt", "Halt": "H", "Unload": "U", "Grenade": "T", "Pause": "Space", "?": "F1"}
 		b.text = spec[0] if main.touch_mode or not hints.has(spec[0]) else "%s (%s)" % [spec[0], hints[spec[0]]]
 		b.toggle_mode = spec[1]
 		b.focus_mode = Control.FOCUS_NONE
@@ -313,6 +318,13 @@ func _refresh() -> void:
 				r.bar.tooltip_text = "Hull"
 			else:
 				r.label.text = "%d/%d  %s" % [sq.present().size(), sq.start_size, st]
+				var gr := ""
+				for k in [["he", "F"], ["ap", "T"], ["smoke", "S"]]:  # grenades left: frag, tank-breaker, smoke
+					var n: int = sq.grenade_count(k[0])
+					if n > 0:
+						gr += " %s%d" % [k[1], n]
+				if gr != "":
+					r.label.text += "  " + gr
 			r.button.modulate = Color(0.6, 1.0, 0.6) if sq.selected else Color.WHITE
 
 

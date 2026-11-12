@@ -420,6 +420,19 @@ def power_blade(rng):
     return finish(reverb(x, 0.6, 0.2, rng, bright=5000), peak=0.8, fade=0.15)
 
 
+def smoke_pop(rng):
+    """A smoke grenade going off: a soft pop, then the canister hissing out its cloud."""
+    dur = 2.6
+    n = int(dur * SR)
+    t = T(dur)
+    pop = filt(noise(n, rng), hi=1500) * env(n, 0.001, 0.02) * 0.9 + chirp(dur, 140, 70, 8) * env(n, 0.001, 0.04) * 0.6
+    hiss_env = np.clip(t / 0.15, 0, 1) * np.clip((dur - t) / 1.2, 0, 1)
+    hiss = filt(noise(n, rng), lo=2200, hi=8000) * hiss_env * (0.35 + 0.08 * np.sin(2 * np.pi * 7 * t))
+    sputter = filt(noise(n, rng), lo=300, hi=1200) * hiss_env * 0.15
+    x = pop + hiss + sputter
+    return finish(reverb(x, 0.7, 0.15, rng, bright=5000), peak=0.75, fade=0.5)
+
+
 # ---------------------------------------------------------------- make them all
 
 def main():
@@ -445,6 +458,7 @@ def main():
         "melee_blade": (3, blade_clash),
         "melee_blunt": (3, blunt_hit),
         "melee_power": (3, power_blade),
+        "smoke": (2, smoke_pop),
     }
     only = sys.argv[1:]  # e.g. make_sounds.py smg pistol: just those
     for name, (count, fn) in makers.items():

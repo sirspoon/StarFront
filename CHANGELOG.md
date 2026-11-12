@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.38 (2026-11-12)
+Grenades, and close combat that punishes men on the ground.
+- Grenades: press Grenade (T on a PC), then click or tap a spot. Each selected squad throws what
+  suits it: tank-breaker charges at enemy armour, frag grenades at enemy infantry, and smoke
+  grenades on open ground (two side by side, a screen across the line of sight). If they're too
+  far away they move up until a man with the right grenade can reach (about 9 cells), then throw.
+  A new move order cancels a throw that hasn't happened yet.
+- Most men carry one or two: conscripts a frag, sergeants and champions smoke, lancers and
+  breachers a tank-breaker, raiders and Sworn brothers a frag and a tank-breaker. The squad cards
+  show what's left (F frag, T tank-breaker, S smoke). Gunners and cannoneers carry none.
+- Smoke screens last about half a minute and block sight and shots through them (men can still
+  see each other at very close range).
+- While picking a spot (PC), rings show how far your men can throw and the marker says what
+  would be thrown there.
+- The computer throws tank-breakers at armour in reach, and frags at infantry nearby, more
+  often when they're dug in or lying low.
+- Close combat: men who are pinned, or lying flat in the Down stance, can't fend off blows.
+  Assault troops hit them far more often, blades wound them more deeply, and charges into them
+  rattle them more. Assault troops go for men on the ground first. Fighting back from the
+  ground is slow and clumsy, so get up (turn off Down) when blades are coming.
+
 ## v0.37 (2026-11-12)
 Close combat and assault squads.
 - New Legion Raider Squad: eight fast trench raiders with short-ranged ripper guns, trench

@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.37"
+const VERSION := "0.38"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -47,34 +47,44 @@ const MELEE := {
 	"edict_greatblade": {"name": "Edict greatblade", "cooldown": 1.0, "hit": 0.7, "parry": 0.45, "dmg": 3, "ap": 0.85, "sound": "melee_power", "blade": true},
 }
 
+## Grenades, thrown at a picked spot (see Grenades). he and ap burst like other explosives
+## (blast, dmg, ap, supp, wall; pen and vdmg against vehicles); smoke makes a screen of
+## radius r that blocks sight for `duration` seconds.
+const THROW_RANGE := 150.0
+const GRENADES := {
+	"he": {"name": "Frag grenade", "blast": 20.0, "dmg": 1, "ap": 0.2, "pen": 2, "vdmg": 1, "supp": 30.0, "wall": 12.0},
+	"ap": {"name": "Tank-breaker charge", "blast": 7.0, "dmg": 3, "ap": 0.85, "pen": 9, "vdmg": 4, "supp": 15.0, "wall": 40.0},
+	"smoke": {"name": "Smoke grenade", "r": 42.0, "duration": 28.0},
+}
+
 ## nerve multiplies morale loss (higher = panics sooner). Optional traits for later units:
 ## "steadfast": true ignores being flanked or caught in crossfire; "flank_bonus": 1.5 makes
 ## their fire from a flank count for more.
 const SOLDIERS := {
 	"conscript": {"name": "Conscript", "hp": 1, "armor": 0.1, "speed": 46.0, "morale": 70.0, "nerve": 1.1,
-		"radius": 7.0, "weapon": "lumen_rifle"},
+		"radius": 7.0, "weapon": "lumen_rifle", "grenades": {"he": 1}},
 	"gunner": {"name": "Stubber gunner", "hp": 1, "armor": 0.1, "speed": 40.0, "morale": 65.0, "nerve": 1.1,
-		"radius": 7.0, "weapon": "heavy_stubber"},
+		"radius": 7.0, "weapon": "heavy_stubber", "grenades": {}},
 	"sergeant": {"name": "Sergeant", "hp": 1, "armor": 0.2, "speed": 46.0, "morale": 80.0, "nerve": 0.9,
-		"radius": 7.0, "weapon": "lumen_rifle", "leader": true},
+		"radius": 7.0, "weapon": "lumen_rifle", "leader": true, "grenades": {"he": 1, "smoke": 2}},
 	"lancer": {"name": "Lancer", "hp": 1, "armor": 0.1, "speed": 42.0, "morale": 65.0, "nerve": 1.1,
-		"radius": 7.0, "weapon": "lance_launcher"},
+		"radius": 7.0, "weapon": "lance_launcher", "grenades": {"ap": 1}},
 	"raider": {"name": "Trench Raider", "hp": 1, "armor": 0.15, "speed": 54.0, "morale": 78.0, "nerve": 0.9,
-		"radius": 7.0, "weapon": "ripper_smg", "melee": "trench_knife", "charger": true},
+		"radius": 7.0, "weapon": "ripper_smg", "melee": "trench_knife", "charger": true, "grenades": {"he": 1, "ap": 1}},
 	"raider_sgt": {"name": "Raider Sergeant", "hp": 1, "armor": 0.2, "speed": 54.0, "morale": 85.0, "nerve": 0.8,
-		"radius": 7.0, "weapon": "ripper_smg", "melee": "hook_sabre", "charger": true, "leader": true},
+		"radius": 7.0, "weapon": "ripper_smg", "melee": "hook_sabre", "charger": true, "leader": true, "grenades": {"he": 1, "smoke": 2, "ap": 1}},
 	"brother": {"name": "Sworn Brother", "hp": 3, "armor": 0.5, "speed": 38.0, "morale": 95.0, "nerve": 0.5,
-		"radius": 10.0, "weapon": "mass_carbine"},
+		"radius": 10.0, "weapon": "mass_carbine", "grenades": {"he": 1, "ap": 1}},
 	"cannoneer": {"name": "Sworn Cannoneer", "hp": 3, "armor": 0.5, "speed": 34.0, "morale": 95.0, "nerve": 0.5,
-		"radius": 10.0, "weapon": "rotor_cannon"},
+		"radius": 10.0, "weapon": "rotor_cannon", "grenades": {}},
 	"breacher": {"name": "Sworn Breacher", "hp": 3, "armor": 0.5, "speed": 38.0, "morale": 95.0, "nerve": 0.5,
-		"radius": 10.0, "weapon": "fusion_carbine"},
+		"radius": 10.0, "weapon": "fusion_carbine", "grenades": {"ap": 1}},
 	"champion": {"name": "Sworn Champion", "hp": 4, "armor": 0.6, "speed": 38.0, "morale": 110.0, "nerve": 0.4,
-		"radius": 10.0, "weapon": "mass_carbine", "leader": true},
+		"radius": 10.0, "weapon": "mass_carbine", "leader": true, "grenades": {"he": 1, "smoke": 2}},
 	"oathblade": {"name": "Sworn Oathblade", "hp": 3, "armor": 0.5, "speed": 47.0, "morale": 100.0, "nerve": 0.45,
-		"radius": 10.0, "weapon": "mass_pistol", "melee": "edict_blade", "charger": true},
+		"radius": 10.0, "weapon": "mass_pistol", "melee": "edict_blade", "charger": true, "grenades": {"he": 1, "ap": 1}},
 	"blade_champion": {"name": "Oathblade Champion", "hp": 4, "armor": 0.6, "speed": 47.0, "morale": 115.0, "nerve": 0.4,
-		"radius": 10.0, "weapon": "mass_pistol", "melee": "edict_greatblade", "charger": true, "leader": true},
+		"radius": 10.0, "weapon": "mass_pistol", "melee": "edict_greatblade", "charger": true, "leader": true, "grenades": {"he": 1, "smoke": 1, "ap": 1}},
 }
 
 ## armour = [front, side, rear]. Carriers hold a squad; one starts the battle inside.

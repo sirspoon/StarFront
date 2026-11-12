@@ -67,6 +67,7 @@ var charging: Soldier = null  # the enemy he's rushing at
 var charge_check := 0.0
 var charge_fresh := false     # the first blow after a charge lands harder
 var resume_to = null          # where he was going before he charged
+var grenades := {}            # grenades he carries: kind -> how many
 
 
 func setup(m: Node, sq: Squad, t: int, kind_id: String) -> void:
@@ -81,6 +82,7 @@ func setup(m: Node, sq: Squad, t: int, kind_id: String) -> void:
 	weapon = GameData.WEAPONS[data.weapon]
 	melee = GameData.MELEE[data.get("melee", "gun_butt")]
 	charger = data.get("charger", false)
+	grenades = data.get("grenades", {}).duplicate()
 	hp = data.hp
 	max_hp = hp
 	armor = data.armor
@@ -331,6 +333,11 @@ func _fight(dt: float, now: float) -> void:
 
 # ---------------------------------------------------------------- close combat
 
+## Pinned, or lying flat in the Down stance: easy meat for a man with a blade.
+func grounded() -> bool:
+	return state == State.PINNED or squad.prone
+
+
 func _reach(e: Soldier) -> float:
 	return radius + e.radius + 6.0
 
@@ -359,7 +366,7 @@ func _charge_target() -> Soldier:
 		if e.team == team or e.is_vehicle or not e.is_alive() or e.state == State.EMBARKED \
 				or e.state == State.ROUTING or not e.seen_by[team]:
 			continue
-		var d := position.distance_to(e.position)
+		var d := position.distance_to(e.position) - (35.0 if e.grounded() else 0.0)  # men on the ground draw them in
 		if d < bd and map.los_clear(position, e.position):
 			bd = d
 			best = e
@@ -414,7 +421,7 @@ func _melee(dt: float, now: float) -> bool:
 		return false
 	if not in_melee and charging != null:
 		# crashing into the enemy line: a shock to them
-		foe.add_suppression(15.0, now)
+		foe.add_suppression(25.0 if foe.grounded() else 15.0, now)
 		halt()
 	in_melee = true
 	charging = null
@@ -430,20 +437,24 @@ func _strike(foe: Soldier, now: float) -> void:
 	var m := melee
 	var p: float = m.hit
 	var sees_it := absf(wrapf((position - foe.position).angle() - foe.facing, -PI, PI)) < 1.6
-	if foe.state == State.READY and sees_it:
+	if foe.grounded():
+		# pinned or lying flat: he can't fend anything off, and assault troops butcher him
+		p *= 1.8 if charger else 1.3
+		if m.blade:
+			m = m.duplicate()
+			m.dmg = int(m.dmg) + 1  # a blade finishes a man on the ground
+	elif foe.state == State.READY and sees_it:
 		p *= 1.0 - float(foe.melee.parry)  # he sees it coming and fends it off
 	elif not sees_it:
 		p *= 1.25  # struck from behind
-	if foe.state == State.PINNED:
-		p *= 1.3  # cowering
 	if charge_fresh:
 		p *= 1.3
 		charge_fresh = false
-	if state == State.PINNED:
-		p *= 0.6
+	if grounded():
+		p *= 0.5  # fighting back from the ground
 	p = minf(p, 0.95)
 	swing = 1.0
-	melee_cd = float(m.cooldown) * randf_range(0.85, 1.15) * (2.0 if state == State.PINNED else 1.0)
+	melee_cd = float(m.cooldown) * randf_range(0.85, 1.15) * (1.8 if grounded() else 1.0)
 	last_fire_time = now
 	foe.add_suppression(6.0, now)
 	main.resolve_blow(self, foe, m, randf() < p)

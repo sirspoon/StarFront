@@ -53,6 +53,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `--shot-melee` waits (after `--shot-time`) for a close fight and centres the screenshot on it;
   `--debug-assault` prints where the assault squads are and what they're doing every 10 s. Test
   results also print close-combat blows, melee kills and each assault squad's kills.
+- `--test-grenades` (with `--autotest`) orders a smoke screen out of a squad's reach and prints whether
+  it moved up, threw both grenades and blocked sight. `--no-ai-grenades`: the computer throws none.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for
