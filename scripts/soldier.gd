@@ -129,11 +129,13 @@ func tick(dt: float, now: float) -> void:
 	if not moving and burst_left == 0 and flash <= 0.0 and squad.facing != Vector2.ZERO:
 		facing = lerp_angle(facing, squad.facing.angle(), minf(1.0, dt * 3.0))
 	var under_fire := now - last_hit_time < 3.0
-	suppression = maxf(0.0, suppression - dt * (4.0 if under_fire else 12.0))
+	# caught in a crossfire, nowhere feels safe: fear fades slower and nerves fray faster
+	var crossfire: bool = under_fire and not data.get("steadfast", false) and not main.no_flank and squad.in_crossfire(now)
+	suppression = maxf(0.0, suppression - dt * (4.0 if under_fire else 12.0) * (0.85 if crossfire else 1.0))
 	if not under_fire:
 		morale = minf(max_morale, morale + dt * (1.2 + 2.0 * squad.leader_bonus(self)))
 	elif suppression > 50.0:
-		morale -= dt * (suppression - 50.0) * 0.04 * nerve
+		morale -= dt * (suppression - 50.0) * 0.04 * nerve * (1.1 if crossfire else 1.0)
 	_update_state(under_fire)
 	match state:
 		State.ROUTING:

@@ -52,6 +52,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   --test-voice` (with `--autotest`, under xvfb) checks a move and a target order each get a reply.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
+- `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for
+  balance comparisons. Balance needs ~48 battles per setting to see a real difference.
 - `--test-follow` orders the player's squads to move every few seconds during a real battle and prints any
   soldier who didn't go, with his state.
 - `--test-touch` gives orders the way a phone does (tap, double-tap, hold-drag, hold) with nobody fighting;

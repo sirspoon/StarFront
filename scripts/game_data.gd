@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.33"
+const VERSION := "0.34"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -32,9 +32,11 @@ const WEAPONS := {
 		"tracer": Color(0.7, 0.9, 1.0), "width": 5.0},
 }
 
-## nerve multiplies morale loss (higher = panics sooner).
+## nerve multiplies morale loss (higher = panics sooner). Optional traits for later units:
+## "steadfast": true ignores being flanked or caught in crossfire; "flank_bonus": 1.5 makes
+## their fire from a flank count for more.
 const SOLDIERS := {
-	"conscript": {"name": "Conscript", "hp": 1, "armor": 0.1, "speed": 46.0, "morale": 60.0, "nerve": 1.25,
+	"conscript": {"name": "Conscript", "hp": 1, "armor": 0.1, "speed": 46.0, "morale": 70.0, "nerve": 1.1,
 		"radius": 7.0, "weapon": "lumen_rifle"},
 	"gunner": {"name": "Stubber gunner", "hp": 1, "armor": 0.1, "speed": 40.0, "morale": 65.0, "nerve": 1.1,
 		"radius": 7.0, "weapon": "heavy_stubber"},

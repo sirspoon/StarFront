@@ -86,6 +86,9 @@ var cover_blocks := [0, 0]   # shots at each side stopped by low cover
 var cover_time := [0.0, 0.0] # soldier-seconds spent in cover, per side
 var field_time := [0.0, 0.0]
 var last_wall_down = null
+var flank_shots := [0, 0]
+var no_flank := "--no-flank" in OS.get_cmdline_user_args()  # test aid: flanking off
+var crossfire_time := [0.0, 0.0]
 var shots := [0, 0]
 var hits := [0, 0]
 
@@ -702,6 +705,8 @@ func _process(dt: float) -> void:
 			field_time[s.team] += dt
 			if s.in_cover:
 				cover_time[s.team] += dt
+			if s.squad.in_crossfire(time):
+				crossfire_time[s.team] += dt
 	for ai in ais:
 		ai.tick(dt)
 	_update_objective(dt)
@@ -844,6 +849,17 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 	if shooter.state == Soldier.State.PINNED:
 		p *= 0.5
 	p *= 1.0 - shooter.suppression / 200.0
+	# flanking: fire from well off the squad's front, with no cover in the way, hits
+	# more often and rattles them more (moderately: this is tactics, not a wipe-out)
+	var flank := 0.0
+	if not target.is_vehicle:
+		flank = target.squad.note_fire(shooter.position - target.position, time)
+		if map.cover_vs(target.position, shooter.position) >= 0.25 or target.data.get("steadfast", false) or no_flank:
+			flank = 0.0
+		flank *= float(shooter.data.get("flank_bonus", 1.0)) if not shooter.is_vehicle else 1.0
+		p *= 1.0 + 0.25 * flank
+		if flank > 0.0:
+			flank_shots[shooter.team] += 1
 	if target.posture == "prone" and not target.is_vehicle:
 		p *= 0.7  # a man lying flat is a small target
 		var tt := map.get_t(map.cell_of(target.position))
@@ -889,7 +905,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 		return
 	if target.is_vehicle:
 		return
-	var supp: float = w.supp * (1.0 if hit else 0.6)
+	var supp: float = w.supp * (1.0 if hit else 0.6) * (1.0 + 0.3 * flank)
 	target.add_suppression(supp, time)
 	for o in soldiers:
 		if o != target and o.team == target.team and o.is_alive() \
@@ -1168,9 +1184,9 @@ func _end(winner: int, reason: String) -> void:
 		else:
 			fled[s.team] += 1
 	if autotest:
-		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d cover=%d%%/%d%% blocked=%s %s" % [
+		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d cover=%d%%/%d%% blocked=%s flank=%s crossfire=%d%%/%d%% %s" % [
 				factions[winner] if winner >= 0 else "draw", int(time), shots, hits,
-				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, reason])
+				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, flank_shots, int(100 * crossfire_time[0] / maxf(field_time[0], 1)), int(100 * crossfire_time[1] / maxf(field_time[1], 1)), reason])
 		get_tree().quit()
 		return
 	var head := "DRAW"

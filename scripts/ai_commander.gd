@@ -79,7 +79,21 @@ func _think(sq: Squad) -> void:
 				sq.order_move(main.map, c, false)  # stop running and get into cover here
 			return
 		if d < rng * 1.6 and not busy:
-			sq.order_move(main.map, c.move_toward(enemy.position, 110.0), false)
+			# if another of ours is already fighting this enemy, come at them from the side
+			var engaged = null
+			for o in main.squads:
+				if o != sq and o.team == team and not o.effective().is_empty() and o.center().distance_to(enemy.position) < rng * 0.85:
+					engaged = o
+					break
+			if engaged != null and not "--no-ai-flank" in OS.get_cmdline_user_args():
+				var axis: Vector2 = (enemy.position - engaged.center()).normalized()
+				var side := axis.orthogonal()
+				if (c - enemy.position).dot(side) < 0.0:
+					side = -side  # swing round on whichever side we're already on
+				var flank_spot: Vector2 = enemy.position + side * rng * 0.6 - axis * 40.0
+				sq.order_move(main.map, c.move_toward(flank_spot, 160.0), false)
+			else:
+				sq.order_move(main.map, c.move_toward(enemy.position, 110.0), false)
 			return
 	if busy:
 		return

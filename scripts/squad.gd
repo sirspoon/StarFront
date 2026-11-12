@@ -15,6 +15,8 @@ var facing := Vector2.ZERO  # the direction the squad watches (ZERO = no order)
 var sub: Array = []          # soldiers picked out individually (Alt+click); orders go to them only
 var think_timer := randf() * 1.2
 var prone := false      # 'Down' stance: lie flat (crouch behind low cover), crawl when moving
+var front := Vector2.ZERO   # the direction the squad is braced against (where its fight is)
+var fire_log: Array = []     # recent incoming fire: [time, direction]
 var queue: Array = []   # orders still to come: {kind: "move"/"line", a, b, face, run}
 var current = null      # the order being carried out now (for drawing the route), or null
 
@@ -263,7 +265,43 @@ func route() -> Array:
 	return out
 
 
+## Notes a shot coming in from dir (target towards shooter) and says how badly it
+## flanks the squad: 0 from the front it is braced against, up to 1 from behind.
+## The front follows sustained fire slowly, so the men gradually turn to face a
+## new threat and a flank attack pays off for a while, not for ever.
+func note_fire(dir: Vector2, now: float) -> float:
+	dir = dir.normalized()
+	fire_log.append([now, dir])
+	while not fire_log.is_empty() and now - fire_log[0][0] > 4.0:
+		fire_log.pop_front()
+	if front == Vector2.ZERO:
+		front = facing if facing != Vector2.ZERO else dir
+	var angle := absf(front.angle_to(dir))
+	front = front.lerp(dir, 0.04).normalized()
+	return clampf((angle - deg_to_rad(60.0)) / deg_to_rad(60.0), 0.0, 1.0)
+
+
+## Taking sustained fire from two clearly different directions at once: at least
+## a few shots from each, more than 110 degrees apart, in the last four seconds.
+func in_crossfire(now: float) -> bool:
+	if fire_log.size() < 6:
+		return false
+	var base: Vector2 = fire_log[-1][1]
+	var same := 0
+	var other := 0
+	for e in fire_log:
+		if now - e[0] > 4.0:
+			continue
+		var a := absf(base.angle_to(e[1]))
+		if a < deg_to_rad(40.0):
+			same += 1
+		elif a > deg_to_rad(110.0):
+			other += 1
+	return same >= 3 and other >= 3
+
+
 func order_move(map: BattleMap, pos: Vector2, run: bool, from_queue := false) -> void:
+	front = Vector2.ZERO  # on the move: they'll brace against whatever they meet next
 	if not from_queue:
 		queue.clear()
 		current = null
@@ -308,6 +346,7 @@ func _assign(ms: Array, slots: Array, run: bool) -> void:
 ## Spread out along the line a-b, each man taking the best cover near his spot,
 ## then watch towards face.
 func order_line(map: BattleMap, a: Vector2, b: Vector2, face: Vector2, run: bool, from_queue := false) -> void:
+	front = face  # braced the way they were told to face
 	if not from_queue:
 		queue.clear()
 		current = null

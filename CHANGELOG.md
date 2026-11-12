@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.34 (2026-11-12)
+Flanking.
+- Each squad braces against the direction its fight is coming from. Fire from well off that front
+  (more than about 60 degrees, most from behind) with no cover in the way hits a little more often
+  (up to +25%) and frightens the men more (up to +30% suppression). Cover facing the original
+  attackers keeps its full strength. The squad slowly turns to face a sustained new threat, so a
+  flank attack pays off for a while rather than for ever. Nothing on screen announces it.
+- A squad under sustained fire from two clearly opposite directions recovers from fear a little
+  slower and loses its nerve a little faster.
+- The computer's squads try it too: a free squad swings round to the side of an enemy another of
+  its squads is already fighting.
+- Ready for later units: a "steadfast" trait ignores flanking, a "flank_bonus" trait strengthens it.
+- Conscripts are a little steadier (morale 70, nerve 1.1), since flanking hurts brittle troops most.
+
 ## v0.33 (2026-11-12)
 - Fixed squad members getting stuck behind squad-mates who arrived first (worst for the big Sworn):
   a man standing still now steps aside for one who is walking, and a man held up for a moment
