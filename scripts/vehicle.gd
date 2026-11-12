@@ -243,6 +243,15 @@ func _drive(dt: float) -> void:
 		position += Vector2.from_angle(facing) * step
 		track_phase += step
 		_run_over(step / maxf(dt, 0.001))
+		var under: Array = []  # it flattens bushes, hedges and wire it drives over
+		for fx in [-0.4, 0.0, 0.4]:
+			for fy in [-0.35, 0.35]:
+				var c := map.cell_of(position + Vector2(length * fx, width * fy).rotated(facing))
+				var t := map.get_t(c)
+				if (t == BattleMap.T.BUSH or t == BattleMap.T.HEDGE or t == BattleMap.T.WIRE) and not under.has(c):
+					under.append(c)
+		if not under.is_empty():
+			map.crush_cells(under)
 	else:
 		track_phase += turn * 12.0
 

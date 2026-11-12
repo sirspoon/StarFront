@@ -10,11 +10,15 @@ const CELL := 16
 const W := 160
 const H := 100
 
-enum T { OPEN, RUBBLE, CRATER, FLOOR, WALL, WRECK, LOW, WINDOW }
+enum T { OPEN, RUBBLE, CRATER, FLOOR, WALL, WRECK, LOW, WINDOW, BUSH, HEDGE, WIRE }
 
-const COVER := [0.0, 0.35, 0.45, 0.15, 0.0, 0.0, 0.3, 0.0]
-const SPEED := [1.0, 0.7, 0.75, 1.0, 1.0, 1.0, 0.35, 1.0]
-const TERRAIN_NAMES := ["Open ground", "Rubble", "Crater", "Ruin floor", "Wall", "Wreck", "Low cover", "Window"]
+## BUSH hides a man who keeps still (and spoils aim a little); HEDGE blocks sight and is slow
+## to push through; WIRE (barbed wire) gives no cover and is very slow to cross. Vehicles
+## flatten all three.
+const COVER := [0.0, 0.35, 0.45, 0.15, 0.0, 0.0, 0.3, 0.0, 0.3, 0.3, 0.0]
+const SPEED := [1.0, 0.7, 0.75, 1.0, 1.0, 1.0, 0.35, 1.0, 0.7, 0.3, 0.22]
+const TERRAIN_NAMES := ["Open ground", "Rubble", "Crater", "Ruin floor", "Wall", "Wreck", "Low cover", "Window",
+		"Bushes", "Hedge", "Barbed wire"]
 const WINDOW_COVER := 0.5  # a man firing from just inside a window
 
 ## Low cover: chest-high things troops crouch behind and fire over. It doesn't block
@@ -46,6 +50,9 @@ var collapsed := PackedByteArray()     # cells whose roof fell in before the bat
 var low_kind := PackedByteArray()      # LowKind of each LOW cell (kept after it is destroyed, for its remains)
 var puddles: Array = []   # [center: Vector2, radius: float, squash: float]
 var roads: Array = []     # Rect2 in world pixels
+var plaza := Rect2i()     # the paved square round the chapel
+var parks: Array[Rect2i] = []
+var crushed := PackedByteArray()  # the T a cell was before a vehicle or blast flattened it (bush, hedge, wire)
 
 const WALL_HP := 100.0
 const CHAPEL_WALL_HP := 160.0
@@ -201,7 +208,8 @@ func los_clear(a: Vector2, b: Vector2) -> bool:
 		if c == last or c == ca or c == cb:
 			continue
 		last = c
-		if blocks(get_t(c)):
+		var t := get_t(c)
+		if blocks(t) or t == T.HEDGE:
 			return false
 	return true
 
@@ -406,31 +414,28 @@ func generate(seed_value: int) -> void:
 	grid.fill(T.OPEN)
 	collapsed.resize(W * H)
 	collapsed.fill(0)
-	roads = [Rect2(0, H * 0.8 * CELL, W * CELL, 5 * CELL), Rect2(W * 0.3 * CELL, 0, 5 * CELL, H * CELL)]
-	_make_chapel()
-	var tries := 0
-	while buildings.size() < 22 and tries < 600:
-		tries += 1
-		var r := Rect2i(rng.randi_range(16, W - 34), rng.randi_range(2, H - 14),
-				rng.randi_range(8, 16), rng.randi_range(6, 11))
-		if r.end.x > W - 16 or r.end.y > H - 2:
-			continue
-		if _overlaps(r.grow(3)):
-			continue
-		_make_ruin(r)
-	for i in 30:
-		_make_crater()
-	for i in 7:
-		_make_wreck()
-	for i in 40:
-		_make_rubble_patch()
 	low_kind.resize(W * H)
 	low_kind.fill(0)
+	crushed.resize(W * H)
+	crushed.fill(0)
+	_make_city()
+	for i in 22:
+		_make_crater()
+	for i in 6:
+		_make_wreck()
+	for i in 26:
+		_make_rubble_patch()
+	for i in 14:
+		_make_scrub()
 	_crumble_walls()
 	_make_windows()
-	for i in 16:
-		_make_sandbags(i < 7)
+	for i in 8:
+		_make_sandbags(i < 4)
+	for i in 4:
+		_make_base(i < 2)
 	_make_barricades()
+	for i in 14:
+		_make_wire()
 	for i in 30:
 		scorches.append([Vector2(rng.randf_range(0, W * CELL), rng.randf_range(0, H * CELL)),
 				rng.randf_range(20, 60)])
@@ -438,6 +443,277 @@ func generate(seed_value: int) -> void:
 	_init_roofs()
 	_make_decor()
 	_build_astar()
+
+
+# ---------------------------------------------------------------- the city
+
+## Streets laid out the way a city's are: avenues running north-south, two cross streets,
+## the chapel in a paved square in the middle, and city blocks between them, each built
+## up, a park, a walled compound or a bombed-out lot. The deployment strips at either end
+## stay open ground.
+func _make_city() -> void:
+	var vx := [rng.randi_range(27, 33), rng.randi_range(50, 56), rng.randi_range(104, 110), rng.randi_range(127, 133)]
+	var vw := [4, 5, 5, 4]
+	var hy := [rng.randi_range(22, 28), rng.randi_range(70, 76)]
+	var hw := [5, 5]
+	for i in vx.size():
+		roads.append(Rect2(vx[i] * CELL, 0, vw[i] * CELL, H * CELL))
+	for i in hy.size():
+		roads.append(Rect2(0, hy[i] * CELL, W * CELL, hw[i] * CELL))
+	_make_chapel()
+	plaza = chapel.grow(5)
+	# the city blocks: between the deployment strips, the avenues and the cross streets
+	var xs := [[16, vx[0] - 1]]
+	for i in range(vx.size() - 1):
+		xs.append([vx[i] + vw[i] + 1, vx[i + 1] - 1])
+	xs.append([vx[vx.size() - 1] + vw[vw.size() - 1] + 1, W - 17])
+	var ys := [[1, hy[0] - 1], [hy[0] + hw[0] + 1, hy[1] - 1], [hy[1] + hw[1] + 1, H - 2]]
+	var blocks: Array[Rect2i] = []
+	for xr in xs:
+		for yr in ys:
+			var r := Rect2i(xr[0], yr[0], xr[1] - xr[0], yr[1] - yr[0])
+			if r.size.x >= 6 and r.size.y >= 6:
+				blocks.append(r)
+	blocks.sort_custom(func(p, q): return _h(p.position.x, p.position.y) < _h(q.position.x, q.position.y))
+	var kinds := ["park", "compound"]  # at least one of each
+	for i in blocks.size():
+		var b := blocks[i]
+		if b.intersects(plaza):
+			_make_square(b)
+			continue
+		var kind: String = kinds.pop_front() if not kinds.is_empty() else ["built", "built", "built", "park", "compound", "lot"][rng.randi() % 6]
+		match kind:
+			"built":
+				_make_built_block(b)
+			"park":
+				_make_park(b)
+			"compound":
+				_make_compound(b)
+			_:
+				for k in 3:
+					_make_rubble_patch_at(Vector2(b.position) + Vector2(b.size) * Vector2(rng.randf(), rng.randf()))
+
+
+func _h(a: int, b: int) -> float:
+	return float(hash(Vector3i(a, b, map_seed)) % 10000) / 10000.0
+
+
+func is_road(c: Vector2i) -> bool:
+	var p := center_of(c)
+	for rd in roads:
+		if (rd as Rect2).has_point(p):
+			return true
+	return false
+
+
+## The chapel's block: the square round it, with the rest of the block built up.
+func _make_square(b: Rect2i) -> void:
+	for side in 2:  # a building or two on the far edges of the block, clear of the square
+		var strip := Rect2i(b.position.x, b.position.y, b.size.x, plaza.position.y - b.position.y - 2) if side == 0 \
+				else Rect2i(b.position.x, plaza.end.y + 2, b.size.x, b.end.y - plaza.end.y - 2)
+		if strip.size.y >= 6:
+			_make_built_block(strip)
+
+
+## Buildings along the block's edges facing the streets, alleys between them, yards behind.
+func _make_built_block(b: Rect2i) -> void:
+	var rows := 2 if b.size.y >= 17 else 1
+	for row in rows:
+		var depth := mini(rng.randi_range(6, 11), b.size.y - 1 if rows == 1 else b.size.y / 2 - 1)
+		if depth < 5:
+			continue
+		var y := b.position.y if row == 0 else b.end.y - depth
+		if rows == 1 and rng.randf() < 0.5:
+			y = b.end.y - depth  # face the other street
+		var x := b.position.x
+		while x < b.end.x - 5:
+			var w := mini(rng.randi_range(7, 16), b.end.x - x)
+			if b.end.x - (x + w) < 6:
+				w = b.end.x - x  # don't leave a sliver
+			if w >= 6:
+				var r := Rect2i(x, y, w, depth)
+				if not _overlaps(r.grow(1)) and not r.intersects(plaza):
+					_make_ruin(r)
+			x += w + rng.randi_range(2, 3)  # an alley
+
+
+## A park: dead grass, gravel paths, bushes and clipped hedges, a low wall round it.
+func _make_park(b: Rect2i) -> void:
+	var r := b.grow(-1)
+	parks.append(r)
+	var walled := rng.randf() < 0.65
+	for c in _ring(r):
+		if walled and rng.randf() > 0.12:
+			_set_low(c, LowKind.STONE)
+		elif not walled and rng.randf() > 0.2:
+			set_t(c, T.HEDGE)
+	# gates: gaps in the middle of each side
+	for g in [Vector2i(r.get_center().x, r.position.y), Vector2i(r.get_center().x, r.end.y - 1),
+			Vector2i(r.position.x, r.get_center().y), Vector2i(r.end.x - 1, r.get_center().y)]:
+		for k in range(-1, 2):
+			var gc: Vector2i = g + (Vector2i(k, 0) if g.y == r.position.y or g.y == r.end.y - 1 else Vector2i(0, k))
+			set_t(gc, T.OPEN)
+			low_kind[gc.y * W + gc.x] = 0
+	var inner := r.grow(-2)
+	for i in int(inner.get_area() / 20):  # clumps of bushes
+		var o := Vector2(inner.position) + Vector2(inner.size) * Vector2(rng.randf(), rng.randf())
+		var rad := rng.randf_range(0.8, 1.8)
+		for x in range(int(o.x - rad), int(o.x + rad) + 1):
+			for y in range(int(o.y - rad), int(o.y + rad) + 1):
+				var c := Vector2i(x, y)
+				if inner.has_point(c) and get_t(c) == T.OPEN and Vector2(c).distance_to(o) <= rad and rng.randf() < 0.85:
+					set_t(c, T.BUSH)
+	for i in rng.randi_range(2, 4):  # hedge rows
+		var horiz := rng.randf() < 0.5
+		var o := Vector2i(rng.randi_range(inner.position.x, inner.end.x - 1), rng.randi_range(inner.position.y, inner.end.y - 1))
+		var along := Vector2i(1, 0) if horiz else Vector2i(0, 1)
+		var length := rng.randi_range(4, 9)
+		var gap := rng.randi_range(1, length - 2)
+		for k in length:
+			var c := o + along * k
+			if k != gap and inner.has_point(c) and get_t(c) == T.OPEN:
+				set_t(c, T.HEDGE)
+
+
+## A compound: a tall wall round the block with a gate on a street, and inside a
+## building, a fortified position or both.
+func _make_compound(b: Rect2i) -> void:
+	var r := b.grow(-1)
+	for c in _ring(r):
+		set_t(c, T.WALL)
+	# a gate wide enough for a vehicle on each long side, and a breach or two
+	var gx := rng.randi_range(r.position.x + 2, r.end.x - 5)
+	for side_y in [r.position.y, r.end.y - 1]:
+		for k in 3:
+			set_t(Vector2i(gx + k, side_y), T.OPEN)
+	var gy := rng.randi_range(r.position.y + 2, r.end.y - 5)
+	for k in 3:
+		set_t(Vector2i(r.position.x if rng.randf() < 0.5 else r.end.x - 1, gy + k), T.OPEN)
+	for c in _ring(r):
+		if get_t(c) == T.WALL:
+			var roll := rng.randf()
+			if roll < 0.05:
+				set_t(c, T.RUBBLE)
+			elif roll < 0.12:
+				_set_low(c, LowKind.STONE)
+	var inner := r.grow(-2)
+	if inner.size.x >= 9 and inner.size.y >= 7 and rng.randf() < 0.7:
+		var w := mini(rng.randi_range(8, 14), inner.size.x - 2)
+		var h := mini(rng.randi_range(6, 10), inner.size.y - 2)
+		var bx := inner.position.x + rng.randi_range(0, inner.size.x - w)
+		var by := inner.position.y + rng.randi_range(0, inner.size.y - h)
+		_make_ruin(Rect2i(bx, by, w, h))
+
+
+## The cells round the edge of r.
+func _ring(r: Rect2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for x in range(r.position.x, r.end.x):
+		out.append(Vector2i(x, r.position.y))
+		out.append(Vector2i(x, r.end.y - 1))
+	for y in range(r.position.y + 1, r.end.y - 1):
+		out.append(Vector2i(r.position.x, y))
+		out.append(Vector2i(r.end.x - 1, y))
+	return out
+
+
+## A fortified position: a ring of sandbags (its sides running straight and at angles),
+## an opening at the back, and barbed wire strung in front of it.
+func _make_base(near_chapel: bool) -> void:
+	for attempt in 40:
+		var o := Vector2(rng.randi_range(20, W - 21), rng.randi_range(5, H - 6))
+		if near_chapel:
+			o = Vector2(plaza.get_center()) + Vector2(rng.randf_range(-1, 1) * (plaza.size.x * 0.5 + 6), rng.randf_range(-1, 1) * (plaza.size.y * 0.5 + 6))
+		var rad := rng.randf_range(2.6, 3.6)
+		var facing := 0.0 if o.x < W * 0.5 else PI  # its front faces the far side of the map
+		facing += rng.randf_range(-0.6, 0.6)
+		var cells: Array = []
+		var n := 40
+		for i in n:
+			var a := i * TAU / n
+			if absf(wrapf(a - facing - PI, -PI, PI)) < 0.5:
+				continue  # the way in, at the back
+			var c := Vector2i(roundi(o.x + cos(a) * rad), roundi(o.y + sin(a) * rad))
+			if not cells.has(c):
+				cells.append(c)
+		var wire: Array = []
+		for i in n:
+			var a := i * TAU / n
+			if absf(wrapf(a - facing, -PI, PI)) > 0.9:
+				continue
+			var c := Vector2i(roundi(o.x + cos(a) * (rad + 3.0)), roundi(o.y + sin(a) * (rad + 3.0)))
+			if not wire.has(c):
+				wire.append(c)
+		if not _open_run(cells) or chapel.grow(2).intersects(Rect2i(Vector2i(o) - Vector2i(5, 5), Vector2i(10, 10))):
+			continue
+		for c in cells:
+			_set_low(c, LowKind.SANDBAGS)
+		for c in wire:
+			if in_bounds(c) and get_t(c) == T.OPEN:
+				set_t(c, T.WIRE)
+		return
+
+
+## A run of barbed wire: across a street, in front of a position or out in the open,
+## straight or at an angle.
+func _make_wire() -> void:
+	for attempt in 30:
+		var o := Vector2i(rng.randi_range(18, W - 19), rng.randi_range(3, H - 4))
+		var dirs := [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(1, -1)]
+		var along: Vector2i = dirs[rng.randi() % 4]
+		var cells: Array = []
+		for k in rng.randi_range(4, 8):
+			cells.append(o + along * k)
+		if not _open_run(cells):
+			continue
+		for c in cells:
+			set_t(c, T.WIRE)
+		return
+
+
+## Flatten a bush, hedge or wire cell (a vehicle drove over it or a shell burst on it).
+func crush(c: Vector2i) -> bool:
+	var t := get_t(c)
+	if t != T.BUSH and t != T.HEDGE and t != T.WIRE:
+		return false
+	crushed[c.y * W + c.x] = t
+	set_t(c, T.OPEN)
+	_refresh_cells([c])
+	return true
+
+
+## A clump of wild scrub grown up on waste ground (not on the streets).
+func _make_scrub() -> void:
+	for attempt in 20:
+		var o := Vector2(rng.randf_range(18, W - 18), rng.randf_range(2, H - 2))
+		if is_road(Vector2i(o)) or get_t(Vector2i(o)) != T.OPEN:
+			continue
+		var rad := rng.randf_range(0.8, 1.6)
+		for x in range(int(o.x - rad), int(o.x + rad) + 1):
+			for y in range(int(o.y - rad), int(o.y + rad) + 1):
+				var c := Vector2i(x, y)
+				if get_t(c) == T.OPEN and not is_road(c) and Vector2(c).distance_to(o) <= rad and rng.randf() < 0.75:
+					set_t(c, T.BUSH)
+		return
+
+
+## Flatten every bush, hedge and wire cell under a footprint (cells), repainting once.
+func crush_cells(cells: Array) -> void:
+	var done: Array = []
+	for c in cells:
+		if crush(c):
+			done.append(c)
+	if not done.is_empty():
+		cells_changed.emit(done)
+
+
+func _make_rubble_patch_at(c: Vector2) -> void:
+	var rad := rng.randf_range(1.0, 2.5)
+	for x in range(int(c.x - rad), int(c.x + rad) + 1):
+		for y in range(int(c.y - rad), int(c.y + rad) + 1):
+			var cell := Vector2i(x, y)
+			if get_t(cell) == T.OPEN and Vector2(cell).distance_to(c) <= rad and rng.randf() < 0.7:
+				set_t(cell, T.RUBBLE)
 
 
 ## Roofs over the buildings: whole where the building still stands, gone where it
@@ -669,8 +945,16 @@ func _make_crater() -> void:
 
 func _make_wreck() -> void:
 	var horiz := rng.randf() < 0.5
+	var at := Vector2i(rng.randi_range(16, W - 22), rng.randi_range(3, H - 9))
+	if rng.randf() < 0.7 and not roads.is_empty():
+		# most burnt-out vehicles lie in the streets, lined up with them
+		var rd: Rect2 = roads[rng.randi() % roads.size()]
+		horiz = rd.size.x > rd.size.y
+		at = Vector2i(rd.position / CELL) + Vector2i(rng.randi_range(0, int(rd.size.x / CELL) - 6), rng.randi_range(0, int(rd.size.y / CELL) - 6))
+		at.x = clampi(at.x, 16, W - 22)
+		at.y = clampi(at.y, 3, H - 9)
 	var size := Vector2i(6, 3) if horiz else Vector2i(3, 6)
-	var r := Rect2i(Vector2i(rng.randi_range(16, W - 22), rng.randi_range(3, H - 9)), size)
+	var r := Rect2i(at, size)
 	var area := r.grow(2)
 	for x in range(area.position.x, area.end.x):
 		for y in range(area.position.y, area.end.y):
@@ -755,6 +1039,10 @@ func _make_sandbags(near_chapel: bool) -> void:
 		var length := rng.randi_range(3, 6)
 		var along := Vector2i(1, 0) if horiz else Vector2i(0, 1)
 		var side := Vector2i(0, 1) if horiz else Vector2i(1, 0)
+		if rng.randf() < 0.4:
+			# at an angle: a diagonal run, its arms going off straight
+			along = Vector2i(1, 1) if rng.randf() < 0.5 else Vector2i(1, -1)
+			side = Vector2i(1, 0) if rng.randf() < 0.5 else Vector2i(0, 1)
 		if rng.randf() < 0.5:
 			side = -side
 		for k in length:
@@ -778,7 +1066,7 @@ func _make_barricades() -> void:
 	for rd in roads:
 		var r: Rect2 = rd
 		var horiz := r.size.x > r.size.y
-		for n in 3:
+		for n in rng.randi_range(1, 2):
 			for attempt in 20:
 				var cells: Array = []
 				if horiz:
@@ -798,7 +1086,7 @@ func _make_barricades() -> void:
 	for i in 6:
 		for attempt in 20:
 			var o := Vector2i(rng.randi_range(18, W - 19), rng.randi_range(3, H - 4))
-			var along := Vector2i(1, 0) if rng.randf() < 0.5 else Vector2i(0, 1)
+			var along: Vector2i = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(1, -1)][rng.randi() % 4]
 			var cells: Array = []
 			for k in rng.randi_range(3, 5):
 				cells.append(o + along * k)

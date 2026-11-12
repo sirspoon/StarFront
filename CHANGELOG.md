@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.46 (2026-11-12)
+A proper city to fight in.
+- The map is laid out like a city: four avenues running north-south and two cross streets, with
+  pavements along them and kerbs that stop at the junctions. The chapel stands in a paved square
+  in the middle. Each city block between the streets is one of:
+  - built up: rows of buildings facing the streets, with alleys between them and yards behind;
+  - a park: dead grass, gravel paths, clumps of bushes and hedges, a low wall (or a hedge) round it;
+  - a walled compound: a tall wall round the block with vehicle-wide gates and a breach or two,
+    usually with a building inside;
+  - a bombed-out lot of rubble and craters.
+  The deployment strips at either end stay open. Burnt-out vehicles now mostly lie in the streets.
+- Sandbags and barricades can run at angles as well as straight, and there are a few ring-shaped
+  sandbagged positions (with angled sides and a way in at the back) with barbed wire in front.
+- New ground:
+  - Bushes: a man keeping still in them is hard to spot, and they spoil aim a little.
+  - Hedges: block sight completely; men can push through, slowly.
+  - Barbed wire: no cover, and very slow to get through (men path round it if they can).
+  Vehicles flatten all three as they drive over them, and shell bursts blow them apart.
+
 ## v0.45 (2026-11-12)
 Tracks, running men down, and more blood.
 - Vehicles leave track marks in the dirt wherever they drive (two treads with the plates' imprint).

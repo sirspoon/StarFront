@@ -76,6 +76,9 @@ func _draw_all() -> void:
 	var area := _cell_area()
 	_draw_ground()
 	_draw_roads()
+	if map.plaza.intersects(area.grow(2)):
+		_draw_plaza()
+	_draw_parks()
 	for s in map.scorches:
 		if _near(s[0], s[1]):
 			_draw_scorch(s[0], s[1])
@@ -111,6 +114,20 @@ func _draw_all() -> void:
 		for x in range(area.position.x, area.end.x):
 			if map.get_t(Vector2i(x, y)) == T.LOW:
 				_draw_low(Vector2i(x, y))
+	for y in range(area.position.y, area.end.y):
+		for x in range(area.position.x, area.end.x):
+			var c := Vector2i(x, y)
+			match map.get_t(c):
+				T.BUSH:
+					_draw_bush(c)
+				T.HEDGE:
+					_draw_hedge(c)
+				T.WIRE:
+					_draw_wire(c)
+				T.OPEN:
+					var was := map.crushed[y * BattleMap.W + x]
+					if was != 0:
+						_draw_crushed(c, was)
 	# shadows, then wrecks, then the walls themselves from back to front
 	for y in range(area.position.y, area.end.y):
 		for x in range(area.position.x, area.end.x):
@@ -186,27 +203,68 @@ func _draw_ground_scatter(c: Vector2i) -> void:
 		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
 
 
+func _in_road(p: Vector2, except := -1) -> bool:
+	for i in map.roads.size():
+		if i != except and (map.roads[i] as Rect2).has_point(p):
+			return true
+	return false
+
+
+## The streets: pavements of worn flagstones along each side, the carriageway, kerbs
+## (broken off where another street crosses), lane markings, cracks and potholes.
 func _draw_roads() -> void:
-	for rd in map.roads:
-		var r: Rect2 = rd
-		if not r.intersects(Rect2(Vector2(cells.position * C), Vector2(cells.size * C)).grow(20)):
+	var view := Rect2(Vector2(cells.position * C), Vector2(cells.size * C)).grow(20)
+	# pavements first, so the streets lie over them at junctions
+	for i in map.roads.size():
+		var r: Rect2 = map.roads[i]
+		var horiz := r.size.x > r.size.y
+		for side in 2:
+			var strip := Rect2(r.position.x, r.position.y - C if side == 0 else r.end.y, r.size.x, C) if horiz \
+					else Rect2(r.position.x - C if side == 0 else r.end.x, r.position.y, C, r.size.y)
+			if not strip.intersects(view):
+				continue
+			var length := strip.size.x if horiz else strip.size.y
+			var s := 0.0
+			while s < length:
+				var slab := Rect2(strip.position + Vector2(s, 0), Vector2(C, C)) if horiz else Rect2(strip.position + Vector2(0, s), Vector2(C, C))
+				s += C
+				if not slab.intersects(view) or _in_road(slab.get_center()):
+					continue
+				var cc := map.cell_of(slab.get_center())
+				var t := map.get_t(cc)
+				if t != T.OPEN and t != T.RUBBLE and t != T.CRATER:
+					continue
+				var shade := 0.33 + (_h(cc.x, cc.y, 71) - 0.5) * 0.05
+				draw_rect(slab, Color(shade, shade * 0.97, shade * 0.93, 0.85))
+				draw_rect(slab, Color(0.12, 0.11, 0.1, 0.5), false, 0.6)
+				if _h(cc.x, cc.y, 72) < 0.25:  # a cracked or missing flag
+					draw_line(slab.position + Vector2(2, _h(cc.x, cc.y, 73) * C), slab.position + Vector2(C - 2, _h(cc.x, cc.y, 74) * C), Color(0.08, 0.08, 0.08, 0.6), 0.6)
+	for i in map.roads.size():
+		var r: Rect2 = map.roads[i]
+		if r.intersects(view):
+			draw_rect(r, Color(0.16, 0.16, 0.17, 0.85))
+	for i in map.roads.size():
+		var r: Rect2 = map.roads[i]
+		if not r.intersects(view):
 			continue
 		var horiz := r.size.x > r.size.y
-		draw_rect(r, Color(0.16, 0.16, 0.17, 0.8))
-		# kerbs
-		if horiz:
-			draw_rect(Rect2(r.position, Vector2(r.size.x, 2)), Color(0.42, 0.4, 0.37, 0.8))
-			draw_rect(Rect2(r.position + Vector2(0, r.size.y - 2), Vector2(r.size.x, 2)), Color(0.42, 0.4, 0.37, 0.8))
-		else:
-			draw_rect(Rect2(r.position, Vector2(2, r.size.y)), Color(0.42, 0.4, 0.37, 0.8))
-			draw_rect(Rect2(r.position + Vector2(r.size.x - 2, 0), Vector2(2, r.size.y)), Color(0.42, 0.4, 0.37, 0.8))
 		var length := r.size.x if horiz else r.size.y
 		var mid := r.get_center()
+		# kerbs, in pieces so they stop at the junctions
 		var s := 0.0
+		while s < length:
+			for edge in 2:
+				var p := Vector2(r.position.x + s, r.position.y if edge == 0 else r.end.y - 2) if horiz \
+						else Vector2(r.position.x if edge == 0 else r.end.x - 2, r.position.y + s)
+				if view.has_point(p) and not _in_road(p + (Vector2(4, 1) if horiz else Vector2(1, 4)), i) \
+						and not _in_road(p + (Vector2(4, -3) if horiz else Vector2(-3, 4)) if edge == 0 else p + (Vector2(4, 5) if horiz else Vector2(5, 4)), i):
+					draw_rect(Rect2(p, Vector2(8, 2) if horiz else Vector2(2, 8)), Color(0.42, 0.4, 0.37, 0.85))
+			s += 8.0
+		s = 0.0
 		while s < length:
 			# worn lane markings, cracks and potholes every few metres
 			var p := Vector2(r.position.x + s, mid.y) if horiz else Vector2(mid.x, r.position.y + s)
-			if _near(p, 40):
+			if _near(p, 40) and not _in_road(p, i) and not _in_road(p + (Vector2(26, 0) if horiz else Vector2(0, 26)), i):
 				_seed(int(s), int(r.position.x + r.position.y), 3)
 				var dash := Rect2(p - Vector2(0, 1.2), Vector2(26, 2.4)) if horiz else Rect2(p - Vector2(1.2, 0), Vector2(2.4, 26))
 				draw_rect(dash, Color(0.65, 0.58, 0.4, rng.randf_range(0.12, 0.35)))
@@ -221,6 +279,154 @@ func _draw_roads() -> void:
 					var hp := pts[3]
 					draw_colored_polygon(_blob(hp, rng.randf_range(3, 7), 0.7, 0.5, int(s)), Color(0.08, 0.08, 0.08, 0.85))
 			s += 64.0
+
+
+## The chapel square: big worn flagstones, cracked and stained.
+func _draw_plaza() -> void:
+	var pr := map.plaza
+	for x in range(pr.position.x, pr.end.x, 2):
+		for y in range(pr.position.y, pr.end.y, 2):
+			var c := Vector2i(x, y)
+			if not _cell_area().grow(1).has_point(c):
+				continue
+			var rr := Rect2(Vector2(c) * C, Vector2(C, C) * 2.0)
+			var shade := 0.38 + (_h(x, y, 81) - 0.5) * 0.07
+			draw_rect(rr, Color(shade, shade * 0.97, shade * 0.92, 0.9))
+			_tex_patch(ground_grit, rr, x, y, 0.35)
+			draw_rect(rr, Color(0.1, 0.1, 0.09, 0.55), false, 0.8)
+			if _h(x, y, 82) < 0.3:
+				_crack(rr.position + Vector2(_h(x, y, 83), 0) * rr.size.x, rr.position + Vector2(_h(x, y, 84), 1) * rr.size.x, rr, 0.7, Color(shade, shade, shade))
+
+
+## Parks: dead, trampled grass and gravel paths from the gates.
+func _draw_parks() -> void:
+	var area := _cell_area()
+	for pk in map.parks:
+		var r: Rect2i = pk
+		if not r.intersects(area.grow(2)):
+			continue
+		for x in range(maxi(r.position.x, area.position.x), mini(r.end.x, area.end.x)):
+			for y in range(maxi(r.position.y, area.position.y), mini(r.end.y, area.end.y)):
+				var c := Vector2i(x, y)
+				var o := Vector2(c) * C
+				var g := 0.5 + (_h(x / 2, y / 2, 91) - 0.5) * 0.4
+				draw_rect(Rect2(o, Vector2(C, C)), Color(0.24 * g + 0.12, 0.27 * g + 0.13, 0.13 * g + 0.08, 0.7))
+				_seed(x, y, 92)
+				for k in 6:  # tufts of dry grass
+					var p := o + Vector2(rng.randf() * C, rng.randf() * C)
+					var col := Color(0.38, 0.38, 0.2).darkened(rng.randf() * 0.4)
+					for b in 3:
+						draw_line(p, p + Vector2.from_angle(-PI * 0.5 + rng.randf_range(-1.0, 1.0)) * rng.randf_range(2.0, 4.0), col, 0.6)
+		var cx := r.get_center()
+		for horiz in [true, false]:  # gravel paths across
+			var path := Rect2(Vector2(r.position.x, cx.y - 1) * C, Vector2(r.size.x, 2) * C) if horiz \
+					else Rect2(Vector2(cx.x - 1, r.position.y) * C, Vector2(2, r.size.y) * C)
+			if path.intersects(Rect2(Vector2(area.position * C), Vector2(area.size * C))):
+				draw_rect(path, Color(0.42, 0.38, 0.3, 0.75))
+				_tex_patch(ground_grit, path, int(path.position.x), int(path.position.y), 0.6)
+
+
+func _bush_col(c: Vector2i, k: int) -> Color:
+	return Color(0.17, 0.23, 0.13).lightened((_h(c.x * 3 + k, c.y, 101) - 0.5) * 0.15)
+
+
+## A bush: a clump of leafy masses, dark and dusty, lit from the top left.
+func _draw_bush(c: Vector2i) -> void:
+	var o := Vector2(c) * C + Vector2(8, 8)
+	_seed(c.x, c.y, 100)
+	var n := rng.randi_range(3, 5)
+	var blobs: Array = []
+	for k in n:
+		blobs.append([o + Vector2(rng.randf_range(-5, 5), rng.randf_range(-5, 5)), rng.randf_range(4.0, 7.0)])
+	for b in blobs:
+		_poly(_blob(b[0] + Vector2(2.5, 3), b[1], 0.9, 0.4, c.x * 7 + c.y), Color(0, 0, 0, 0.35))
+	for i in blobs.size():
+		var b: Array = blobs[i]
+		var col := _bush_col(c, i)
+		_poly(_blob(b[0], b[1], 0.95, 0.45, c.x * 11 + c.y * 3 + i), col)
+		for k in 7:  # leaves catching the light
+			var p: Vector2 = b[0] + Vector2(rng.randf_range(-1, 0.6), rng.randf_range(-1, 0.6)) * b[1] * 0.8
+			draw_circle(p, rng.randf_range(0.8, 1.6), col.lightened(rng.randf_range(0.1, 0.3)))
+		if rng.randf() < 0.4:
+			draw_circle(b[0] + Vector2(rng.randf_range(-3, 3), rng.randf_range(-3, 3)), 1.0, Color(0.42, 0.3, 0.16))  # dead leaves
+
+
+func _hedge_linked(c: Vector2i) -> bool:
+	return map.get_t(c) == T.HEDGE
+
+
+## A clipped hedge: a dense block of foliage joined to its neighbours, gone ragged with
+## neglect, darker on its shaded sides.
+func _draw_hedge(c: Vector2i) -> void:
+	var o := Vector2(c) * C
+	var r := Rect2(o + Vector2(1.5, 1.5), Vector2(C - 3, C - 3))
+	if _hedge_linked(c + Vector2i(-1, 0)): r = r.grow_individual(1.5, 0, 0, 0)
+	if _hedge_linked(c + Vector2i(1, 0)): r = r.grow_individual(0, 0, 1.5, 0)
+	if _hedge_linked(c + Vector2i(0, -1)): r = r.grow_individual(0, 1.5, 0, 0)
+	if _hedge_linked(c + Vector2i(0, 1)): r = r.grow_individual(0, 0, 0, 1.5)
+	draw_rect(Rect2(r.position + Vector2(3, 4), r.size), Color(0, 0, 0, 0.35))
+	var col := Color(0.14, 0.2, 0.11).lightened((_h(c.x, c.y, 102) - 0.5) * 0.08)
+	draw_rect(r, col)
+	_seed(c.x, c.y, 103)
+	for k in 26:  # the leaf texture, lighter towards the lit top-left
+		var p := r.position + Vector2(rng.randf(), rng.randf()) * r.size
+		var lit := 1.0 - ((p.x - r.position.x) / r.size.x + (p.y - r.position.y) / r.size.y) * 0.5
+		draw_circle(p, rng.randf_range(0.8, 1.8), col.lightened(lit * 0.25 - 0.05).darkened(rng.randf() * 0.15))
+	for k in 6:  # straggly bits poking out
+		var p := r.position + Vector2(rng.randf(), rng.randf()) * r.size
+		draw_line(p, p + Vector2.from_angle(rng.randf() * TAU) * 3.0, col.lightened(0.1), 0.7)
+
+
+func _wire_linked(c: Vector2i) -> bool:
+	return map.get_t(c) == T.WIRE
+
+
+## Barbed wire: coils strung between iron pickets, along whichever way the run goes.
+func _draw_wire(c: Vector2i) -> void:
+	var mid := Vector2(c) * C + Vector2(8, 8)
+	var along := Vector2(1, 0)
+	for d in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(1, -1)]:
+		if _wire_linked(c + d) or _wire_linked(c - d):
+			along = Vector2(d).normalized()
+			break
+	var half := 8.0 * (1.41 if absf(along.x) > 0.1 and absf(along.y) > 0.1 else 1.0)
+	var a := mid - along * half
+	var b := mid + along * half
+	var metal := Color(0.52, 0.5, 0.47)
+	# pickets
+	for p in [mid - along * half * 0.5, mid + along * half * 0.5]:
+		draw_line(p + Vector2(1, 1.5), p + Vector2(1, -3.5), Color(0, 0, 0, 0.4), 1.6)
+		draw_line(p, p + Vector2(0, -4.5), Color(0.25, 0.2, 0.15), 1.3)
+	# coils: overlapping loops along the run
+	var n := 5
+	for k in n:
+		var q := a.lerp(b, (k + 0.5) / n)
+		draw_set_transform(q, along.angle(), Vector2(1.0, 0.75))
+		draw_arc(Vector2(0, 1.2), 3.6, 0, TAU, 12, Color(0, 0, 0, 0.35), 0.7)
+		draw_arc(Vector2.ZERO, 3.6, 0, TAU, 12, metal.darkened(_h(c.x + k, c.y, 104) * 0.3), 0.6)
+		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+	draw_line(a, b, metal.darkened(0.2), 0.5)  # the line strand
+	_seed(c.x, c.y, 105)
+	for k in 6:  # barbs
+		var p := a.lerp(b, rng.randf()) + along.orthogonal() * rng.randf_range(-3, 3)
+		draw_line(p - Vector2(0.8, 0.8), p + Vector2(0.8, 0.8), metal, 0.4)
+		draw_line(p - Vector2(0.8, -0.8), p + Vector2(0.8, -0.8), metal, 0.4)
+
+
+## What's left after a vehicle drove over a bush, hedge or wire, or a shell burst on it.
+func _draw_crushed(c: Vector2i, was: int) -> void:
+	var o := Vector2(c) * C
+	_seed(c.x, c.y, 106)
+	if was == T.WIRE:
+		for k in 4:
+			var p := o + Vector2(rng.randf_range(2, 14), rng.randf_range(4, 12))
+			draw_arc(p, rng.randf_range(2, 4), rng.randf() * TAU, rng.randf() * TAU + 3.0, 8, Color(0.42, 0.4, 0.37, 0.8), 0.5)
+		draw_line(o + Vector2(2, 9), o + Vector2(10, 12), Color(0.25, 0.2, 0.15), 1.2)  # a flattened picket
+		return
+	for k in (10 if was == T.HEDGE else 6):  # crushed branches and torn leaves
+		var p := o + Vector2(rng.randf_range(1, 15), rng.randf_range(1, 15))
+		draw_line(p, p + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(2, 5), Color(0.3, 0.22, 0.13, 0.8), 0.8)
+		draw_circle(p + Vector2(rng.randf_range(-2, 2), rng.randf_range(-2, 2)), rng.randf_range(1, 2), Color(0.18, 0.22, 0.13, 0.7))
 
 
 func _draw_scorch(p: Vector2, r: float) -> void:
@@ -600,6 +806,21 @@ func _low_horizontal(c: Vector2i) -> bool:
 	return h >= v
 
 
+## The way a line of low cover runs through c: along a street-straight line, or at an
+## angle where it only joins its neighbours corner to corner.
+func _low_along(c: Vector2i) -> Vector2:
+	var k := _low_kind(c)
+	var h := int(_low_linked(c + Vector2i(-1, 0), k)) + int(_low_linked(c + Vector2i(1, 0), k))
+	var v := int(_low_linked(c + Vector2i(0, -1), k)) + int(_low_linked(c + Vector2i(0, 1), k))
+	if h + v > 0:
+		return Vector2(1, 0) if h >= v else Vector2(0, 1)
+	var d1 := int(_low_linked(c + Vector2i(1, 1), k)) + int(_low_linked(c + Vector2i(-1, -1), k))
+	var d2 := int(_low_linked(c + Vector2i(1, -1), k)) + int(_low_linked(c + Vector2i(-1, 1), k))
+	if d1 + d2 > 0:
+		return Vector2(1, 1).normalized() if d1 >= d2 else Vector2(1, -1).normalized()
+	return Vector2(1, 0)
+
+
 func _draw_low(c: Vector2i) -> void:
 	match _low_kind(c):
 		BattleMap.LowKind.SANDBAGS:
@@ -629,8 +850,8 @@ func _bag_shape(p: Vector2, along: Vector2, half_len: float, half_w: float, seed
 func _draw_sandbags(c: Vector2i) -> void:
 	var o := Vector2(c) * C
 	var stage := map.wall_stage(c)
-	var horiz := _low_horizontal(c)
-	var along := Vector2(1, 0) if horiz else Vector2(0, 1)
+	var along := _low_along(c)
+	var diag := absf(along.x) > 0.1 and absf(along.y) > 0.1
 	var across := along.orthogonal()
 	var mid := o + Vector2(8, 8)
 	var base := Color(0.47, 0.42, 0.31)
@@ -639,9 +860,9 @@ func _draw_sandbags(c: Vector2i) -> void:
 	var n := 0
 	for li in layers.size():
 		var L: Array = layers[li]
-		for k in 3:
+		for k in (4 if diag else 3):  # a diagonal run is longer across the cell: one more bag
 			n += 1
-			var t: float = k * 6.0 - 6.0 + L[2]
+			var t: float = k * 6.0 - (9.0 if diag else 6.0) + L[2]
 			var p: Vector2 = mid + along * t + across * L[0] + Vector2(0, L[1])
 			if stage > 0 and _h(c.x * 7 + k, c.y * 5 + li, 111) < 0.18 * stage:
 				# burst open: a flattened sack with sand spilling out
@@ -671,9 +892,9 @@ func _draw_sandbags(c: Vector2i) -> void:
 func _draw_barricade(c: Vector2i) -> void:
 	var o := Vector2(c) * C
 	var stage := map.wall_stage(c)
-	var horiz := _low_horizontal(c)
-	var along := Vector2(1, 0) if horiz else Vector2(0, 1)
-	var across := Vector2(0, 1) if horiz else Vector2(1, 0)
+	var along := _low_along(c)
+	var reach := 11.5 if absf(along.x) > 0.1 and absf(along.y) > 0.1 else 8.5
+	var across := along.orthogonal()
 	var mid := o + Vector2(8, 8)
 	draw_rect(Rect2(o + Vector2(2, 3), Vector2(C, C)), Color(0, 0, 0, 0.25))
 	_seed(c.x, c.y, 120)
@@ -682,8 +903,8 @@ func _draw_barricade(c: Vector2i) -> void:
 	for k in 3:
 		if stage > 0 and _h(c.x, c.y + k, 122) < 0.25 * stage:
 			continue  # blown off
-		var a := mid - along * 8.5 + across * (k - 1) * 2.4
-		var b := mid + along * 8.5 + across * (k - 1) * 2.4 + across * rng.randf_range(-0.8, 0.8)
+		var a := mid - along * reach + across * (k - 1) * 2.4
+		var b := mid + along * reach + across * (k - 1) * 2.4 + across * rng.randf_range(-0.8, 0.8)
 		var col := Color(0.4, 0.37, 0.33) if sheet else Color(0.36, 0.26, 0.17).lightened(rng.randf_range(-0.1, 0.1))
 		draw_line(a + Vector2(0.6, 0.8), b + Vector2(0.6, 0.8), Color(0, 0, 0, 0.35), 2.4)
 		draw_line(a, b, col, 2.2)

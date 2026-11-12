@@ -1241,6 +1241,15 @@ func _blast(at: Vector2, w: Dictionary, shooter: Soldier, show: bool) -> void:
 		light_fx.flash(at, Color(1.0, 0.6, 0.3), 2.4, r * 3.0 + 40.0, 0.6, true)
 	decals.add_scorch(at, r * 0.7)
 	map.damage_roof(at, r, float(w.get("wall", 25.0)) * 1.1)
+	var shredded: Array = []  # bushes, hedges and wire close to the burst are blown apart
+	var cr := int(ceil(r * 0.5 / BattleMap.CELL))
+	var c0 := map.cell_of(at)
+	for dx in range(-cr, cr + 1):
+		for dy in range(-cr, cr + 1):
+			var cc := c0 + Vector2i(dx, dy)
+			if map.center_of(cc).distance_to(at) <= r * 0.5 + 4.0:
+				shredded.append(cc)
+	map.crush_cells(shredded)
 	if w.get("wall", 0.0) > 0.0:
 		var hit_wall := map.wall_near(at, r * 0.5 + BattleMap.CELL)
 		var fell := map.damage_walls(at, r, w.wall)

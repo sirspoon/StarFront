@@ -59,6 +59,15 @@ func _draw_all() -> void:
 					draw_rect(Rect2(o + Vector2(3, 3), Vector2(C - 6, C - 6)), _hc(0.58))
 	for y in range(area.position.y, area.end.y):
 		for x in range(area.position.x, area.end.x):
+			var c := Vector2i(x, y)
+			var t := map.get_t(c)
+			if t == T.BUSH:  # leafy mounds
+				_poly(_blob(Vector2(c) * C + Vector2(8, 8), 7.0, 1.0, 0.4, x * 13 + y), _hc(0.5))
+				_poly(_blob(Vector2(c) * C + Vector2(7, 7), 4.0, 1.0, 0.4, x * 13 + y + 1), _hc(0.58))
+			elif t == T.HEDGE:
+				draw_rect(Rect2(Vector2(c) * C + Vector2(1, 1), Vector2(C - 2, C - 2)), _hc(0.62))
+	for y in range(area.position.y, area.end.y):
+		for x in range(area.position.x, area.end.x):
 			if map.is_wall(map.get_t(Vector2i(x, y))):
 				_wall(Vector2i(x, y))
 

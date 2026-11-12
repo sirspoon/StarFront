@@ -104,7 +104,9 @@ func setup(m: Node) -> void:
 			+ "   close (not while Down). Up close, blades win,\n" \
 			+ "   and anyone pinned or lying Down is easy meat.\n" \
 			+ "Heavy Gun Teams set up when stopped by cover or a\n" \
-			+ "   window, or when Down: then they're far more accurate."
+			+ "   window, or when Down: then they're far more accurate.\n" \
+			+ "Bushes hide men who keep still; hedges block sight;\n" \
+			+ "   barbed wire is very slow to cross. Vehicles flatten them."
 	help_panel.add_child(help)
 	if main.touch_mode:
 		help.text = "TOUCH CONTROLS  (? hides)\n" \
