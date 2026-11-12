@@ -384,6 +384,17 @@ func show_menu() -> void:
 			+ "that both sides have sworn to take. Choose who you command."
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(intro)
+	var prev: String = main.previous_stage
+	if Settings._q().contains("debug") and prev != "":
+		# ?debug in the address: where the last visit got to (to track down crashes)
+		var last := Label.new()
+		last.text = "Last visit: %s" % prev
+		last.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		last.custom_minimum_size = Vector2(620, 0)
+		last.add_theme_font_size_override("font_size", 11)
+		last.add_theme_color_override("font_color", Color(0.6, 0.57, 0.5))
+		last.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(last)
 	_tick_breadcrumbs()
 	if "--shot-whatsnew" in OS.get_cmdline_user_args() or "--shot-menu" in OS.get_cmdline_user_args():
 		_shot_whats_new.call_deferred()

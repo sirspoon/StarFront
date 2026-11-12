@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.40 (2026-11-12)
+- Crash tracking: the game notes how far it got every 20 seconds during a battle too (not just
+  while loading). Add `?debug` to the address to see where the last visit got to on the title
+  screen (hidden otherwise).
+
 ## v0.39 (2026-11-12)
 - The version on the title screen is now a link: click it for a short "What's new" summary of
   the game's improvements (scripts/whats_new.gd).

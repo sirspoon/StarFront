@@ -732,9 +732,10 @@ func _process(dt: float) -> void:
 	if not started or over or paused:
 		return
 	time += dt
-	if not ran_ok and time > 15.0:
-		ran_ok = true
-		Settings.stage("ran fine")
+	if int(time / 20.0) != int((time - dt) / 20.0):
+		# breadcrumbs in battle too, in case the browser's graphics give out mid-fight
+		Settings.stage("in battle at %d:%02d (%d smoke screens, %d grenades in the air, %s)" % [int(time) / 60, int(time) % 60,
+				grenades.screens.size(), grenades.flying.size(), Settings.summary()])
 	for s in soldiers:
 		s.tick(dt, time)
 	_separate(dt)
@@ -1261,6 +1262,7 @@ func _check_end() -> void:
 
 func _end(winner: int, reason: String) -> void:
 	over = true
+	Settings.stage("ran fine")
 	var left := [0, 0]
 	var dead := [0, 0]
 	var fled := [0, 0]
