@@ -366,25 +366,27 @@ func show_menu() -> void:
 	title.add_theme_color_override("font_color", Color(0.85, 0.7, 0.4))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
+	var sub_row := HBoxContainer.new()
+	sub_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(sub_row)
 	var sub := Label.new()
-	sub.text = "Battle for the Ashen Chapel   ·   prototype v%s" % GameData.VERSION
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(sub)
+	sub.text = "Battle for the Ashen Chapel   ·   "
+	sub_row.add_child(sub)
+	var ver := LinkButton.new()  # the version: click it for what's new
+	ver.text = "prototype v%s  (what's new)" % GameData.VERSION
+	ver.focus_mode = Control.FOCUS_NONE
+	ver.add_theme_color_override("font_color", Color(0.85, 0.7, 0.4))
+	ver.add_theme_color_override("font_hover_color", Color(1.0, 0.85, 0.5))
+	ver.pressed.connect(_show_whats_new)
+	sub_row.add_child(ver)
 	var intro := Label.new()
 	intro.text = "The hive-city of Vell is ash and rubble. At its heart stands a ruined chapel\n" \
 			+ "that both sides have sworn to take. Choose who you command."
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(intro)
-	var prev: String = main.previous_stage
-	if prev != "" and prev != "ran fine":
-		var warn := Label.new()
-		warn.text = "Last visit stopped while: %s\nIf it keeps crashing, try adding ?safe to the address." % prev
-		warn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		warn.custom_minimum_size = Vector2(620, 0)
-		warn.add_theme_color_override("font_color", Color(1.0, 0.6, 0.45))
-		warn.add_theme_font_size_override("font_size", 13)
-		v.add_child(warn)
 	_tick_breadcrumbs()
+	if "--shot-whatsnew" in OS.get_cmdline_user_args() or "--shot-menu" in OS.get_cmdline_user_args():
+		_shot_whats_new.call_deferred()
 	var info := Label.new()
 	info.text = "Graphics: " + Settings.summary()
 	info.add_theme_font_size_override("font_size", 11)
@@ -409,6 +411,29 @@ func show_menu() -> void:
 		b.focus_mode = Control.FOCUS_NONE
 		b.pressed.connect(func(): _choose(key))
 		v.add_child(b)
+
+
+## Test aid: a screenshot of the title screen with "What's new" open.
+func _shot_whats_new() -> void:
+	if "--shot-whatsnew" in OS.get_cmdline_user_args():
+		_show_whats_new()
+	await get_tree().create_timer(1.5).timeout
+	await RenderingServer.frame_post_draw
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--shot="):
+			get_viewport().get_texture().get_image().save_png(a.trim_prefix("--shot="))
+	get_tree().quit()
+
+
+func _show_whats_new() -> void:
+	var d := AcceptDialog.new()
+	d.title = "What's new"
+	d.dialog_text = WhatsNew.TEXT
+	d.ok_button_text = "Close"
+	root.add_child(d)
+	d.popup_centered()
+	d.confirmed.connect(d.queue_free)
+	d.canceled.connect(d.queue_free)
 
 
 func _map_ready() -> bool:

@@ -9,6 +9,9 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - Every change to the game bumps the version by 0.01: `VERSION` in `scripts/game_data.gd` and
   `config/version` in `project.godot`. Add an entry at the top of `CHANGELOG.md` (version, date,
   what changed in plain words).
+- When a change is something a player would notice, also update the short running summary in
+  `scripts/whats_new.gd` (shown by clicking the version on the title screen): one concise line per
+  feature, newest first, no version numbers except a heading for each whole version (1.0, 2.0 ...).
 - The setting must stay original: no Warhammer 40,000 (Games Workshop) names, factions, symbols or
   designs. Keep the gothic grimdark feel, but with our own names and looks.
 
@@ -55,6 +58,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   results also print close-combat blows, melee kills and each assault squad's kills.
 - `--test-grenades` (with `--autotest`) orders a smoke screen out of a squad's reach and prints whether
   it moved up, threw both grenades and blocked sight. `--no-ai-grenades`: the computer throws none.
+- `--shot-menu` / `--shot-whatsnew` (with `--shot=file.png`, under xvfb, no `--autotest`) save the
+  title screen, without or with the "What's new" box open.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

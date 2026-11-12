@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.39 (2026-11-12)
+- The version on the title screen is now a link: click it for a short "What's new" summary of
+  the game's improvements (scripts/whats_new.gd).
+- Removed the orange note on the title screen about where the last visit stopped loading.
+
 ## v0.38 (2026-11-12)
 Grenades, and close combat that punishes men on the ground.
 - Grenades: press Grenade (T on a PC), then click or tap a spot. Each selected squad throws what
