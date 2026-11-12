@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.53 (2026-11-12)
+Longer, more tactical battles (around 8-10 minutes instead of 2-3).
+- Shooting hits far less often (all weapons), and fewer of the hits that land wound: most only graze
+  a man or tear through his kit. Misses and grazes still frighten men, so fire pins them down as
+  much as ever; it just kills much more slowly.
+- Fewer blows in close combat wound (except on men pinned or lying Down).
+- Nerve drains more slowly under fire, and men who break can rally: once clear of the fire they
+  recover quickly and stop running instead of always fleeing the field.
+- Holding the chapel unchallenged now takes 4 minutes to win (was 3), and a side is beaten when
+  fewer than 15% of its men are still fighting (was 20%).
+- In computer-v-computer test battles: about 8-9 minutes on average (from about 2.5), and the
+  Legion now wins a little over half (they were winning about a quarter), mostly by holding the chapel.
+
 ## v0.52 (2026-11-12)
 - Phones: far fewer combat lights, to stop the Android app crashing in heavy firefights. Every round
   fired used to light up a muzzle flash and a light travelling with it, and with the heavy guns'

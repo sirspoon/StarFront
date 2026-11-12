@@ -167,9 +167,11 @@ func tick(dt: float, now: float) -> void:
 	var crossfire: bool = under_fire and not data.get("steadfast", false) and not main.no_flank and squad.in_crossfire(now)
 	suppression = maxf(0.0, suppression - dt * (4.0 if under_fire else 12.0) * (0.85 if crossfire else 1.0))
 	if not under_fire:
-		morale = minf(max_morale, morale + dt * (1.2 + 2.0 * squad.leader_bonus(self)))
+		# men who broke and got clear of the fire pull themselves together quickly
+		var regain := 1.2 + 2.0 * squad.leader_bonus(self) + (2.0 if state == State.ROUTING else 0.0)
+		morale = minf(max_morale, morale + dt * regain)
 	elif suppression > 50.0:
-		morale -= dt * (suppression - 50.0) * 0.04 * nerve * (1.1 if crossfire else 1.0)
+		morale -= dt * (suppression - 50.0) * 0.03 * nerve * (1.1 if crossfire else 1.0)
 	_update_state(under_fire)
 	match state:
 		State.ROUTING:
@@ -311,8 +313,8 @@ func _update_setup(dt: float) -> void:
 
 func _update_state(under_fire: bool) -> void:
 	if state == State.ROUTING:
-		if morale > 45.0 and not under_fire:
-			state = State.READY
+		if morale > 40.0 and not under_fire:
+			state = State.READY  # rallied: he stops running and can be ordered back in
 			halt()
 		return
 	if morale < 12.0:

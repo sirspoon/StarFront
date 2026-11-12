@@ -6,7 +6,7 @@ extends Node2D
 
 const SIGHT := 560.0          # how far soldiers can spot an enemy in the open
 const SIGHT_HIDDEN := 260.0   # ...one in cover who hasn't fired lately
-const HOLD_TO_WIN := 180.0    # seconds of holding the chapel unchallenged to win early
+const HOLD_TO_WIN := 240.0    # seconds of holding the chapel unchallenged to win early
 const OverlayScript := preload("res://scripts/overlay.gd")
 const DecalsScript := preload("res://scripts/decals.gd")
 
@@ -18,7 +18,8 @@ var grenades: Grenades
 var grenade_mode := false  # the next click / tap picks where to throw grenades
 var grenades_thrown := [0, 0]
 var heavy_kills := [0, 0]
-var friendly_kills := [0, 0]   # men killed by their own side (stray grenades, shells)
+var friendly_kills := [0, 0]
+var kill_sources := {}  # test aid: what killed whom ("kind" or "kind/melee")   # men killed by their own side (stray grenades, shells)
 var bastion_kills := [0, 0]    # kills by the Sworn's heavy-armoured flamers and hail cannons: [flamer, hail]
 var heavy_time := [0.0, 0.0]   # seconds a heavy gun was on the field, per side...
 var heavy_set_time := [0.0, 0.0]  # ...and of those, set up
@@ -149,7 +150,7 @@ func _ready() -> void:
 		hud._choose.call_deferred("legion")  # test aid in the browser: start, then order everyone about
 		_web_mass.call_deferred()
 	if autotest:
-		battle_length = 600.0  # test battles still end
+		battle_length = 1800.0  # test battles still end
 		print("StarFront autotest, seed %d" % seed_value)
 		start_battle("sworn" if "--side=sworn" in args else "legion")
 		if "--demo-damage" in args:
@@ -1099,7 +1100,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 	shots[shooter.team] += 1
 	_fire_sound(shooter, w, muzzle)
 	var d := shooter.position.distance_to(target.position)
-	var p: float = w.acc * lerpf(1.0, 0.45, clampf(d / w.range, 0.0, 1.0))
+	var p: float = w.acc * lerpf(1.0, 0.45, clampf(d / w.range, 0.0, 1.0)) * GameData.ACCURACY
 	if target.is_vehicle:
 		p = minf(0.95, p * 1.6)  # big target, and it can't hide in a crater
 	else:
@@ -1278,6 +1279,9 @@ func resolve_blow(attacker: Soldier, foe: Soldier, m: Dictionary, landed: bool) 
 		if show:
 			effects.spark(at)  # glances off his armour
 		foe.morale -= 1.0
+		return
+	if randf() > GameData.MELEE_LETHALITY and not foe.grounded():
+		foe.morale -= 3.0 * foe.nerve  # a glancing blow: shaken, not wounded (men on the ground get no such luck)
 		return
 	var away := (foe.position - attacker.position).normalized()
 	if show:
@@ -1472,6 +1476,8 @@ func on_death(s: Soldier, killer: Soldier) -> void:
 		_take_over_gun(s)
 	if killer != null and killer.team == s.team:
 		friendly_kills[s.team] += 1
+	var how := "?" if killer == null else (str(killer.kind) + ("/melee" if killer.in_melee else ""))
+	kill_sources[how] = kill_sources.get(how, 0) + 1
 	if killer != null and killer.kind == "pyre_warden":
 		bastion_kills[0] += 1
 	elif killer != null and killer.kind == "bastion":
@@ -1552,7 +1558,7 @@ func _check_end() -> void:
 			eff[s.team] += s.strength
 	var broken := [false, false]
 	for t in 2:
-		broken[t] = eff[t] <= int(start_counts[t] * 0.2)
+		broken[t] = eff[t] <= int(start_counts[t] * 0.15)
 	var names := [GameData.FACTIONS[factions[0]].name, GameData.FACTIONS[factions[1]].name]
 	if broken[0] and broken[1]:
 		_end(-1, "Both forces are shattered. Nobody holds the chapel.")
@@ -1588,6 +1594,7 @@ func _end(winner: int, reason: String) -> void:
 		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d cover=%d%%/%d%% blocked=%s flank=%s crossfire=%d%%/%d%% blows=%s mkills=%s raider_kills=%d blade_kills=%d grenades=%s heavy_kills=%s heavy_set=%d%%/%d%% own_side_kills=%s flamer_hail_kills=%s %s" % [
 				factions[winner] if winner >= 0 else "draw", int(time), shots, hits,
 				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, flank_shots, int(100 * crossfire_time[0] / maxf(field_time[0], 1)), int(100 * crossfire_time[1] / maxf(field_time[1], 1)), blows, melee_kills, assault_kills[0], assault_kills[1], grenades_thrown, heavy_kills, int(100 * heavy_set_time[0] / maxf(heavy_time[0], 1)), int(100 * heavy_set_time[1] / maxf(heavy_time[1], 1)), friendly_kills, bastion_kills, reason])
+		print("KILLS " + JSON.stringify(kill_sources))
 		get_tree().quit()
 		return
 	var head := "DRAW"

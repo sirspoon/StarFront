@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.52"
+const VERSION := "0.53"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -72,9 +72,16 @@ const GRENADES := {
 const HEAVY_SET_UP := 2.4   # accuracy multiplier once set up
 const HEAVY_LOOSE := 0.4    # ...and when firing it unbraced
 
-## The share of wounding hits (shots, bursts, flames) that really wound; the rest only
+## The share of wounding hits (shots, bursts, flames, blasts) that really wound; the rest only
 ## graze or tear through kit, frightening the man instead. Lower = longer, more tactical fights.
-const LETHALITY := 0.7
+## (With ACCURACY and MELEE_LETHALITY these set the pace: computer-v-computer battles average
+## about 8-9 minutes.)
+const LETHALITY := 0.3
+## All shooting's chance to hit is scaled by this (lower = slower, longer battles; misses still
+## frighten men, so fire still pins them down).
+const ACCURACY := 0.3
+## Likewise for blows in close combat that would wound: the rest are fended off by kit or armour.
+const MELEE_LETHALITY := 0.3
 
 ## nerve multiplies morale loss (higher = panics sooner). Optional traits for later units:
 ## "steadfast": true ignores being flanked or caught in crossfire; "flank_bonus": 1.5 makes

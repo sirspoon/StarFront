@@ -80,6 +80,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   the Options panel open. Options are saved in `user://settings.cfg` (the address / command line wins).
 - `--phonetest` (or `?phonetest`) makes the game treat this machine as a phone (fewer lights, no shadows,
   one map tile at a time), to test the phone settings here.
+- Test battles stop at 30 minutes (`battle_length` in autotest). Results end with a `KILLS {...}` line:
+  kills by kind of killer (`/melee` for close combat), for seeing what drives casualties.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for
