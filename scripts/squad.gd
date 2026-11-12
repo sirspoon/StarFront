@@ -211,8 +211,41 @@ func busy() -> bool:
 	return false
 
 
+## A man who has got out of contact ahead of squad-mates who are still on the way
+## (crawling, or held up) pauses until they catch up, so the squad keeps together.
+func _keep_together() -> void:
+	var live: Array = members.filter(func(m): return m.is_alive() and m.state != Soldier.State.ROUTING)
+	if live.size() < 2:
+		return
+	for m in live:
+		if m.path_i >= m.path.size():
+			m.wait_for_squad = false
+			continue
+		var near := INF
+		var nearest = null
+		var others_coming := false
+		for o in live:
+			if o == m:
+				continue
+			var d: float = o.position.distance_to(m.position)
+			if d < near:
+				near = d
+				nearest = o
+			if o.path_i < o.path.size() and not o.wait_for_squad:
+				others_coming = true
+		var dest: Vector2 = m.path[m.path.size() - 1]
+		# only a man who is out ahead (nearer the destination than his nearest mate) waits;
+		# one left behind keeps walking, which brings him back into contact
+		var ahead: bool = nearest != null and m.position.distance_to(dest) < nearest.position.distance_to(dest)
+		if m.wait_for_squad:
+			m.wait_for_squad = others_coming and ahead and near > COH * 0.8
+		else:
+			m.wait_for_squad = others_coming and ahead and near > COH * 0.95 and not sub.has(m)
+
+
 ## Called every frame: once the squad reaches one planned point, set off for the next.
 func advance(map: BattleMap) -> void:
+	_keep_together()
 	if current == null or busy():
 		return
 	if queue.is_empty():

@@ -31,7 +31,7 @@ var player_team := 0
 var factions := ["legion", "sworn"]
 var start_counts := [0, 0]
 var time := 0.0
-var battle_length := 600.0
+var battle_length := 0.0  # seconds; 0 = no time limit (computer-v-computer tests use 600)
 var spot_timer := 0.0
 var objective_owner := -1
 var hold_streak := 0.0
@@ -116,6 +116,7 @@ func _ready() -> void:
 	add_child(hud)
 	hud.setup(self)
 	if autotest:
+		battle_length = 600.0  # test battles still end
 		print("StarFront autotest, seed %d" % seed_value)
 		start_battle("legion")
 		if "--demo-damage" in args:
@@ -126,6 +127,8 @@ func _ready() -> void:
 			_test_orders()
 		if "--test-carrier" in args:
 			_test_carrier()
+		if "--test-follow" in args:
+			_test_follow()
 		if "--prone" in args:  # test aid: the Legion fights in the Down stance
 			for sq in _player_squads():
 				sq.set_prone(true)
@@ -205,6 +208,35 @@ func _test_carrier() -> void:
 	var boarding := inf.members.filter(func(m): return m.board_vehicle == car).size()
 	await get_tree().create_timer(1.0).timeout
 	print("double tap on carrier: %d men ordered to board, carrier selected=%s, infantry selected=%s" % [boarding, car.squad.selected, inf.selected])
+
+
+## Test aid: during a real battle, order the player's squads to move every few
+## seconds and report any soldier who didn't go, and why.
+func _test_follow() -> void:
+	ais = ais.filter(func(ai): return ai.team != 0)
+	var stuck_total := 0
+	var orders := 0
+	for round_i in 30:
+		await get_tree().create_timer(4.0).timeout
+		if over:
+			break
+		for sq in _player_squads():
+			if sq.vehicle() != null or sq.carrier() != null or sq.alive().size() < 2:
+				continue
+			var c := sq.center()
+			var dest := c + Vector2(randf_range(80, 220), randf_range(-160, 160))
+			var before := {}
+			for m in sq.alive():
+				before[m] = m.position
+			sq.enqueue(map, {"kind": "move", "a": dest, "b": dest, "face": Vector2.ZERO, "run": false}, true)
+			orders += 1
+			await get_tree().create_timer(3.0).timeout
+			for m in sq.alive():
+				if before.has(m) and m.position.distance_to(before[m]) < 6.0 and m.position.distance_to(dest) > 60.0:
+					stuck_total += 1
+					print("STUCK %s state=%s supp=%d path=%d/%d sub=%d board=%s dist_to_dest=%d" % [sq.name, Soldier.State.keys()[m.state],
+							m.suppression, m.path_i, m.path.size(), sq.sub.size(), m.board_vehicle != null, m.position.distance_to(dest)])
+	print("FOLLOW orders=%d stuck=%d" % [orders, stuck_total])
 
 
 ## Test aid: shell the chapel's west wall so screenshots show every damage stage.
@@ -821,7 +853,7 @@ func _fire_sound(shooter: Soldier, w: Dictionary, muzzle: Vector2) -> void:
 	if time - float(fire_sound_at.get(key, -99.0)) < span:
 		return
 	fire_sound_at[key] = time
-	sfx.play(Sfx.WEAPON_SOUND.get(w.name, "laser"), muzzle)
+	sfx.play(Sfx.sound_for(w), muzzle)
 
 
 func _ricochet(pos: Vector2, incoming: Vector2, w := {}) -> void:
@@ -1020,7 +1052,7 @@ func _check_end() -> void:
 		_end(w, "%s have broken. %s hold the field." % [names[1 - w], names[w]])
 	elif objective_owner >= 0 and hold_streak >= HOLD_TO_WIN:
 		_end(objective_owner, "%s have held the Ashen Chapel unchallenged." % names[objective_owner])
-	elif time >= battle_length:
+	elif battle_length > 0.0 and time >= battle_length:
 		if objective_owner >= 0:
 			_end(objective_owner, "Time is up. %s hold the Ashen Chapel." % names[objective_owner])
 		else:

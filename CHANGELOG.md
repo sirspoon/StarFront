@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.29 (2026-11-12)
+- Fixed every infantry weapon playing the Legion's laser sound: the Sworn's carbines and rotor cannon,
+  the stubbers, lance rockets and fusion carbines now make their own sounds.
+- Fixed squads leaving men behind: pinned soldiers ignored move orders, so part of a squad walked off
+  and lost contact. Pinned men given an order now crawl after the squad (unless the fire is very
+  heavy), the order steadies them a little, and a man who gets out of contact ahead of slower
+  squad-mates waits for them to catch up.
+- No time limit on the battle for now (win by holding the chapel or breaking the enemy).
+
 ## v0.28 (2026-11-11)
 Sound changes.
 - Armour hits are now a heavy thud on a hollow hull, with booming hull tones ringing inside it.

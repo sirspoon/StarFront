@@ -49,6 +49,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   them (one sound per weapon burst, the weapon -> sound table is `Sfx.WEAPON_SOUND`).
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
+- `--test-follow` orders the player's squads to move every few seconds during a real battle and prints any
+  soldier who didn't go, with his state.
 - `--test-carrier` checks one tap on a carrier selects it and a double tap boards the selected infantry.
 - `--test-orders` (with `--autotest`, headless is fine) runs a line order and a picked-soldier move and
   prints where the men ended up and whether the squad stayed in contact. `--shot-select` selects the

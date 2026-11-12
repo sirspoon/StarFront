@@ -277,12 +277,13 @@ func _refresh() -> void:
 	var f1: Dictionary = GameData.FACTIONS[main.factions[1]]
 	var t := int(main.time)
 	var total := int(main.battle_length)
+	var clock := "%d:%02d" % [t / 60, t % 60] + (" / %d:%02d" % [total / 60, total % 60] if total > 0 else "")
 	var chapel := "unclaimed"
 	if main.objective_owner >= 0:
 		chapel = "%s  (%d / %d s to win)" % [GameData.FACTIONS[main.factions[main.objective_owner]].short,
 				int(main.hold_streak), int(main.HOLD_TO_WIN)]
-	top_label.text = "STARFRONT v%s      %s  vs  %s      Time %d:%02d / %d:%02d      Chapel: %s%s" % [
-			GameData.VERSION, f0.name, f1.name, t / 60, t % 60, total / 60, total % 60, chapel,
+	top_label.text = "STARFRONT v%s      %s  vs  %s      Time %s      Chapel: %s%s" % [
+			GameData.VERSION, f0.name, f1.name, clock, chapel,
 			"      [ PAUSED ]" if main.paused else ""]
 	for sq in main.squads:
 		var st: String = sq.status()

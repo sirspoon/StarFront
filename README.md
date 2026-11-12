@@ -25,7 +25,7 @@ If it struggles or crashes, add `?safe` to the address (or one at a time: `?shad
   Walls can be blown down.
 - Two factions: the **Dominion Legion** (many brittle conscripts) and **The Sworn** (a few armoured warrior-monks),
   each with a troop carrier and a tank.
-- Win by holding the chapel unchallenged for 3 minutes, by breaking the enemy, or by holding it when the 10 minutes run out.
+- Win by holding the chapel unchallenged for 3 minutes, or by breaking the enemy. (No time limit for now, for testing.)
 
 ### Controls
 | Input | Action |

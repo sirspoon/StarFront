@@ -32,6 +32,14 @@ var recent := {}  # name -> [msec, position]
 var engine_stream: AudioStreamWAV
 
 
+## The sound for a weapon (looked up by the weapon's data, whose key isn't stored in it).
+static func sound_for(w: Dictionary) -> String:
+	for k in WEAPON_SOUND:
+		if GameData.WEAPONS[k] == w:
+			return WEAPON_SOUND[k]
+	return "laser"
+
+
 func setup(camera: Camera2D) -> void:
 	if DisplayServer.get_name() == "headless" or not Settings.on("sound", true):
 		enabled = false

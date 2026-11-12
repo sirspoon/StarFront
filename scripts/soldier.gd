@@ -42,6 +42,7 @@ var flash := 0.0
 var walk := 0.0
 var seen_by := [true, true]
 var is_vehicle := false
+var wait_for_squad := false  # got ahead of slower squad-mates: pausing for them
 var in_cover := false      # crouched behind cover facing the threat
 var behind_low := false    # waist-high cover between him and the threat
 var corner_cover := false  # a wall or wreck between him and the threat (leans out to fire)
@@ -98,6 +99,11 @@ func go_to(p: Vector2, run: bool) -> void:
 	path = map.find_path(position, p)
 	path_i = 0
 	running = run
+	wait_for_squad = false
+	if state == State.PINNED:
+		# an order steadies a man: "Move! Keep with us!"
+		suppression = maxf(0.0, suppression - 15.0)
+		morale = minf(max_morale, morale + 4.0)
 
 
 func halt() -> void:
@@ -130,7 +136,11 @@ func tick(dt: float, now: float) -> void:
 		State.ROUTING:
 			_follow_path(dt, true)
 		State.PINNED:
-			moving = false
+			# pinned men with orders crawl after the squad, unless the fire is too heavy
+			if path_i < path.size() and suppression < 85.0:
+				_follow_path(dt, false)
+			else:
+				moving = false
 		State.READY:
 			_follow_path(dt, false)
 	if state != State.ROUTING and is_alive():
@@ -218,8 +228,13 @@ func _follow_path(dt: float, fleeing: bool) -> void:
 		return
 	var target := path[path_i]
 	var to := target - position
+	if wait_for_squad and not fleeing:
+		moving = false
+		return
 	var spd := speed * map.speed_mult(position)
-	if squad.prone and not fleeing:
+	if state == State.PINNED:
+		spd *= 0.25  # crawling under fire
+	elif squad.prone and not fleeing:
 		spd *= 0.35  # crawling
 	elif running:
 		spd *= 1.7
