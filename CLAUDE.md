@@ -28,6 +28,14 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 ## Web version
 - `.github/workflows/web.yml` exports the web build (`export_presets.cfg`, preset "Web", no threads,
   so it runs on GitHub Pages without special headers) and deploys it to Pages on every push to main.
+- `.github/workflows/native.yml` exports Windows (preset "Windows Desktop", one .exe with the pack
+  embedded) and Android (preset "Android", prebuilt template, arm64, signed with a key kept in the
+  Actions cache) on every push, and replaces the GitHub release `latest-build` with them. Android needs
+  `textures/vram_compression/import_etc2_astc` on in project.godot.
+- Performance: `--test-mass` (with `--autotest`, under xvfb to include drawing) orders every squad across
+  the map at once and prints the frame times, the time spent drawing soldiers and redraws per second.
+  In the web build, `?massdemo` does the same in the browser console; `alwaysdraw` redraws every soldier
+  every frame (the old way) for comparison.
 - Touch controls switch on with a touch screen (or `--touch`); on phones the UI is laid out for a
   screen about 620 points tall. Emulated mouse events from touches are ignored in `main.gd`.
 - To test the web build here: download `Godot_v4.3-stable_export_templates.tpz` (resume with
