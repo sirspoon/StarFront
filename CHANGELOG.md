@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.32 (2026-11-12)
+- "Your will" is now said with the stress on "your", so it no longer sounds like "you will".
+- New Sworn death sounds: instead of spoken words, a strained, breaking grunt ("uhh", "aargh" or a
+  clenched "ngh") through the helmet vox, then the clank of heavy armour hitting the ground.
+
 ## v0.31 (2026-11-12)
 - The Sworn answer your orders in a deep, armoured, robotic British voice over the vox: "Confirmed",
   "On our way" or "Your will" for a move, and "On my mark", "Fire!" or "Unleash hell!" when told to
