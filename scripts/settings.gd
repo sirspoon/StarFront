@@ -7,12 +7,35 @@ extends RefCounted
 ##   normals=0           no normal maps (flat lighting)
 ##   lights=0            no combat lights or moonlight
 ##   bake=0              no detailed map at all: a plain flat one (no off-screen drawing)
-##   batch=N             map tiles drawn per frame (default 4, 1 on phones)
+##   batch=N             map tiles drawn per frame (default 4, 1 in a phone's browser)
+## Most can also be chosen in the game's Options menu and are saved on the device.
 ##   sound=0             no sound effects
 ##   safe                all of the above off
 
 static var _query := ""
 static var _read := false
+## Choices made in the game's Options menu, kept on the device (user://settings.cfg).
+## The address / command line still wins over them.
+static var _cfg: ConfigFile = null
+## Carried over when the scene is reloaded to restart a battle.
+static var next_faction := ""
+static var next_seed := -1
+
+
+static func _saved() -> ConfigFile:
+	if _cfg == null:
+		_cfg = ConfigFile.new()
+		_cfg.load("user://settings.cfg")
+	return _cfg
+
+
+static func saved(name: String, default_value):
+	return _saved().get_value("options", name, default_value)
+
+
+static func save_option(name: String, value) -> void:
+	_saved().set_value("options", name, value)
+	_cfg.save("user://settings.cfg")
 
 
 static func _q() -> String:
@@ -41,6 +64,8 @@ static func on(name: String, default_on: bool) -> bool:
 		return false
 	if q.contains(name + "=1"):
 		return true
+	if _saved().has_section_key("options", name):
+		return bool(_cfg.get_value("options", name))
 	if safe():
 		return false
 	return default_on
@@ -52,7 +77,7 @@ static func detail() -> float:
 		return 1.0
 	if q.contains("detail=medium"):
 		return 1.5
-	return 2.0
+	return float(saved("detail", 2.0))
 
 
 ## Breadcrumbs for crashes we can't see: the last step reached is kept in the
@@ -74,7 +99,9 @@ static func batch() -> int:
 	for n in [1, 2, 4, 8]:
 		if q.contains("batch=%d" % n):
 			return n
-	return 1 if is_phone() else 4
+	# one at a time only in a phone's browser, which runs out of graphics memory otherwise;
+	# the installed app (and every PC) paints four at once
+	return 1 if is_phone() and OS.has_feature("web") else 4
 
 
 static func summary() -> String:

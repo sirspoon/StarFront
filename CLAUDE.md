@@ -75,6 +75,9 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   their own side and kills by the Pyre Warden / Bastion Brother.
 - `--gallery` (with `--autotest`, `--shot-at=1290,634 --shot-time=0.2 --shot-zoom=4.5 --shot-nohud`) lines up
   one of each kind of soldier above the chapel and pauses, to look at the soldier drawings.
+- `--test-restart` (under xvfb, no `--autotest`) starts a battle, restarts it from the battle menu and
+  prints whether the same battlefield and side came back. `--shot-options` saves the title screen with
+  the Options panel open. Options are saved in `user://settings.cfg` (the address / command line wins).
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

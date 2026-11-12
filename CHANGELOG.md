@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.50 (2026-11-12)
+Options, a battle menu, and quicker loading on Android.
+- The Android app prepares the battlefield four map tiles at a time instead of one (the one-at-a-time
+  pace is only needed in a phone's web browser, which otherwise runs out of graphics memory).
+- Options (on the title screen, and in the battle menu): map detail (high, medium or low: lower
+  prepares the battlefield faster), wall shadows from fires and explosions (off by default on phones),
+  normal maps, combat lights and moonlight, and sound. They're saved on the device. Applying them
+  prepares the battlefield again (restarting the battle if one is going).
+- A Menu button (Esc on a PC) pauses the battle and offers: Resume, Restart this battle (the same
+  battlefield and side), New battle (back to the title screen) and Options.
+
 ## v0.49 (2026-11-12)
 Smoother, and Windows and Android versions.
 - Much less work drawing soldiers: each man is only redrawn when how he looks changes (turning,

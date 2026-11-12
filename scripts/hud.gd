@@ -156,9 +156,9 @@ func _build_touch_bar() -> void:
 	touch_bar.add_theme_constant_override("separation", 6)
 	panel.add_child(touch_bar)
 	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Grenade", true], ["Pick", true], ["Halt", false], ["Unload", false],
-			["Squads", true], ["Pause", true], ["?", false]]:
+			["Squads", true], ["Pause", true], ["?", false], ["Menu", false]]:
 		var b := Button.new()
-		var hints := {"Assault": "R", "Down": "G", "Pick": "Alt", "Halt": "H", "Unload": "U", "Grenade": "T", "Pause": "Space", "?": "F1"}
+		var hints := {"Assault": "R", "Down": "G", "Pick": "Alt", "Halt": "H", "Unload": "U", "Grenade": "T", "Pause": "Space", "?": "F1", "Menu": "Esc"}
 		b.text = spec[0] if main.touch_mode or not hints.has(spec[0]) else "%s (%s)" % [spec[0], hints[spec[0]]]
 		b.toggle_mode = spec[1]
 		b.focus_mode = Control.FOCUS_NONE
@@ -341,6 +341,116 @@ func add_message(text: String) -> void:
 		log_label.text = "\n".join(messages)
 
 
+var battle_menu: PanelContainer = null
+var options_panel: PanelContainer = null
+var paused_before := false
+
+
+## A full-screen dimmed backdrop under a menu panel (freed along with it).
+func _dim_under(panel: Control) -> void:
+	var dim := ColorRect.new()
+	dim.color = Color(0.03, 0.025, 0.02, 0.92)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_child(dim)
+	root.move_child(dim, panel.get_index())
+	panel.tree_exiting.connect(dim.queue_free)
+
+
+func _menu_button(v: Container, text: String, action: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(300, 48 if main.touch_mode else 34)
+	b.add_theme_font_size_override("font_size", 18 if main.touch_mode else 15)
+	b.pressed.connect(action)
+	v.add_child(b)
+	return b
+
+
+## The in-battle menu (Menu button or Esc): the battle pauses while it's open.
+func toggle_battle_menu() -> void:
+	if battle_menu != null and is_instance_valid(battle_menu):
+		battle_menu.queue_free()
+		battle_menu = null
+		main.paused = paused_before
+		sync_touch("Pause", main.paused)
+		return
+	paused_before = main.paused
+	main.paused = true
+	sync_touch("Pause", true)
+	battle_menu = _centre_panel()
+	_dim_under(battle_menu)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	battle_menu.add_child(v)
+	var t := Label.new()
+	t.text = "BATTLE PAUSED"
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	t.add_theme_font_size_override("font_size", 22)
+	v.add_child(t)
+	_menu_button(v, "Resume", toggle_battle_menu)
+	_menu_button(v, "Restart this battle", func(): main.restart(true))
+	_menu_button(v, "New battle", func(): main.restart(false))
+	_menu_button(v, "Options", show_options)
+
+
+## Graphics and sound options, kept on the device. Applying them prepares the battlefield
+## again, so it restarts the battle (or the title screen).
+func show_options() -> void:
+	if options_panel != null and is_instance_valid(options_panel):
+		return
+	options_panel = _centre_panel()
+	_dim_under(options_panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	options_panel.add_child(v)
+	var t := Label.new()
+	t.text = "OPTIONS"
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	t.add_theme_font_size_override("font_size", 22)
+	v.add_child(t)
+	var detail := OptionButton.new()
+	for d in [["Map detail: high (sharpest, slowest to prepare)", 2.0], ["Map detail: medium", 1.5], ["Map detail: low (quickest)", 1.0]]:
+		detail.add_item(d[0])
+		detail.set_item_metadata(detail.item_count - 1, d[1])
+	var cur := Settings.detail()
+	detail.select(0 if cur >= 2.0 else (1 if cur >= 1.5 else 2))
+	detail.focus_mode = Control.FOCUS_NONE
+	detail.custom_minimum_size = Vector2(420, 44 if main.touch_mode else 30)
+	v.add_child(detail)
+	var checks := {}
+	for o in [["shadows", "Wall shadows from fires and explosions", not Settings.is_phone()],
+			["normals", "Raised, lit surfaces (normal maps)", true],
+			["lights", "Combat lights and moonlight", true],
+			["sound", "Sound", true]]:
+		var c := CheckButton.new()
+		c.text = o[1]
+		c.button_pressed = Settings.on(o[0], o[2])
+		c.focus_mode = Control.FOCUS_NONE
+		c.custom_minimum_size = Vector2(420, 44 if main.touch_mode else 28)
+		v.add_child(c)
+		checks[o[0]] = c
+	var note := Label.new()
+	note.text = "Applying prepares the battlefield again" + (" and restarts this battle." if main.started else ".")
+	note.add_theme_font_size_override("font_size", 12)
+	v.add_child(note)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	v.add_child(row)
+	_menu_button(row, "Apply", func():
+		Settings.save_option("detail", detail.get_item_metadata(detail.selected))
+		for k in checks:
+			Settings.save_option(k, checks[k].button_pressed)
+		if main.started:
+			main.restart(true)
+		else:
+			main.get_tree().reload_current_scene())
+	_menu_button(row, "Cancel", func():
+		options_panel.queue_free()
+		options_panel = null)
+
+
 func toggle_help() -> void:
 	help_panel.visible = not help_panel.visible
 
@@ -400,7 +510,8 @@ func show_menu() -> void:
 		last.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(last)
 	_tick_breadcrumbs()
-	if "--shot-whatsnew" in OS.get_cmdline_user_args() or "--shot-menu" in OS.get_cmdline_user_args():
+	if "--shot-whatsnew" in OS.get_cmdline_user_args() or "--shot-menu" in OS.get_cmdline_user_args() \
+			or "--shot-options" in OS.get_cmdline_user_args():
 		_shot_whats_new.call_deferred()
 	var info := Label.new()
 	info.text = "Graphics: " + Settings.summary()
@@ -426,12 +537,19 @@ func show_menu() -> void:
 		b.focus_mode = Control.FOCUS_NONE
 		b.pressed.connect(func(): _choose(key))
 		v.add_child(b)
+	var ob := Button.new()
+	ob.text = "Options"
+	ob.focus_mode = Control.FOCUS_NONE
+	ob.pressed.connect(show_options)
+	v.add_child(ob)
 
 
 ## Test aid: a screenshot of the title screen with "What's new" open.
 func _shot_whats_new() -> void:
 	if "--shot-whatsnew" in OS.get_cmdline_user_args():
 		_show_whats_new()
+	if "--shot-options" in OS.get_cmdline_user_args():
+		show_options()
 	await get_tree().create_timer(1.5).timeout
 	await RenderingServer.frame_post_draw
 	for a in OS.get_cmdline_user_args():

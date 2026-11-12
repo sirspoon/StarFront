@@ -5,6 +5,8 @@ extends RefCounted
 ## When a whole version is reached (1.0, 2.0 ...), start a new heading for it.
 
 const TEXT := """PROTOTYPE (before 1.0)
+- Options menu (graphics and sound), and a battle menu to restart or start a new battle
+- Windows and Android versions; smoother with big armies on the move
 - Tougher troops (more grazes and pinning, fewer quick wipe-outs); clearer heavy guns
 - The Legion redrawn in detail: greatcoats, packs, helmets and rebreathers
 - Heavy guns fire long sustained streams that pin enemy infantry down

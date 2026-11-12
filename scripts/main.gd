@@ -50,6 +50,7 @@ var paused := false
 var autotest := false
 var dragging := false
 var rdragging := false
+var current_seed := 0
 var previous_stage := ""  # where the last visit got to (web only), shown if it didn't finish
 var ran_ok := false
 var touch_mode := false       # phone / tablet controls
@@ -113,6 +114,10 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	autotest = "--autotest" in args
 	var seed_value := randi()
+	if Settings.next_seed >= 0:
+		seed_value = Settings.next_seed  # restarting the same battle: the same battlefield
+		Settings.next_seed = -1
+	current_seed = seed_value
 	for a in args:
 		if a.begins_with("--seed="):
 			seed_value = int(a.trim_prefix("--seed="))
@@ -134,6 +139,11 @@ func _ready() -> void:
 	hud = HUD.new()
 	add_child(hud)
 	hud.setup(self)
+	if "--test-restart" in args:
+		_test_restart.call_deferred()
+	if Settings.next_faction != "":
+		hud._choose.call_deferred(Settings.next_faction)  # restarted: straight back into battle
+		Settings.next_faction = ""
 	if OS.has_feature("web") and Settings._q().contains("massdemo"):
 		hud._choose.call_deferred("legion")  # test aid in the browser: start, then order everyone about
 		_web_mass.call_deferred()
@@ -286,6 +296,36 @@ func _web_mass() -> void:
 		last = now
 	print("MASS before any order: average frame %.1f ms" % (total / 60.0))
 	_test_mass()
+
+
+static var _restart_check := {}
+
+
+## Test aid: start a battle, restart it, and check the same battlefield and side came back.
+func _test_restart() -> void:
+	if _restart_check.is_empty():
+		hud._choose("sworn")
+		while not started:
+			await get_tree().create_timer(0.3).timeout
+		await get_tree().create_timer(1.0).timeout
+		_restart_check = {"seed": current_seed, "side": factions[player_team], "buildings": map.buildings.size()}
+		restart(true)
+		return
+	while not started:
+		await get_tree().create_timer(0.3).timeout
+	print("RESTART same seed %s, same side %s, same map %s" % [current_seed == _restart_check.seed,
+			factions[player_team] == _restart_check.side, map.buildings.size() == _restart_check.buildings])
+	get_tree().quit()
+
+
+## Back into a battle from the start: the same battlefield and side, or a new battle
+## (back to the title screen).
+func restart(same: bool) -> void:
+	if same:
+		Settings.next_faction = factions[player_team]
+		Settings.next_seed = current_seed
+	get_tree().paused = false
+	get_tree().reload_current_scene()
 
 
 ## Test aid: select every squad and order them all across the map at once, a few times,
@@ -1641,6 +1681,8 @@ func _unhandled_input(e: InputEvent) -> void:
 		if k == KEY_SPACE and started and not over:
 			paused = not paused
 			hud.sync_touch("Pause", paused)
+		elif k == KEY_ESCAPE and started and not over:
+			hud.toggle_battle_menu()
 		elif k == KEY_F1:
 			hud.toggle_help()
 		elif k == KEY_U:
@@ -2290,3 +2332,5 @@ func touch_button(key: String, on: bool) -> void:
 				paused = on
 		"?":
 			hud.toggle_help()
+		"Menu":
+			hud.toggle_battle_menu()
