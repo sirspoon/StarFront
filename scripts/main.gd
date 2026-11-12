@@ -1026,6 +1026,8 @@ func _take_shot() -> void:
 			sq.selected = true
 	if "--shot-nohud" in OS.get_cmdline_user_args():
 		hud.visible = false
+	if "--shot-noroofs" in OS.get_cmdline_user_args() and roofs != null:
+		roofs.visible = false
 	if "--shot-cover" in OS.get_cmdline_user_args():
 		cover_mode = true
 		hud.show_cover_key(true)

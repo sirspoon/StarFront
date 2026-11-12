@@ -101,6 +101,14 @@ func _draw_all() -> void:
 				_draw_floor(c)
 	if map.chapel.intersects(area):
 		_draw_chapel_floor()
+	if not map.building_of.is_empty():
+		for y in range(area.position.y, area.end.y):
+			for x in range(area.position.x, area.end.x):
+				var c := Vector2i(x, y)
+				if map.get_t(c) == T.FLOOR and not _is_fallen(c):
+					var bi := map.building_of[y * BattleMap.W + x]
+					if bi > 0 and bi < map.building_kind.size():
+						_draw_furnishing(c, bi, map.building_kind[bi])
 	for y in range(area.position.y, area.end.y):
 		for x in range(area.position.x, area.end.x):
 			var c := Vector2i(x, y)
@@ -144,6 +152,7 @@ func _draw_all() -> void:
 				_draw_wall(Vector2i(x, y))
 				if map.get_t(Vector2i(x, y)) == T.WINDOW:
 					_draw_window(Vector2i(x, y))
+	_draw_exteriors(area)
 
 
 func _indoors(c: Vector2i) -> bool:
@@ -1223,3 +1232,236 @@ func _draw_wreck(rect: Rect2i, horiz: bool) -> void:
 	draw_line(mid, mid + barrel_dir.normalized() * 34, Color(0.1, 0.09, 0.08), 4.0)
 	draw_circle(mid + Vector2(-3, -2), 4, Color(0.04, 0.04, 0.04))
 	draw_circle(mid + Vector2(-3, -2), 2, Color(0.25, 0.1, 0.04))
+
+
+# ---------------------------------------------------------------- a lived-in town
+
+const WOOD := Color(0.36, 0.25, 0.15)
+const DARK_WOOD := Color(0.24, 0.16, 0.1)
+const IRON := Color(0.3, 0.3, 0.31)
+
+
+## Which way the nearest wall lies from c (for furniture standing against it), or ZERO.
+func _wall_dir(c: Vector2i) -> Vector2i:
+	for d in [Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, 1)]:
+		if map.is_wall(map.get_t(c + d)):
+			return d
+	return Vector2i.ZERO
+
+
+func _box(center: Vector2, size: Vector2, col: Color, rot := 0.0) -> void:
+	draw_set_transform(center, rot, Vector2.ONE)
+	draw_rect(Rect2(-size * 0.5 + Vector2(1, 1.2), size), Color(0, 0, 0, 0.35))
+	draw_rect(Rect2(-size * 0.5, size), col)
+	draw_rect(Rect2(-size * 0.5, size), col.darkened(0.45), false, 0.5)
+	draw_line(-size * 0.5 + Vector2(0.4, 0.4), Vector2(size.x * 0.5 - 0.4, -size.y * 0.5 + 0.4), col.lightened(0.25), 0.5)
+	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+
+
+func _barrel(p: Vector2, r: float, col: Color) -> void:
+	draw_circle(p + Vector2(0.8, 1.0), r, Color(0, 0, 0, 0.35))
+	draw_circle(p, r, col)
+	draw_arc(p, r * 0.75, 0, TAU, 12, col.darkened(0.4), 0.6)
+	draw_arc(p, r, 0, TAU, 12, col.darkened(0.55), 0.6)
+	draw_circle(p - Vector2(r * 0.3, r * 0.3), r * 0.25, col.lightened(0.25))
+
+
+func _crate(p: Vector2, s: float, rot: float) -> void:
+	_box(p, Vector2(s, s), WOOD.lightened(0.05), rot)
+	draw_set_transform(p, rot, Vector2.ONE)
+	draw_line(Vector2(-s, -s) * 0.5, Vector2(s, s) * 0.5, DARK_WOOD, 0.6)
+	draw_line(Vector2(-s, s) * 0.5, Vector2(s, -s) * 0.5, DARK_WOOD, 0.6)
+	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+
+
+func _table(m: Vector2, round_top: bool) -> void:
+	for k in 4:  # chairs round it, a couple knocked over
+		var a := k * PI * 0.5 + _h(int(m.x), int(m.y), 320 + k) * 0.4
+		var cp := m + Vector2.from_angle(a) * 6.0
+		_box(cp, Vector2(3.0, 3.0), WOOD.darkened(0.1), a + (0.9 if _h(int(m.x), k, 321) < 0.3 else 0.0))
+	if round_top:
+		draw_circle(m + Vector2(0.8, 1.0), 4.2, Color(0, 0, 0, 0.35))
+		draw_circle(m, 4.2, WOOD)
+		draw_arc(m, 4.2, 0, TAU, 14, DARK_WOOD, 0.6)
+	else:
+		_box(m, Vector2(8, 6), WOOD, 0.0)
+	if _h(int(m.x), int(m.y), 322) < 0.5:
+		draw_circle(m + Vector2(1.5, -1), 0.9, Color(0.75, 0.72, 0.65))  # a cup or a plate
+
+
+## One cell of a building's insides: furniture against the walls and in the rooms, by what
+## the building was. Purely scenery.
+func _draw_furnishing(c: Vector2i, bi: int, kind: String) -> void:
+	var roll := _h(c.x, c.y, 300 + bi)
+	var pick := _h(c.x, c.y, 301)
+	var o := Vector2(c) * C
+	var m := o + Vector2(8, 8)
+	var wd := _wall_dir(c)
+	var along := Vector2(absf(wd.y), absf(wd.x))  # runs along the wall
+	var back := m + Vector2(wd) * 4.5  # pushed up against it
+	match kind:
+		"home":
+			if roll > 0.4:
+				return
+			if wd != Vector2i.ZERO:
+				if pick < 0.4:  # a bed: frame, blanket, pillow at the wall end
+					var rot := Vector2(wd).angle() + PI * 0.5
+					_box(m + Vector2(wd) * 2.0, Vector2(8, 13), WOOD.darkened(0.15), rot)
+					_box(m + Vector2(wd) * 2.0 - Vector2(wd) * 1.0, Vector2(7, 9), Color(0.38, 0.3, 0.25).lerp(Color(0.3, 0.32, 0.4), pick * 2.0), rot)
+					_box(m + Vector2(wd) * 6.5, Vector2(6, 3), Color(0.7, 0.68, 0.6), rot)
+				elif pick < 0.7:  # a dresser
+					_box(back, Vector2(12, 5) if along.x > 0 else Vector2(5, 12), WOOD, 0.0)
+				else:  # an iron stove and its soot
+					draw_circle(back, 6, Color(0.05, 0.04, 0.03, 0.3))
+					_box(back, Vector2(7, 7), IRON.darkened(0.3), 0.0)
+					draw_circle(back, 1.6, Color(0.6, 0.25, 0.1, 0.8))
+			elif pick < 0.5:
+				_table(m, false)
+			else:  # a worn rug
+				_box(m, Vector2(13, 9), Color(0.4, 0.15, 0.12).lerp(Color(0.25, 0.25, 0.32), _h(c.x, c.y, 302)), _h(c.x, c.y, 303) * 0.3)
+				draw_rect(Rect2(m - Vector2(4.5, 2.5), Vector2(9, 5)), Color(0.75, 0.6, 0.35, 0.4), false, 0.6)
+		"shop":
+			if roll > 0.5:
+				return
+			if wd != Vector2i.ZERO:
+				# shelves of goods against the walls
+				var sz := Vector2(15, 5) if along.x > 0 else Vector2(5, 15)
+				_box(back, sz, DARK_WOOD, 0.0)
+				for k in 6:
+					var q := back + along * (k - 2.5) * 2.4 + Vector2(_h(c.x + k, c.y, 304) - 0.5, _h(c.x, c.y + k, 305) - 0.5)
+					draw_rect(Rect2(q - Vector2(0.8, 0.8), Vector2(1.6, 1.6)), Color.from_hsv(_h(c.x + k, c.y, 306), 0.35, 0.6))
+			elif pick < 0.5:
+				_box(m, Vector2(14, 5), WOOD, 0.0)  # the counter
+				draw_rect(Rect2(m + Vector2(3, -1.5), Vector2(3, 2)), Color(0.45, 0.45, 0.4))  # a cash box
+			else:
+				_crate(m + Vector2(-2, 1), 6.0, pick)
+				_crate(m + Vector2(3, -3), 5.0, pick * 2.0)
+		"tavern":
+			if roll > 0.45:
+				return
+			if wd != Vector2i.ZERO and pick < 0.6:
+				var sz := Vector2(15, 5) if along.x > 0 else Vector2(5, 15)
+				_box(back, sz, DARK_WOOD.lightened(0.1), 0.0)  # the bar
+				for k in 4:
+					var q := back + along * (k - 1.5) * 3.2
+					draw_circle(q, 0.9, Color(0.3, 0.45, 0.25, 0.9) if k % 2 == 0 else Color(0.5, 0.3, 0.15, 0.9))  # bottles
+			elif wd != Vector2i.ZERO:
+				_barrel(back, 3.6, WOOD)
+			else:
+				_table(m, true)
+		"office":
+			if roll > 0.4:
+				return
+			if wd != Vector2i.ZERO and pick < 0.5:
+				_box(back, Vector2(12, 5) if along.x > 0 else Vector2(5, 12), IRON.lightened(0.15), 0.0)  # filing cabinets
+				for k in 3:
+					draw_line(back + along * (k - 1) * 3.6 - Vector2(wd) * 1.5, back + along * (k - 1) * 3.6 + Vector2(wd) * 1.5, IRON.darkened(0.3), 0.5)
+			else:
+				_box(m, Vector2(10, 6), WOOD.darkened(0.05), 0.0)  # a desk
+				draw_rect(Rect2(m - Vector2(3, 2), Vector2(4, 3)), Color(0.8, 0.78, 0.7))  # papers
+				_box(m + Vector2(0, 5), Vector2(3.5, 3.5), WOOD.darkened(0.2), 0.0)
+				for k in 3:  # papers strewn about
+					draw_rect(Rect2(m + Vector2(_h(c.x, k, 307) * 14 - 7, _h(k, c.y, 308) * 14 - 7), Vector2(3, 2)), Color(0.78, 0.75, 0.68, 0.8))
+		"industry":
+			if roll > 0.55:
+				if roll < 0.7:
+					draw_circle(m + Vector2(pick * 6 - 3, roll * 6 - 3), 4.0 + pick * 3.0, Color(0.03, 0.03, 0.03, 0.35))  # oil stain
+				return
+			if wd != Vector2i.ZERO and pick < 0.45:
+				# a machine against the wall: housing, flywheel, dials
+				_box(back - Vector2(wd) * 1.0, Vector2(13, 9) if along.x > 0 else Vector2(9, 13), IRON, 0.0)
+				draw_circle(back - Vector2(wd) * 1.0 + along * 3.0, 2.6, IRON.darkened(0.35))
+				draw_arc(back - Vector2(wd) * 1.0 + along * 3.0, 2.6, 0, TAU, 10, IRON.lightened(0.3), 0.5)
+				draw_circle(back - Vector2(wd) * 1.0 - along * 3.0, 1.0, Color(0.85, 0.75, 0.4))
+			elif wd != Vector2i.ZERO:
+				# pipes running along the wall
+				for k in 2:
+					var a := back - along * 8.0 + Vector2(wd) * (k * 2.5 - 1.0)
+					draw_line(a, a + along * 16.0, Color(0.05, 0.05, 0.05), 2.4)
+					draw_line(a, a + along * 16.0, Color(0.45, 0.32, 0.22) if k == 0 else IRON.lightened(0.1), 1.6)
+			elif pick < 0.5:
+				_barrel(m + Vector2(-2.5, -1), 3.4, Color(0.35, 0.22, 0.14))
+				_barrel(m + Vector2(3, 2.5), 3.4, Color(0.25, 0.3, 0.22))
+			else:
+				_crate(m, 9.0, pick)
+
+
+## Outside the buildings: striped awnings over shop and tavern fronts, washing strung up
+## behind homes, barrels and crates in the yards of the works.
+func _draw_exteriors(area: Rect2i) -> void:
+	for bi in range(1, map.buildings.size()):
+		if bi >= map.building_kind.size():
+			break
+		var r: Rect2i = map.buildings[bi]
+		if not r.grow(4).intersects(area):
+			continue
+		var kind: String = map.building_kind[bi]
+		var front: int = map.building_front[bi]
+		var dirs := [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
+		var out: Vector2i = dirs[front]
+		var along := Vector2i(1, 0) if front < 2 else Vector2i(0, 1)
+		var start := Vector2i(r.position.x, r.position.y - 1) if front == 0 else (Vector2i(r.position.x, r.end.y) if front == 1 \
+				else (Vector2i(r.position.x - 1, r.position.y) if front == 2 else Vector2i(r.end.x, r.position.y)))
+		var length := r.size.x if front < 2 else r.size.y
+		if kind == "shop" or kind == "tavern":
+			# an awning over the shop front, faded stripes, torn here and there
+			var stripe_a := Color(0.5, 0.16, 0.12) if _h(bi, 0, 330) < 0.5 else Color(0.2, 0.3, 0.22)
+			for k in range(2, length - 2):
+				var c: Vector2i = start + along * k
+				if not area.has_point(c) or map.get_t(c) != T.OPEN or _h(c.x, c.y, 331) < 0.12:
+					continue
+				var rr := Rect2(Vector2(c) * C, Vector2(C, C))
+				draw_rect(Rect2(rr.position + Vector2(2, 3), rr.size), Color(0, 0, 0, 0.3))
+				for s in 4:
+					var sr := Rect2(rr.position + Vector2(along) * s * 4.0, Vector2(4, C) if along.x > 0 else Vector2(C, 4))
+					draw_rect(sr, stripe_a if s % 2 == 0 else Color(0.72, 0.68, 0.58))
+				var edge := Vector2(c) * C + (Vector2(0, C) if front == 0 else (Vector2.ZERO if front == 1 else (Vector2(C, 0) if front == 2 else Vector2.ZERO)))
+				if front == 0 or front == 3:
+					edge = Vector2(c) * C + (Vector2(0, 0) if front == 0 else Vector2(C, 0))
+				draw_line(edge, edge + Vector2(along) * C, Color(0.15, 0.1, 0.08), 0.8)
+		elif kind == "home":
+			# a washing line in the yard behind
+			var back_side: int = [1, 0, 3, 2][front]
+			var bout: Vector2i = dirs[back_side]
+			var bstart := Vector2i(r.position.x, r.position.y - 2) if back_side == 0 else (Vector2i(r.position.x, r.end.y + 1) if back_side == 1 \
+					else (Vector2i(r.position.x - 2, r.position.y) if back_side == 2 else Vector2i(r.end.x + 1, r.position.y)))
+			var k0 := 1 + int(_h(bi, 1, 332) * 3)
+			var n := 4
+			var a: Vector2i = bstart + along * k0
+			var b: Vector2i = a + along * n
+			var ok := true
+			for k in n + 1:
+				var t := map.get_t(a + along * k)
+				if t != T.OPEN and t != T.RUBBLE:
+					ok = false
+			if not ok or not Rect2i(a.min(b), (b - a).abs() + Vector2i.ONE).intersects(area):
+				continue
+			var pa := map.center_of(a)
+			var pb := map.center_of(b)
+			for p in [pa, pb]:
+				draw_circle(p + Vector2(1, 1), 1.4, Color(0, 0, 0, 0.35))
+				draw_circle(p, 1.3, DARK_WOOD)
+			draw_line(pa, pb, Color(0.6, 0.58, 0.52), 0.5)
+			for k in 7:
+				var q := pa.lerp(pb, (k + 0.6) / 7.6)
+				var col := Color.from_hsv(_h(bi, k, 333), 0.25, 0.55)
+				var sz := Vector2(3.0, 4.0) if along.x > 0 else Vector2(4.0, 3.0)
+				draw_rect(Rect2(q - sz * 0.5 + Vector2(1, 1.2), sz), Color(0, 0, 0, 0.25))
+				draw_rect(Rect2(q - sz * 0.5, sz), col)
+		elif kind == "industry":
+			# barrels and crates stacked in the yard round the works
+			for k in range(-1, length + 1):
+				for d in [1, 2]:
+					for side in [front, [1, 0, 3, 2][front]]:
+						var so: Vector2i = dirs[side]
+						var base := Vector2i(r.position.x, r.position.y) if side == 0 else (Vector2i(r.position.x, r.end.y - 1) if side == 1 \
+								else (Vector2i(r.position.x, r.position.y) if side == 2 else Vector2i(r.end.x - 1, r.position.y)))
+						var c: Vector2i = base + along * k + so * d
+						if not area.has_point(c) or map.get_t(c) != T.OPEN or map.is_road(c) or _h(c.x, c.y, 334) > 0.16:
+							continue
+						var m := map.center_of(c)
+						if _h(c.x, c.y, 335) < 0.5:
+							_barrel(m + Vector2(-2, 0), 3.2, Color(0.35, 0.22, 0.14) if _h(c.x, c.y, 336) < 0.5 else Color(0.25, 0.3, 0.22))
+							_barrel(m + Vector2(3, 2), 3.2, Color(0.3, 0.3, 0.3))
+						else:
+							_crate(m, 9.0, _h(c.x, c.y, 337))

@@ -5,6 +5,7 @@ extends RefCounted
 ## When a whole version is reached (1.0, 2.0 ...), start a new heading for it.
 
 const TEXT := """PROTOTYPE (before 1.0)
+- A lived-in town: homes, shops, taverns, offices and works, furnished inside, with signs and chimneys
 - Men behind walls lean out round them to shoot (and can be shot while they do)
 - Cover view (C) showing what's standing and where to take cover; sight and weapon ranges for selected squads
 - Longer battles (around 10 minutes): fire pins more and kills less, broken men can rally

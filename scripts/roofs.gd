@@ -26,6 +26,52 @@ func setup(m: Node) -> void:
 		nodes.append(piece)
 		alpha.append(1.0)
 	map.roof_changed.connect(func(b): nodes[b].queue_redraw())
+	if not Settings.is_phone():
+		# smoke from working chimneys: the works and taverns, and now and then a home
+		for i in map.buildings.size():
+			var kind: String = map.building_kind[i] if i < map.building_kind.size() else ""
+			if kind != "industry" and kind != "tavern" and not (kind == "home" and _hh(i, 1) < 0.35):
+				continue
+			for p in chimneys(i):
+				var sm := SimpleParticles.new()
+				sm.texture = main._dot_tex if main._dot_tex != null else main._soft_dot(64)
+				sm.position = p
+				sm.amount = 10
+				sm.lifetime = 5.0
+				sm.preprocess = 5.0
+				sm.emission_radius = 2.0
+				sm.direction = Vector2(0.6, -1)
+				sm.spread = 15.0
+				sm.gravity = Vector2(6, -4)
+				sm.velocity_min = 5.0
+				sm.velocity_max = 10.0
+				sm.scale_min = 0.25
+				sm.scale_max = 0.45
+				var curve := Curve.new()
+				curve.add_point(Vector2(0, 0.4))
+				curve.add_point(Vector2(1, 2.0))
+				sm.scale_curve = curve
+				sm.color_ramp = main._ramp([Color(0.3, 0.29, 0.28, 0.0), Color(0.32, 0.31, 0.3, 0.35), Color(0.4, 0.39, 0.38, 0.0)])
+				sm.z_index = 5
+				sm.emitting = true
+				main.add_child(sm)
+
+
+## Chimney stacks on building i's roof: two big ones on the works, one on taverns and on
+## some homes. Picked from the map seed, so they're the same every time.
+func chimneys(i: int) -> Array:
+	var r: Rect2i = map.buildings[i]
+	var kind: String = map.building_kind[i] if i < map.building_kind.size() else ""
+	var n := 2 if kind == "industry" else (1 if kind == "tavern" or (kind == "home" and _hh(i, 0) < 0.6) else 0)
+	var out: Array = []
+	for k in n:
+		var c := Vector2i(r.position.x + 1 + int(_hh(i, 10 + k) * maxi(1, r.size.x - 2)), r.position.y + 1 + int(_hh(i, 20 + k) * maxi(1, r.size.y - 2)))
+		out.append(Vector2(c) * C + Vector2(C, C) * 0.5)
+	return out
+
+
+func _hh(a: int, b: int) -> float:
+	return float(hash(Vector3i(a, b, map.map_seed + 77)) % 10000) / 10000.0
 
 
 ## Is any of the player's soldiers in or right beside building i?
@@ -132,7 +178,15 @@ class RoofPiece:
 		var horiz := r.size.x >= r.size.y  # the ridge runs along the longer side
 		var ridge := (r.position.y + r.size.y * 0.5) * C if horiz else (r.position.x + r.size.x * 0.5) * C
 		var is_chapel := r == map.chapel
+		var kind: String = map.building_kind[index] if index < map.building_kind.size() else "home"
+		var flat := kind == "shop" or kind == "office"  # flat roofs: tar paper or concrete
+		var metal := kind == "industry"  # corrugated iron on the works
 		var slate := Color(0.23, 0.235, 0.245) if not is_chapel else Color(0.31, 0.31, 0.3)  # chapel: old lead
+		match kind:
+			"tavern": slate = Color(0.3, 0.2, 0.17)  # old clay tiles
+			"shop": slate = Color(0.19, 0.19, 0.2)
+			"office": slate = Color(0.27, 0.26, 0.25)
+			"industry": slate = Color(0.33, 0.3, 0.27)
 		slate = slate.lightened((_h(index, 0, 1) - 0.5) * 0.1)
 		var has := func(c: Vector2i) -> bool: return map.in_bounds(c) and map.roof_at(c) > 0.0 and r.has_point(c)
 		# shadow thrown on the ground beyond the eaves
@@ -150,7 +204,7 @@ class RoofPiece:
 					var centre := o + Vector2(C, C) * 0.5
 					# a pitched roof: the side facing the top-left catches the light
 					var lit: bool = (centre.y < ridge) if horiz else (centre.x < ridge)
-					var col := slate.lightened(0.06) if lit else slate.darkened(0.12)
+					var col := slate if flat else (slate.lightened(0.06) if lit else slate.darkened(0.12))
 					if pass_no == 0:
 						draw_rect(Rect2(o, Vector2(C, C)).grow(0.3), col)
 						var mv = roofs.main.map_view
@@ -159,8 +213,27 @@ class RoofPiece:
 							var gs := Vector2(g.get_width(), g.get_height())
 							var src := Rect2(Vector2(fposmod(o.x * 2.0, gs.x - 32.0), fposmod(o.y * 2.0, gs.y - 32.0)), Vector2(32, 32))
 							draw_texture_rect_region(g, Rect2(o, Vector2(C, C)), src, Color(1, 1, 1, 0.9))
+						if metal:
+							# corrugated iron: ridges running down the slope, rust blooming through
+							var k2 := 0.0
+							while k2 < C:
+								var a2 := o + (Vector2(k2, 0) if horiz else Vector2(0, k2))
+								var b2 := a2 + (Vector2(0, C) if horiz else Vector2(C, 0))
+								draw_line(a2, b2, col.lightened(0.12), 0.6)
+								draw_line(a2 + (Vector2(1, 0) if horiz else Vector2(0, 1)), b2 + (Vector2(1, 0) if horiz else Vector2(0, 1)), col.darkened(0.25), 0.6)
+								k2 += 2.0
+							if _h(x, y, 7) < 0.25:
+								draw_circle(o + Vector2(_h(x, y, 8), _h(x, y, 9)) * C, 3.0 + _h(x, y, 11) * 4.0, Color(0.45, 0.22, 0.1, 0.35))
+						elif flat:
+							# tar paper or concrete: seams, gravel, puddle stains
+							draw_line(o + Vector2(0, 8), o + Vector2(C, 8), col.darkened(0.25), 0.5)
+							draw_line(o + Vector2(8, 0), o + Vector2(8, C), col.darkened(0.15), 0.4)
+							for k3 in 4:
+								draw_circle(o + Vector2(_h(x * 3 + k3, y, 12), _h(x, y * 3 + k3, 13)) * C, 0.5, col.lightened(0.2))
+							if _h(x, y, 14) < 0.12:
+								draw_circle(o + Vector2(8, 8), 5.0, Color(0.05, 0.05, 0.06, 0.25))
 						# courses of slates, staggered
-						for k in 4:
+						for k in (0 if metal or flat else 4):
 							var along := k * 4.0
 							var off := 2.0 if (y * 4 + k) % 2 == 0 else 0.0
 							if horiz:
@@ -179,7 +252,9 @@ class RoofPiece:
 						if _h(x, y, 3) < 0.15:
 							draw_circle(o + Vector2(_h(x, y, 4), _h(x, y, 5)) * C, 2.0 + _h(x, y, 6) * 2.5, Color(0.2, 0.24, 0.16, 0.35))
 						# the ridge cap
-						if horiz and absf(centre.y - ridge) < C * 0.5:
+						if flat:
+							pass
+						elif horiz and absf(centre.y - ridge) < C * 0.5:
 							draw_rect(Rect2(o.x, ridge - 1.2, C, 2.4), slate.lightened(0.12))
 						elif not horiz and absf(centre.x - ridge) < C * 0.5:
 							draw_rect(Rect2(ridge - 1.2, o.y, 2.4, C), slate.lightened(0.12))
@@ -249,3 +324,55 @@ class RoofPiece:
 								var sc := col
 								draw_primitive(PackedVector2Array([corner, corner + Vector2(dd.x, 0) * s1, corner + Vector2(0, dd.y) * s2]),
 									PackedColorArray([sc, sc, sc]), PackedVector2Array())
+		_decor(map, r, kind, has)
+
+	## On top of the roof: chimneys, skylights and vents by what the building is, and a sign
+	## over the front for shops, taverns and works.
+	func _decor(map: BattleMap, r: Rect2i, kind: String, has: Callable) -> void:
+		for p in roofs.chimneys(index):
+			var big := kind == "industry"
+			var s := 7.0 if big else 5.0
+			draw_rect(Rect2(p - Vector2(s, s) * 0.5 + Vector2(3, 4), Vector2(s, s)), Color(0, 0, 0, 0.35))
+			draw_rect(Rect2(p - Vector2(s, s) * 0.5, Vector2(s, s)), Color(0.4, 0.22, 0.16) if not big else Color(0.32, 0.2, 0.15))
+			draw_rect(Rect2(p - Vector2(s, s) * 0.5, Vector2(s, s)), Color(0.12, 0.07, 0.05), false, 0.7)
+			draw_circle(p, s * 0.3, Color(0.04, 0.03, 0.03))  # the flue, sooty
+		if kind == "shop" or kind == "office" or kind == "industry":
+			for k in 3:  # skylights: grimy glass in iron frames
+				var c := Vector2i(r.position.x + 2 + int(_h(index, k, 400) * maxi(1, r.size.x - 4)), r.position.y + 2 + int(_h(k, index, 401) * maxi(1, r.size.y - 4)))
+				if not has.call(c):
+					continue
+				var rr := Rect2(Vector2(c) * C + Vector2(3, 3), Vector2(10, 10))
+				draw_rect(rr, Color(0.2, 0.25, 0.3))
+				draw_rect(rr, Color(0.08, 0.08, 0.08), false, 0.8)
+				draw_line(rr.get_center() - Vector2(5, 0), rr.get_center() + Vector2(5, 0), Color(0.08, 0.08, 0.08), 0.6)
+				draw_line(rr.position + Vector2(1, 1), rr.position + Vector2(5, 1), Color(0.5, 0.55, 0.6, 0.6), 0.6)
+				if _h(index, k, 402) < 0.4:
+					draw_rect(Rect2(rr.position + Vector2(5, 5), Vector2(5, 5)), Color(0.03, 0.03, 0.03))  # a smashed pane
+		var nm: String = map.building_name[index] if index < map.building_name.size() else ""
+		if nm == "":
+			return
+		# the sign over the front
+		var front: int = map.building_front[index]
+		var font := ThemeDB.fallback_font
+		var fs := 9
+		var w := font.get_string_size(nm, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 8.0
+		var rc := Vector2(r.position * C) + Vector2(r.size * C) * 0.5
+		var pos: Vector2
+		var rot := 0.0
+		match front:
+			0: pos = Vector2(rc.x, r.position.y * C + 6)
+			1: pos = Vector2(rc.x, r.end.y * C - 6)
+			2:
+				pos = Vector2(r.position.x * C + 6, rc.y)
+				rot = -PI * 0.5
+			_:
+				pos = Vector2(r.end.x * C - 6, rc.y)
+				rot = PI * 0.5
+		draw_set_transform(pos, rot, Vector2.ONE)
+		var board := Rect2(Vector2(-w * 0.5, -6), Vector2(w, 12))
+		draw_rect(Rect2(board.position + Vector2(2, 2), board.size), Color(0, 0, 0, 0.4))
+		var paint := Color(0.22, 0.12, 0.1) if kind == "tavern" else (Color(0.12, 0.16, 0.14) if kind == "shop" else Color(0.2, 0.2, 0.22))
+		draw_rect(board, paint)
+		draw_rect(board, Color(0.6, 0.48, 0.25), false, 0.8)
+		draw_string(font, Vector2(-w * 0.5 + 4, 3.5), nm, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.85, 0.75, 0.5))
+		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)

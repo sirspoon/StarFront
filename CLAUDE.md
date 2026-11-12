@@ -86,6 +86,7 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   that squad, to see its sight area and weapon range rings.
 - `--shot-peek` waits for a man leaning right out round cover and firing, and centres on him. Test results
   print `peeks=[legion, sworn]`: how often men leaned out to shoot.
+- `--shot-noroofs` hides the roofs for a screenshot, to see the buildings' furnishings.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

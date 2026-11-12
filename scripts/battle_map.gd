@@ -52,6 +52,16 @@ var puddles: Array = []   # [center: Vector2, radius: float, squash: float]
 var roads: Array = []     # Rect2 in world pixels
 var plaza := Rect2i()     # the paved square round the chapel
 var parks: Array[Rect2i] = []
+## What each building was before the war (parallel to buildings): "chapel", "home", "shop",
+## "tavern", "office" or "industry"; its sign (shops and taverns); and the side facing the
+## nearest street (0 top, 1 bottom, 2 left, 3 right).
+var building_kind: Array[String] = []
+var building_name: Array[String] = []
+var building_front: Array[int] = []
+const SHOP_NAMES := ["CANDLE & CENSER", "RELIC MENDER", "BREAD OF VELL", "PAWN & SCRIP", "APOTHECARY",
+		"TAILOR OF ASH ROW", "LAMP OIL", "VOTIVE GOODS", "SALVAGE", "RATION HALL", "IRONMONGER", "BOOKBINDER"]
+const TAVERN_NAMES := ["THE DROWNED SAINT", "THE LAST CANDLE", "THE IRON PEW", "THE ASHEN LAMB"]
+const WORKS_NAMES := ["VELL IRONWORKS", "TALLOW & LYE", "RECLAMATION WORKS", "PUMP STATION 3", "GAS WORKS"]
 var crushed := PackedByteArray()  # the T a cell was before a vehicle or blast flattened it (bush, hedge, wire)
 
 const WALL_HP := 100.0
@@ -602,7 +612,7 @@ func _make_compound(b: Rect2i) -> void:
 		var h := mini(rng.randi_range(6, 10), inner.size.y - 2)
 		var bx := inner.position.x + rng.randi_range(0, inner.size.x - w)
 		var by := inner.position.y + rng.randi_range(0, inner.size.y - h)
-		_make_ruin(Rect2i(bx, by, w, h))
+		_make_ruin(Rect2i(bx, by, w, h), "industry")  # behind a compound's walls: works
 
 
 ## The cells round the edge of r.
@@ -863,6 +873,7 @@ func _fill_room(r: Rect2i) -> void:
 func _make_chapel() -> void:
 	chapel = Rect2i(W / 2 - 12, H / 2 - 7, 24, 14)
 	buildings.append(chapel)
+	_note_building("chapel")
 	_fill_room(chapel)
 	for side in 4:
 		var cells := _side_cells(chapel, side)
@@ -884,8 +895,12 @@ func _make_chapel() -> void:
 			Vector2(chapel.size - Vector2i(2, 2)) * CELL)
 
 
-func _make_ruin(r: Rect2i) -> void:
+func _make_ruin(r: Rect2i, kind := "") -> void:
 	buildings.append(r)
+	if kind == "":
+		var roll := rng.randf()
+		kind = "home" if roll < 0.4 else ("shop" if roll < 0.65 else ("industry" if roll < 0.82 else ("tavern" if roll < 0.9 else "office")))
+	_note_building(kind)
 	_fill_room(r)
 	for side in 4:
 		var cells := _side_cells(r, side)
@@ -915,6 +930,39 @@ func _make_ruin(r: Rect2i) -> void:
 			if get_t(Vector2i(x, y)) == T.FLOOR and rng.randf() < 0.1:
 				set_t(Vector2i(x, y), T.RUBBLE)
 	_add_buttresses(r)
+
+
+## Note the latest building's kind, its name (if it has a sign) and which side faces the street.
+func _note_building(kind: String) -> void:
+	var r: Rect2i = buildings[buildings.size() - 1]
+	building_kind.append(kind)
+	var nm := ""
+	match kind:
+		"shop": nm = SHOP_NAMES[rng.randi() % SHOP_NAMES.size()]
+		"tavern": nm = TAVERN_NAMES[rng.randi() % TAVERN_NAMES.size()]
+		"industry": nm = WORKS_NAMES[rng.randi() % WORKS_NAMES.size()]
+	building_name.append(nm)
+	var best := 0
+	var bd := INF
+	var mids := [Vector2(r.get_center().x, r.position.y), Vector2(r.get_center().x, r.end.y),
+			Vector2(r.position.x, r.get_center().y), Vector2(r.end.x, r.get_center().y)]
+	for side in 4:
+		var p: Vector2 = mids[side] * CELL
+		for rd in roads:
+			var rr: Rect2 = rd
+			var d := Vector2(clampf(p.x, rr.position.x, rr.end.x), clampf(p.y, rr.position.y, rr.end.y)).distance_to(p)
+			if d < bd:
+				bd = d
+				best = side
+	building_front.append(best)
+
+
+## Which building a cell is inside (-1: none).
+func building_at(c: Vector2i) -> int:
+	for i in buildings.size():
+		if buildings[i].has_point(c):
+			return i
+	return -1
 
 
 func _add_buttresses(r: Rect2i) -> void:

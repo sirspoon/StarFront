@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.56 (2026-11-12)
+A town people lived in.
+- Every building was something before the war: a home, a shop, a tavern, an office or an industrial
+  works (the walled compounds hold works).
+- Inside (seen when the roof fades as your troops come near): homes have beds, dressers, stoves,
+  tables and chairs and worn rugs; shops have shelves of goods, counters and crates; taverns a bar
+  lined with bottles, barrels and round tables; offices filing cabinets, desks and strewn papers;
+  works have machines with flywheels and dials, pipes along the walls, barrels, crates and oil stains.
+- Outside: striped awnings over shop and tavern fronts, washing lines in the yards behind homes, and
+  barrels and crates stacked round the works.
+- Roofs to match: corrugated iron with rust and big brick chimneys on the works, dark tar roofs with
+  skylights on shops, concrete on offices, old clay tiles on taverns, slate on homes. Shops, taverns
+  and works have a painted sign over the front facing the street (Candle & Censer, The Drowned Saint,
+  Vell Ironworks...). Smoke curls from the chimneys of the works, taverns and some homes (not on
+  phones).
+- All of it is scenery: it doesn't change cover or movement. Maps from a given seed are laid out a
+  little differently from before.
+
 ## v0.55 (2026-11-12)
 Leaning out round cover.
 - A man with a wall in front of him, while his squad is fighting, now looks for a shot by leaning out
