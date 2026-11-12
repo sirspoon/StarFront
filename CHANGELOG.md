@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.36 (2026-11-12)
+Less square roof damage.
+- Holes in roofs have ragged, wandering edges with broken slates hanging over them, a dark torn
+  lip and a shadow falling into the hole, instead of following the map's square cells.
+- Shell damage shows as soft round soot stains and a few scattered missing slates, not dark squares.
+- Fires and weapon flashes no longer light the roofs: their light was picking out blocky orange
+  patches on the slates. The moonlight still does.
+- Fixed errors when lights are switched off (lights=0).
+
 ## v0.35 (2026-11-12)
 Windows and roofs.
 - Building walls now have windows (the chapel has a row of stained-glass ones). Men can see and

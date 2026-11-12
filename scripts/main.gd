@@ -362,6 +362,9 @@ func _demo_damage() -> void:
 	var by := b.position.y * BattleMap.CELL + 8
 	for k in 2:
 		_blast(Vector2(bx, by), GameData.WEAPONS["siege_cannon"], null, true)
+	# and shells and rockets through its roof
+	_blast(Vector2(bx - 40, by + 40), GameData.WEAPONS["siege_cannon"], null, true)
+	_blast(Vector2(bx + 30, by + 60), GameData.WEAPONS["lance_launcher"], null, true)
 	print("demo damage: %d wall cells down; building hole at %d,%d" % [walls_destroyed, bx, by])
 
 
@@ -389,6 +392,7 @@ func _build_world(seed_value: int) -> void:
 	moon.energy = 0.5
 	moon.height = 0.3
 	moon.rotation = deg_to_rad(35.0)
+	moon.range_item_cull_mask = 3  # the moon also lights the roofs (layer 2; fires and flashes don't)
 	add_child(moon)
 	map = BattleMap.new()
 	add_child(map)
