@@ -21,6 +21,8 @@ var last_status := {}
 var refresh_timer := 0.0
 var top_panel: PanelContainer
 var squad_panel: PanelContainer
+var unit_card: UnitCard
+var squads_on := true
 var touch_bar: HBoxContainer
 var touch_buttons := {}
 var loading_label: Label
@@ -50,13 +52,20 @@ func setup(m: Node) -> void:
 	var sp := PanelContainer.new()
 	sp.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	sp.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	sp.position += Vector2(10, -10)
+	sp.position += Vector2(10, -(76 if main.touch_mode else 56))  # clear of the command bar
 	root.add_child(sp)
 	squad_panel = sp
 	squad_box = VBoxContainer.new()
 	sp.add_child(squad_box)
 	if main.touch_mode:
 		squad_box.add_theme_constant_override("separation", 1)
+	# shown instead of the list while one of the player's squads is selected
+	unit_card = UnitCard.new(main.touch_mode)
+	unit_card.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	unit_card.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	unit_card.position += Vector2(10, -(76 if main.touch_mode else 56))
+	unit_card.visible = false
+	root.add_child(unit_card)
 
 	var lp := PanelContainer.new()
 	lp.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -184,13 +193,14 @@ func sync_touch(key: String, on: bool) -> void:
 
 
 func set_squads_visible(on: bool) -> void:
-	squad_panel.visible = on
+	squads_on = on
+	squad_panel.visible = on and not unit_card.visible
 
 
 ## True if a screen position is over a panel or button, so a touch there
 ## isn't also taken as an order on the battlefield.
 func is_over_ui(pos: Vector2) -> bool:
-	for c in [top_panel, squad_panel, help_panel, touch_bar.get_parent() if touch_bar else null,
+	for c in [top_panel, squad_panel, unit_card, help_panel, touch_bar.get_parent() if touch_bar else null,
 			menu_panel, end_panel]:
 		if c != null and is_instance_valid(c) and c.is_visible_in_tree() and c.get_global_rect().has_point(pos):
 			return true
@@ -335,6 +345,15 @@ func _refresh() -> void:
 				if gr != "":
 					r.label.text += "  " + gr
 			r.button.modulate = Color(0.6, 1.0, 0.6) if sq.selected else Color.WHITE
+	# the unit card replaces the list while a squad of ours is selected
+	var sel: Array = main.squads.filter(func(q): return q.team == main.player_team and q.selected and q.alive().size() > 0)
+	if sel.is_empty() or not main.started or main.over:
+		unit_card.visible = false
+		squad_panel.visible = squads_on
+	else:
+		unit_card.show_squad(sel[0], sel.size() - 1)
+		unit_card.visible = true
+		squad_panel.visible = false
 
 
 func add_message(text: String) -> void:

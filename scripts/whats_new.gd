@@ -5,6 +5,7 @@ extends RefCounted
 ## When a whole version is reached (1.0, 2.0 ...), start a new heading for it.
 
 const TEXT := """PROTOTYPE (before 1.0)
+- Unit cards: select a squad to see its men, health, morale, weapons, armour, pace, close combat, specials and attack strengths
 - Tank main guns have two settings (V): the lance's 4-second beam or rapid pulses; the Sworn cannon's AP or HE
 - Vehicles redrawn and handling smoothly; the Legion tank's lumen lance beam; big guns that shake the ground
 - Concrete bunkers with firing slits guarding the chapel and key buildings

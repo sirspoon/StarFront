@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.67 (2026-11-12)
+Unit cards.
+- Selecting one of your squads shows its unit card in place of the squad list (the list comes back
+  when nothing is selected; with several selected it shows the first and says how many more).
+- The card shows: men left (and how many are aboard a carrier) and what they're doing; health and
+  morale bars; armour (light / medium / heavy, wounds each, or a vehicle's front / side / rear
+  armour); pace; weapons with their reach; close combat strength and weapons; grenades left; special
+  abilities (leader, assault troops, heavy gun, loader, bastion armour, flamer, wall breaker,
+  carrier, gun settings).
+- Bars for how hard the unit hits light, medium and heavy infantry and armour: bright for what the
+  men still standing can do, dim for the full unit. The three infantry bars share one scale (the
+  hardest-hitting unit in the game), so they can be compared; a tank's bars follow its gun setting.
+- The squad list and card sit clear of the command bar.
+
 ## v0.66 (2026-11-12)
 Another fix for the phone crash mid-battle.
 - The last crash note showed it stopped while drawing a map repair after only 32 repairs, so it

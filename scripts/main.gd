@@ -1067,6 +1067,7 @@ func _take_shot() -> void:
 			camera.position = q.center()
 			if "--shot-pick" in OS.get_cmdline_user_args():
 				q.selected = true
+				hud._refresh()  # show the unit card in the shot
 	if "--shot-melee" in OS.get_cmdline_user_args():
 		camera.position = _melee_spot()
 	if demo_burn_at != null:
