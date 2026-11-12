@@ -111,6 +111,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest-build --yes --cleanup-tag || true
-          gh release create latest-build build/StarFront-windows.zip build/StarFront-android.apk \
-            --title "Latest build (v${VERSION})" --prerelease --target "${GITHUB_SHA}" \
+          gh release create latest-build --title "Latest build (v${VERSION})" --prerelease --target "${GITHUB_SHA}" \
             --notes "StarFront v${VERSION}, built from the latest commit. Windows: download StarFront-windows.zip, unzip it and run StarFront.exe (Windows may warn that it doesn't recognise the app: More info, then Run anyway). Android: open this page on the phone, download StarFront-android.apk and open it (allow installs from your browser when asked)."
+          # uploads to GitHub sometimes time out: try each file a few times
+          for f in build/StarFront-windows.zip build/StarFront-android.apk; do
+            for i in 1 2 3 4 5; do
+              gh release upload latest-build "$f" --clobber && break
+              echo "upload of $f failed, retrying"; sleep $((i * 15))
+              [ $i = 5 ] && exit 1
+            done
+          done
