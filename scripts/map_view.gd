@@ -58,10 +58,6 @@ func setup(m: BattleMap) -> void:
 			_build_occluders(y)
 	tiles_total = all.size()
 	SCALE = Settings.detail()
-	max_live_patches = 16 if Settings.is_phone() else 64
-	for a in OS.get_cmdline_user_args():
-		if a.begins_with("--patch-cap="):
-			max_live_patches = int(a.get_slice("=", 1))  # test aid
 	use_normals = Settings.on("normals", true)
 	BATCH = Settings.batch()
 	for i in range(0, all.size(), BATCH):
@@ -71,6 +67,7 @@ func setup(m: BattleMap) -> void:
 		if BATCH == 1:
 			for f in 3:
 				await get_tree().process_frame  # let the phone's graphics catch up between tiles
+	_make_patch_kit()
 	Settings.stage("map ready (%s)" % Settings.summary())
 	ready_drawn = true
 
@@ -149,11 +146,11 @@ func _tile_cells(k: Vector2i, size := CHUNK) -> Rect2i:
 	return r.intersection(Rect2i(0, 0, BattleMap.W, BattleMap.H))
 
 
-## Paint the given tiles (or, with as_patches, the given repair patches).
-func _bake(keys: Array, as_patches := false) -> void:
+## Paint the given tiles.
+func _bake(keys: Array) -> void:
 	var jobs: Array = []
 	for k in keys:
-		var rect := _tile_cells(k, PATCH if as_patches else CHUNK)
+		var rect := _tile_cells(k, CHUNK)
 		var size := Vector2i(Vector2(rect.size * BattleMap.CELL) * SCALE)
 		var vp := _viewport(size)
 		vp.add_child(_painter(MapPainter.new(), rect))
@@ -185,9 +182,6 @@ func _bake(keys: Array, as_patches := false) -> void:
 	if use_normals:
 		await RenderingServer.frame_post_draw
 		Settings.stage(_where + ": normal maps drawn")
-	if as_patches:
-		_show_patches(jobs)
-		return
 	Settings.stage(_where + ": reading tiles back")
 	for j in jobs:
 		var vp: SubViewport = j[1]
@@ -201,7 +195,7 @@ func _bake(keys: Array, as_patches := false) -> void:
 			tex.normal_texture = ImageTexture.create_from_image(nimg)
 		tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		var k: Vector2i = j[0]
-		var store: Dictionary = patches if as_patches else sprites
+		var store: Dictionary = sprites
 		var spr: Sprite2D = store.get(k)
 		if spr == null:
 			spr = Sprite2D.new()
@@ -221,68 +215,82 @@ func _bake(keys: Array, as_patches := false) -> void:
 			j[4].queue_free()
 
 
-## Repair patches are shown straight from the viewports they were painted in. Reading
-## them back into images (as the big tiles are) makes the graphics chip finish all its
-## work first, which is what stalled the game when a shell hit a wall.
-var patch_vps := {}  # Vector2i patch -> [colour viewport, normal viewport or null]
-var patch_order: Array = []  # patches still shown from live viewports, oldest first
-## Live viewports cost graphics memory and render targets, and every distinct patch
-## damaged in a long battle used to keep its own until the end, which ran phones out
-## of memory after a few minutes. Past this many, the oldest are copied into plain
-## images (one per frame, small enough not to stall) and their viewports freed.
-var max_live_patches := 64
-var patches_stored := 0
+## Repair patches. Phones' graphics drivers crashed when off-screen drawing surfaces were
+## made and freed over and over mid-battle (twice, both times while a repair was being
+## drawn), so one set is made when the map is ready and reused for every repair: paint the
+## patch into it, then copy the result into plain images for the patch's sprite.
+var kit := {}  # colour / height / normal viewports and the painters' parent nodes
+var patches_done := 0
 
 
-func _show_patches(jobs: Array) -> void:
-	for j in jobs:
-		var k: Vector2i = j[0]
-		var vp: SubViewport = j[1]
-		var tex := CanvasTexture.new()
-		tex.diffuse_texture = vp.get_texture()
-		if use_normals:
-			tex.normal_texture = j[4].get_texture()
-			j[3].queue_free()  # the height pass is no longer needed once the normal map is drawn
-		var spr: Sprite2D = patches.get(k)
-		if spr == null:
-			spr = Sprite2D.new()
-			spr.centered = false
-			spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-			spr.scale = Vector2(1.0 / SCALE, 1.0 / SCALE)
-			var rect: Rect2i = j[2]
-			spr.position = Vector2(rect.position * BattleMap.CELL)
-			add_child(spr)
-			patches[k] = spr
-		spr.texture = tex
-		for old in patch_vps.get(k, []):
-			if old != null:
-				old.queue_free()
-		patch_vps[k] = [vp, j[4] if use_normals else null]
-		# the painter's drawing is kept in the viewport; it is not needed again
-		patch_order.erase(k)
-		patch_order.append(k)
+func _make_patch_kit() -> void:
+	var size := Vector2i(Vector2(PATCH * BattleMap.CELL) * SCALE)
+	var vp := _viewport(size)
+	vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	kit = {"vp": vp, "hvp": null, "nvp": null}
+	if use_normals:
+		var hvp := _viewport(size)
+		hvp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		var nvp := _viewport(size)
+		nvp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		var mat := ShaderMaterial.new()
+		mat.shader = normal_shader
+		mat.set_shader_parameter("height_tex", hvp.get_texture())
+		mat.set_shader_parameter("albedo_tex", vp.get_texture())
+		mat.set_shader_parameter("texel", Vector2(1.0 / size.x, 1.0 / size.y))
+		var rect_node := ColorRect.new()
+		rect_node.size = Vector2(size)
+		rect_node.material = mat
+		nvp.add_child(rect_node)
+		kit.hvp = hvp
+		kit.nvp = nvp
 
 
-## Copy the oldest live patch into images and free its viewports.
-func _store_oldest_patch() -> void:
+func _bake_patch(k: Vector2i) -> void:
+	var rect := _tile_cells(k, PATCH)
+	var vp: SubViewport = kit.vp
+	var hvp: SubViewport = kit.hvp
+	var nvp: SubViewport = kit.nvp
+	var painter := _painter(MapPainter.new(), rect)
+	vp.add_child(painter)
+	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	var hpainter: MapPainter = null
+	if hvp != null:
+		hpainter = _painter(HeightPainter.new(), rect)
+		hvp.add_child(hpainter)
+		hvp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	Settings.stage(_where + ": drawing")
+	await RenderingServer.frame_post_draw
+	if nvp != null:
+		Settings.stage(_where + ": drawing its normal map")
+		nvp.render_target_update_mode = SubViewport.UPDATE_ONCE
+		await RenderingServer.frame_post_draw
+	if not is_instance_valid(vp):
+		return  # the battle was left mid-repair
+	Settings.stage(_where + ": copying it into images")
 	var t0 := Time.get_ticks_usec()
-	var k: Vector2i = patch_order.pop_front()
-	var vps: Array = patch_vps.get(k, [])
-	patch_vps.erase(k)
-	var spr: Sprite2D = patches.get(k)
-	if vps.is_empty() or spr == null:
-		return
 	var tex := CanvasTexture.new()
-	tex.diffuse_texture = ImageTexture.create_from_image(vps[0].get_texture().get_image())
-	if vps[1] != null:
-		tex.normal_texture = ImageTexture.create_from_image(vps[1].get_texture().get_image())
+	tex.diffuse_texture = ImageTexture.create_from_image(vp.get_texture().get_image())
+	if nvp != null:
+		tex.normal_texture = ImageTexture.create_from_image(nvp.get_texture().get_image())
+	painter.queue_free()
+	if hpainter != null:
+		hpainter.queue_free()
+	var spr: Sprite2D = patches.get(k)
+	if spr == null:
+		spr = Sprite2D.new()
+		spr.centered = false
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		spr.scale = Vector2(1.0 / SCALE, 1.0 / SCALE)
+		spr.position = Vector2(rect.position * BattleMap.CELL)
+		add_child(spr)
+		patches[k] = spr
 	spr.texture = tex
-	for v in vps:
-		if v != null:
-			v.queue_free()
-	patches_stored += 1
+	if "--debug-normals" in OS.get_cmdline_user_args() and nvp != null:
+		spr.texture = tex.normal_texture
+	patches_done += 1
 	if "--perf" in OS.get_cmdline_user_args():
-		print("PERF stored patch %s as an image in %.1f ms (%d live)" % [k, (Time.get_ticks_usec() - t0) / 1000.0, patch_order.size()])
+		print("PERF copied patch %s into images in %.1f ms" % [k, (Time.get_ticks_usec() - t0) / 1000.0])
 
 
 func _viewport(size: Vector2i) -> SubViewport:
@@ -330,16 +338,12 @@ func _on_cells_changed(cells: Array) -> void:
 
 
 func _process(_dt: float) -> void:
-	if baking or not ready_drawn:
-		return
-	if dirty.is_empty():
-		if patch_order.size() > max_live_patches:
-			_store_oldest_patch()
+	if baking or not ready_drawn or dirty.is_empty() or kit.is_empty():
 		return
 	baking = true
 	var keys := dirty.keys().slice(0, 1)  # one small patch at a time, so the work is spread over frames
 	for k in keys:
 		dirty.erase(k)
-	_where = "repairing map patch %s (%d live, %d stored, %d waiting)" % [keys[0], patch_order.size(), patches_stored, dirty.size()]
-	await _bake(keys, true)
+	_where = "repairing map patch %s (%d done, %d waiting)" % [keys[0], patches_done, dirty.size()]
+	await _bake_patch(keys[0])
 	baking = false

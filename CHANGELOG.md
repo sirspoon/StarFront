@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.66 (2026-11-12)
+Another fix for the phone crash mid-battle.
+- The last crash note showed it stopped while drawing a map repair after only 32 repairs, so it
+  wasn't memory running out but the phone's graphics driver failing as fresh off-screen drawing
+  surfaces were made (and old ones freed) during the battle.
+- Now one set of drawing surfaces is made when the map is ready and reused for every repair; each
+  finished repair is copied into plain images (about 0.6 ms). No surfaces are made or freed while
+  the battle is on.
+- The crash note now names each step of a repair (drawing, normal map, copying).
+
 ## v0.65 (2026-11-12)
 Tank main gun settings.
 - The Legion tank's lumen lance beam now holds for 4 seconds instead of 1.3, doing the same harm in
