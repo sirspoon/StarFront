@@ -89,6 +89,10 @@ var shot_zoom := 1.2
 var walls_destroyed := 0
 var perf_log := "--perf" in OS.get_cmdline_user_args()  # test aid: print the slowest frame regularly
 var perf_last := 0
+var perf_parts: Array = []
+var draw_us := 0  # test aid: time spent building soldier drawings
+var draw_n := 0
+var always_draw := Settings._q().contains("alwaysdraw")  # test aid: redraw every soldier every frame (the old way)  # test aid: time spent in each part of the simulation
 var perf_worst := 0.0
 var perf_frames := 0
 var cover_blocks := [0, 0]   # shots at each side stopped by low cover
@@ -130,6 +134,9 @@ func _ready() -> void:
 	hud = HUD.new()
 	add_child(hud)
 	hud.setup(self)
+	if OS.has_feature("web") and Settings._q().contains("massdemo"):
+		hud._choose.call_deferred("legion")  # test aid in the browser: start, then order everyone about
+		_web_mass.call_deferred()
 	if autotest:
 		battle_length = 600.0  # test battles still end
 		print("StarFront autotest, seed %d" % seed_value)
@@ -152,6 +159,8 @@ func _ready() -> void:
 			_demo_flame()
 		if "--gallery" in args:
 			_gallery()
+		if "--test-mass" in args:
+			_test_mass()
 		if "--test-touch" in args:
 			_test_touch()
 		if "--test-reach" in args:
@@ -262,6 +271,58 @@ func _test_grenades() -> void:
 	await get_tree().create_timer(3.0).timeout
 	var s0: Vector2 = grenades.screens[0].pos if not grenades.screens.is_empty() else spot
 	print("  sight through the smoke: %s (should be false); beside it: %s" % [map.los_clear(s0 - Vector2(0, 120), s0 + Vector2(0, 120)), map.los_clear(s0 + Vector2(120, -120), s0 + Vector2(120, 120))])
+
+
+func _web_mass() -> void:
+	while not started:
+		await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(2.0).timeout
+	var last := Time.get_ticks_usec()
+	var total := 0.0
+	for f in 60:
+		await get_tree().process_frame
+		var now := Time.get_ticks_usec()
+		total += (now - last) / 1000.0
+		last = now
+	print("MASS before any order: average frame %.1f ms" % (total / 60.0))
+	_test_mass()
+
+
+## Test aid: select every squad and order them all across the map at once, a few times,
+## timing the order itself and the slowest frames that follow.
+func _test_mass() -> void:
+	ais = ais.filter(func(ai): return ai.team != 0)
+	for round_i in 4:
+		await get_tree().create_timer(3.0).timeout
+		for sq in _player_squads():
+			sq.selected = true
+		var dest := Vector2((40 + round_i * 25) * BattleMap.CELL, (30 + (round_i % 2) * 40) * BattleMap.CELL)
+		draw_us = 0
+		var t0 := Time.get_ticks_usec()
+		_order(dest, false)
+		var order_ms := (Time.get_ticks_usec() - t0) / 1000.0
+		draw_n = 0
+		var game_t0 := time
+		var worst := 0.0
+		var total := 0.0
+		var frames := 0
+		var last := Time.get_ticks_usec()
+		for f in 60:
+			await get_tree().process_frame
+			var now := Time.get_ticks_usec()
+			var ms := (now - last) / 1000.0
+			last = now
+			worst = maxf(worst, ms)
+			total += ms
+			frames += 1
+		print("MASS order %.1f ms; next 60 frames: worst %.1f ms, average %.1f ms; drawing soldiers %.2f ms a frame, %d soldier redraws a game second" % [order_ms, worst, total / frames, draw_us / 60000.0, int(draw_n / maxf(time - game_t0, 0.01))])
+		draw_us = 0
+		var n: float = maxf(1.0, perf_parts[4])
+		print("  engine: process %.2f ms, physics %.2f ms, objects %d, nodes %d" % [Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+				Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, Performance.get_monitor(Performance.OBJECT_COUNT), Performance.get_monitor(Performance.OBJECT_NODE_COUNT)])
+		print("  per frame: soldiers %.2f ms, separation %.2f, spotting %.2f, squads %.2f" % [perf_parts[0] / n / 1000.0, perf_parts[1] / n / 1000.0, perf_parts[2] / n / 1000.0, perf_parts[3] / n / 1000.0])
+		perf_parts = []
+	get_tree().quit()
 
 
 ## Test aid: one of each kind of soldier lined up in the chapel square, the battle paused,
@@ -782,7 +843,9 @@ func _process(dt: float) -> void:
 	if paused and started:
 		# soldiers only redraw as they act; while paused, keep their selection rings up to date
 		for s in soldiers:
-			if s.visible:
+			if not s.is_vehicle:
+				s.refresh_look()
+			elif s.visible:
 				s.queue_redraw()
 	if not started or over or paused:
 		return
@@ -791,16 +854,28 @@ func _process(dt: float) -> void:
 		# breadcrumbs in battle too, in case the browser's graphics give out mid-fight
 		Settings.stage("in battle at %d:%02d (%d smoke screens, %d grenades in the air, %s)" % [int(time) / 60, int(time) % 60,
 				grenades.screens.size(), grenades.flying.size(), Settings.summary()])
+	var _p0 := Time.get_ticks_usec()
 	for s in soldiers:
 		s.tick(dt, time)
+	var _p1 := Time.get_ticks_usec()
 	_separate(dt)
+	var _p2 := Time.get_ticks_usec()
 	spot_timer -= dt
 	if spot_timer <= 0.0:
 		spot_timer = 0.25
 		_update_spotting()
+	var _p3 := Time.get_ticks_usec()
 	for sq in squads:
 		sq.think(self, dt)
 		sq.advance(map)
+	var _p4 := Time.get_ticks_usec()
+	if perf_parts.size() == 0:
+		perf_parts = [0.0, 0.0, 0.0, 0.0, 0]
+	perf_parts[0] += _p1 - _p0
+	perf_parts[1] += _p2 - _p1
+	perf_parts[2] += _p3 - _p2
+	perf_parts[3] += _p4 - _p3
+	perf_parts[4] += 1
 	for s in soldiers:
 		if s.is_alive() and not s.is_vehicle:
 			field_time[s.team] += dt

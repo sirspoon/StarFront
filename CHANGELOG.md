@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.49 (2026-11-12)
+Smoother, and Windows and Android versions.
+- Much less work drawing soldiers: each man is only redrawn when how he looks changes (turning,
+  stance, firing, being hit or selected), and a walking man's stride is redrawn a few times a
+  second rather than every frame. With the whole army on the move this cuts the drawing work to
+  about a quarter, which was what made the game stutter when everyone moved at once. Zoomed right
+  out, soldiers are drawn simply.
+- Windows and Android versions are built automatically with every update and put on the
+  repository's "Latest build" release (Releases, on the GitHub page). Windows: unzip and run
+  StarFront.exe. Android: open the release page on the phone, download the .apk and open it.
+
 ## v0.48 (2026-11-12)
 The Legion's new look, heavy guns that hose, selection while paused.
 - The Legion are redrawn in detail like the Sworn: long greatcoats with their skirts flaring

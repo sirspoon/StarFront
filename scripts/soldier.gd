@@ -198,7 +198,25 @@ func tick(dt: float, now: float) -> void:
 		if moving and bleed_step <= 0.0:
 			bleed_step = 0.5
 			main.decals.add_smear(position, -Vector2.from_angle(facing), 9.0, Color(colors.blood))
-	if visible:
+	refresh_look()
+
+
+var _look := 0
+const LOD_ZOOM := 0.9  # zoomed further out than this, soldiers are drawn simply (the detail can't be seen)
+
+
+## Redraw only when something about how he looks has changed (he's moved by his node's
+## position, which needs no redraw): drawing every man every frame was the main cost.
+func refresh_look() -> void:
+	if not visible:
+		return
+	# turning shows in 5-degree steps and the stride at about 7 frames a second: plenty at this
+	# size, and far fewer redraws when a whole army is on the move
+	var k := hash([int(facing * 12.0), posture, int(lean * 4.0), squad.selected, squad.sub.has(self), state, hp,
+			flash > 0.0, int(swing * 4.0), int(walk * 0.6) if moving else -1, int(setup_t * 4.0), in_melee,
+			charging != null, squad.prone, reload_t > 0.0, main.camera.zoom.x < LOD_ZOOM])
+	if k != _look or main.always_draw:
+		_look = k
 		queue_redraw()
 
 
@@ -632,6 +650,13 @@ func take_hit(dmg: int, from: Soldier) -> void:
 # ---------------------------------------------------------------- drawing
 
 func _draw() -> void:
+	var t0 := Time.get_ticks_usec()
+	_draw_body()
+	main.draw_us += Time.get_ticks_usec() - t0
+	main.draw_n += 1
+
+
+func _draw_body() -> void:
 	if state == State.DEAD:
 		_draw_corpse()
 		return
@@ -671,7 +696,9 @@ func _draw() -> void:
 		var sw := sin(walk) * r * 0.45
 		draw_circle(Vector2(sw, -r * 0.38), r * 0.32, leg)
 		draw_circle(Vector2(-sw, r * 0.38), r * 0.32, leg)
-	if faction == "sworn":
+	if main.camera.zoom.x < LOD_ZOOM:
+		_draw_simple()
+	elif faction == "sworn":
 		_draw_sworn()
 	else:
 		_draw_conscript()
@@ -793,6 +820,18 @@ func _draw_conscript() -> void:
 		draw_circle(hc + Vector2(hr * 0.7, sgn * hr * 0.45 - 0.3), hr * 0.08, Color(0.85, 0.9, 0.8))
 	if is_leader:
 		draw_line(hc - Vector2(hr * 0.8, 0), hc + Vector2(hr * 0.6, 0), trim, 1.6)  # gilded crest
+
+
+## Zoomed right out: a body, a head and a gun line in the side's colours.
+func _draw_simple() -> void:
+	var r := radius
+	var coat: Color = colors.coat
+	draw_circle(Vector2.ZERO, r * 0.85, Color(0.03, 0.03, 0.03))
+	draw_circle(Vector2.ZERO, r * 0.75, coat)
+	draw_line(Vector2(0, 2), Vector2(r + (14.0 if heavy else 7.0), 2), Color(0.1, 0.1, 0.1), 3.0 if heavy else 1.8)
+	draw_circle(Vector2(r * 0.15, 0), r * 0.42, Color(colors.armour))
+	if faction == "sworn":
+		draw_circle(Vector2(r * 0.35, 0), r * 0.15, Color(1.0, 0.35, 0.15))
 
 
 ## An ellipse (optionally turned by rot) as a polygon.

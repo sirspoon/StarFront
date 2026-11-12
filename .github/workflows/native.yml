@@ -1,0 +1,116 @@
+# Builds the Windows and Android versions on every push to main and puts them on a
+# GitHub release called "Latest build" (Releases on the repository's page), replacing
+# the previous one. Windows: unzip and run StarFront.exe. Android: download the .apk on
+# the phone and open it (allow installing from your browser when asked).
+name: Native builds
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: native
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.3
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot and its Windows and Android templates
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-native
+
+      - name: Download Godot and the templates
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          cd ~/godot
+          curl -sSL --retry 5 -o godot.zip https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          unzip -q godot.zip && rm godot.zip
+          curl -sSL --retry 5 -C - -o templates.tpz https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz
+          unzip -q -j templates.tpz templates/windows_release_x86_64.exe templates/windows_debug_x86_64.exe \
+            templates/android_release.apk templates/android_debug.apk templates/version.txt \
+            -d ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+          rm templates.tpz
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # The Android signing key is kept between builds (in the cache), so a new build installs
+      # over the old one. If the cache is ever cleared, a new key is made: uninstall first then.
+      - name: Signing key cache
+        uses: actions/cache@v4
+        with:
+          path: ~/keys
+          key: starfront-android-key-v1
+
+      - name: Set up Android export
+        run: |
+          mkdir -p ~/keys
+          if [ ! -f ~/keys/release.keystore ]; then
+            keytool -genkeypair -v -keystore ~/keys/release.keystore -alias starfront -keyalg RSA -keysize 2048 \
+              -validity 10000 -storepass starfront -keypass starfront -dname "CN=StarFront, O=StarFront, C=GB"
+          fi
+          if [ ! -f ~/keys/debug.keystore ]; then
+            keytool -genkeypair -v -keystore ~/keys/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 \
+              -validity 10000 -storepass android -keypass android -dname "CN=Android Debug, O=Android, C=US"
+          fi
+          mkdir -p ~/.config/godot
+          cat > ~/.config/godot/editor_settings-4.3.tres <<EOT
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "${ANDROID_SDK_ROOT}"
+          export/android/java_sdk_path = "${JAVA_HOME}"
+          export/android/debug_keystore = "$HOME/keys/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOT
+          sed -i 's/^ *//' ~/.config/godot/editor_settings-4.3.tres
+          cat ~/.config/godot/editor_settings-4.3.tres
+
+      - name: Export Windows and Android
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: /home/runner/keys/release.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: starfront
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: starfront
+        run: |
+          GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          VERSION=$(grep -oP 'config/version="\K[^"]+' project.godot)
+          CODE=$(echo "$VERSION" | tr -d '.' | sed 's/^0*//')
+          sed -i "s/^version\/code=.*/version\/code=${CODE:-1}/; s/^version\/name=.*/version\/name=\"${VERSION}\"/" export_presets.cfg
+          mkdir -p build/windows build/android
+          $GODOT --headless --import || true
+          $GODOT --headless --export-release "Windows Desktop" build/windows/StarFront.exe
+          $GODOT --headless --export-release "Android" build/android/StarFront.apk
+          ls -la build/windows build/android
+          test -f build/windows/StarFront.exe
+          test -f build/android/StarFront.apk
+          (cd build/windows && zip -q ../StarFront-windows.zip StarFront.exe)
+          cp build/android/StarFront.apk build/StarFront-android.apk
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Publish the "Latest build" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest-build --yes --cleanup-tag || true
+          gh release create latest-build build/StarFront-windows.zip build/StarFront-android.apk \
+            --title "Latest build (v${VERSION})" --prerelease --target "${GITHUB_SHA}" \
+            --notes "StarFront v${VERSION}, built from the latest commit. Windows: download StarFront-windows.zip, unzip it and run StarFront.exe (Windows may warn that it doesn't recognise the app: More info, then Run anyway). Android: open this page on the phone, download StarFront-android.apk and open it (allow installs from your browser when asked)."
