@@ -179,7 +179,7 @@ class RoofPiece:
 		var ridge := (r.position.y + r.size.y * 0.5) * C if horiz else (r.position.x + r.size.x * 0.5) * C
 		var is_chapel := r == map.chapel
 		var kind: String = map.building_kind[index] if index < map.building_kind.size() else "home"
-		var flat := kind == "shop" or kind == "office"  # flat roofs: tar paper or concrete
+		var flat := kind == "shop" or kind == "office" or kind == "bunker"  # flat roofs: tar paper or concrete
 		var metal := kind == "industry" or kind == "warehouse"  # corrugated iron on the works and warehouses
 		var slate := Color(0.23, 0.235, 0.245) if not is_chapel else Color(0.31, 0.31, 0.3)  # chapel: old lead
 		match kind:
@@ -188,6 +188,7 @@ class RoofPiece:
 			"office": slate = Color(0.27, 0.26, 0.25)
 			"industry": slate = Color(0.33, 0.3, 0.27)
 			"warehouse": slate = Color(0.3, 0.31, 0.3)
+			"bunker": slate = Color(0.33, 0.33, 0.3)
 		slate = slate.lightened((_h(index, 0, 1) - 0.5) * 0.1)
 		var has := func(c: Vector2i) -> bool: return map.in_bounds(c) and map.roof_at(c) > 0.0 and r.has_point(c)
 		# shadow thrown on the ground beyond the eaves
@@ -339,6 +340,23 @@ class RoofPiece:
 			draw_circle(p, s * 0.3, Color(0.04, 0.03, 0.03))  # the flue, sooty
 		if kind == "chapel":
 			_chapel_spire(map, r)
+		if kind == "bunker":
+			# sandbags laid along the roof's edges, and an armoured periscope cupola
+			var rr := Rect2(Vector2(r.position * C), Vector2(r.size * C))
+			for edge in 4:
+				var a: Vector2 = [rr.position, Vector2(rr.end.x, rr.position.y), rr.end, Vector2(rr.position.x, rr.end.y)][edge]
+				var b: Vector2 = [Vector2(rr.end.x, rr.position.y), rr.end, Vector2(rr.position.x, rr.end.y), rr.position][edge]
+				var inward := (rr.get_center() - (a + b) * 0.5).normalized() * 4.0
+				var n := int(a.distance_to(b) / 7.0)
+				for k in n:
+					var q := a.lerp(b, (k + 0.5) / n) + inward
+					draw_circle(q + Vector2(0.8, 1.0), 3.2, Color(0, 0, 0, 0.35))
+					draw_circle(q, 3.2, Color(0.47, 0.42, 0.31).lightened((_h(index, k + edge * 10, 410) - 0.5) * 0.15))
+			var cp := rr.get_center()
+			draw_circle(cp + Vector2(2, 3), 5.0, Color(0, 0, 0, 0.4))
+			draw_circle(cp, 5.0, Color(0.28, 0.29, 0.26))
+			draw_arc(cp, 5.0, 0, TAU, 14, Color(0.1, 0.1, 0.09), 1.0)
+			draw_rect(Rect2(cp + Vector2(-1, -3.5), Vector2(2, 2)), Color(0.05, 0.05, 0.05))
 		if kind == "warehouse":
 			# a long strip of skylights down the ridge
 			var horiz := r.size.x >= r.size.y

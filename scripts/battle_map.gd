@@ -20,6 +20,8 @@ const SPEED := [1.0, 0.7, 0.75, 1.0, 1.0, 1.0, 0.35, 1.0, 0.7, 0.3, 0.22, 0.85]
 const TERRAIN_NAMES := ["Open ground", "Rubble", "Crater", "Ruin floor", "Wall", "Wreck", "Low cover", "Window",
 		"Bushes", "Hedge", "Barbed wire", "Trench"]
 const WINDOW_COVER := 0.5  # a man firing from just inside a window
+const SLIT_COVER := 0.78   # ...or a bunker's firing slit
+const BUNKER_WALL_HP := 320.0
 
 ## Low cover: chest-high things troops crouch behind and fire over. It doesn't block
 ## sight, infantry can clamber over it slowly, vehicles go round. It soaks up more
@@ -64,6 +66,7 @@ var trenches := false  # dig trench lines across the battlefield (an option)
 var props: Array = []
 ## Railway sidings, drawn on the ground: [start cell, length in cells, horizontal].
 var rails: Array = []
+var bunker_mask := PackedByteArray()  # 1 on every cell of a bunker
 var building_name: Array[String] = []
 var building_front: Array[int] = []
 const SHOP_NAMES := ["CANDLE & CENSER", "RELIC MENDER", "BREAD OF VELL", "PAWN & SCRIP", "APOTHECARY",
@@ -169,7 +172,7 @@ func cell_cover_dir(c: Vector2i, dir: Vector2) -> float:
 		elif nt == T.RUBBLE:
 			v = 0.4
 		elif nt == T.WINDOW:
-			v = WINDOW_COVER + 0.1  # a firing position: safe, and he can shoot out
+			v = (SLIT_COVER if is_bunker(n) else WINDOW_COVER) + 0.1  # a firing position: safe, and he can shoot out
 		elif nt == T.WALL or nt == T.WRECK:
 			v = 0.3  # safe, but he can't shoot through it
 		best = maxf(best, v * (1.0 if off == 0.0 else 0.8))
@@ -196,7 +199,7 @@ func cover_vs(target_pos: Vector2, shooter_pos: Vector2) -> float:
 	elif ft == T.WALL or ft == T.WRECK:
 		cov = maxf(cov, 0.55)
 	elif ft == T.WINDOW:
-		cov = maxf(cov, WINDOW_COVER)
+		cov = maxf(cov, SLIT_COVER if is_bunker(cell_of(target_pos + dir * CELL)) else WINDOW_COVER)
 	var lc := cover_cell(target_pos, shooter_pos)
 	if lc.x >= 0:
 		cov = maxf(cov, low_cover_at(lc))
@@ -437,6 +440,8 @@ func generate(seed_value: int) -> void:
 	low_kind.fill(0)
 	crushed.resize(W * H)
 	crushed.fill(0)
+	bunker_mask.resize(W * H)
+	bunker_mask.fill(0)
 	_make_city()
 	for i in 22:
 		_make_crater()
@@ -736,6 +741,8 @@ func _ring(r: Rect2i) -> Array[Vector2i]:
 ## across the streets leading in.
 func _fortify() -> void:
 	_fortify_site(chapel, [0.0, PI, PI * 0.25, -PI * 0.25, PI * 0.75, -PI * 0.75, PI * 0.5, -PI * 0.5])
+	_make_bunker(chapel, 0)  # bunkers on the chapel's east and west approaches
+	_make_bunker(chapel, 2)
 	var picks: Array = []
 	for i in range(1, buildings.size()):
 		var k := building_kind[i]
@@ -746,6 +753,7 @@ func _fortify() -> void:
 		var r: Rect2i = buildings[i]
 		var east := r.get_center().x > W / 2  # positions face the way the enemy would come
 		_fortify_site(r, [0.0 if east else PI, (0.4 if east else PI - 0.4), (-0.4 if east else PI + 0.4)])
+		_make_bunker(r, 0 if east else 2)
 
 
 func _fortify_site(site: Rect2i, angles: Array) -> void:
@@ -801,6 +809,44 @@ func _fighting_position(o: Vector2, a: float, shape: String) -> bool:
 		if in_bounds(wc) and get_t(wc) == T.OPEN and wc.x > 16 and wc.x < W - 17:
 			set_t(wc, T.WIRE)
 	return true
+
+
+## A small concrete bunker out on one approach to a site (side 0 east, 1 south, 2 west,
+## 3 north): thick walls, a long firing slit in the front facing the approach, and a doorway
+## at the back facing the site.
+func _make_bunker(site: Rect2i, side: int) -> void:
+	var dirs := [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
+	var out: Vector2i = dirs[side]
+	var size := Vector2i(4, 5) if out.x != 0 else Vector2i(5, 4)
+	for attempt in 14:
+		var dist := rng.randi_range(5, 10)
+		var c := site.get_center()
+		var base := Vector2i(site.end.x + dist if out.x > 0 else (site.position.x - dist - size.x if out.x < 0 else c.x - size.x / 2),
+				site.end.y + dist if out.y > 0 else (site.position.y - dist - size.y if out.y < 0 else c.y - size.y / 2))
+		base += Vector2i(0, rng.randi_range(-6, 6)) if out.x != 0 else Vector2i(rng.randi_range(-6, 6), 0)
+		var r := Rect2i(base, size)
+		var ok := r.position.x >= 17 and r.end.x <= W - 17 and r.position.y >= 1 and r.end.y <= H - 1 and not _overlaps(r.grow(1))
+		if ok:
+			for x in range(r.position.x - 1, r.end.x + 1):
+				for y in range(r.position.y - 1, r.end.y + 1):
+					var t := get_t(Vector2i(x, y))
+					if is_road(Vector2i(x, y)) or not (t == T.OPEN or t == T.RUBBLE or t == T.BUSH):
+						ok = false
+		if not ok:
+			continue
+		buildings.append(r)
+		_note_building("bunker")
+		_fill_room(r)
+		for x in range(r.position.x, r.end.x):
+			for y in range(r.position.y, r.end.y):
+				bunker_mask[y * W + x] = 1
+		# the firing slit along the front, and the doorway at the back
+		var front := _side_cells(r, [3, 1, 2, 0][side])
+		var back := _side_cells(r, [2, 0, 3, 1][side])
+		for k in front.size():
+			set_t(front[k], T.WINDOW)
+		set_t(back[back.size() / 2], T.FLOOR)
+		return
 
 
 ## Barricades across the streets leading to a site, a little way out from it, each with a
@@ -960,6 +1006,10 @@ func _make_scrub() -> void:
 
 ## Can fire take hold here (a flamer's jet)? Bushes, hedges, wooden barricades, crates,
 ## and the furnishings of rooms.
+func is_bunker(c: Vector2i) -> bool:
+	return in_bounds(c) and bunker_mask[c.y * W + c.x] == 1
+
+
 func flammable(c: Vector2i) -> bool:
 	var t := get_t(c)
 	if t == T.BUSH or t == T.HEDGE:
@@ -1054,7 +1104,7 @@ func damage_roof(at: Vector2, radius: float, dmg: float) -> void:
 			if d > reach:
 				continue
 			var j := c.y * W + c.x
-			roof_hp[j] = maxf(0.0, roof_hp[j] - dmg * clampf(1.0 - d / (reach * 1.2), 0.3, 1.0))
+			roof_hp[j] = maxf(0.0, roof_hp[j] - dmg * clampf(1.0 - d / (reach * 1.2), 0.3, 1.0) * (0.2 if bunker_mask[j] == 1 else 1.0))
 			touched[building_of[j]] = true
 	for b in touched:
 		if b >= 0:
@@ -1087,6 +1137,8 @@ func _init_walls() -> void:
 	for y in H:
 		for x in W:
 			var hp := CHAPEL_WALL_HP if chapel.grow(1).has_point(Vector2i(x, y)) else WALL_HP
+			if bunker_mask[y * W + x] == 1:
+				hp = BUNKER_WALL_HP  # thick reinforced concrete
 			if grid[y * W + x] == T.LOW:
 				hp = LOW_HP[low_kind[y * W + x]]
 			elif grid[y * W + x] == T.WINDOW:
@@ -1100,7 +1152,7 @@ func _init_walls() -> void:
 			for c in _side_cells(b, side) + [b.position, Vector2i(b.end.x - 1, b.position.y),
 					Vector2i(b.position.x, b.end.y - 1), b.end - Vector2i.ONE]:
 				var t := get_t(c)
-				if is_wall(t) or t == T.LOW or (is_chapel and t == T.FLOOR):
+				if is_wall(t) or t == T.LOW or ((is_chapel or is_bunker(c)) and t == T.FLOOR):
 					continue
 				if t == T.OPEN:
 					set_t(c, T.RUBBLE)

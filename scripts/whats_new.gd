@@ -5,6 +5,7 @@ extends RefCounted
 ## When a whole version is reached (1.0, 2.0 ...), start a new heading for it.
 
 const TEXT := """PROTOTYPE (before 1.0)
+- Concrete bunkers with firing slits guarding the chapel and key buildings
 - Defences built round the chapel and key buildings, facing outward; optional trench lines
 - Foundry District battlefield: warehouses, storage tanks, furnaces and rail yards
 - Statues, a spired chapel, and flamers that set the scenery alight

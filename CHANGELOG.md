@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.59 (2026-11-12)
+Bunkers.
+- Small concrete bunkers out on the approaches of the defended places: two by the chapel (east and
+  west) and one by each other fortified building, facing the enemy's approach. Thick walls of dark
+  military concrete take about three times as much to break as a building's, and the roof shrugs off
+  most shell damage.
+- A long firing slit runs along the front wall: men firing out of it are in much better cover than at an
+  ordinary window (and the computer's men seek it out). A doorway at the back faces what the bunker
+  defends.
+- Drawn with a flat concrete roof edged with sandbags and an armoured periscope cupola; inside (when the
+  roof fades), ammunition boxes, a bench and a field telephone.
+- In test battles the balance is unchanged (the Legion wins a little over half).
+
 ## v0.58 (2026-11-12)
 Defences that defend something, and trenches.
 - Fortifications are now built round what's worth holding: the chapel, and two or three key buildings

@@ -1029,6 +1029,8 @@ func _draw_low_remains(c: Vector2i) -> void:
 func _wall_base(c: Vector2i) -> Color:
 	if map.chapel.grow(1).has_point(c):
 		return Color(0.52, 0.5, 0.47)  # pale, older ferrocrete
+	if map.is_bunker(c):
+		return Color(0.34, 0.34, 0.31)  # dark, heavy military concrete
 	# each building was cast from its own batch of concrete
 	for i in map.buildings.size():
 		if map.buildings[i].grow(1).has_point(c):
@@ -1197,8 +1199,13 @@ func _draw_window(c: Vector2i) -> void:
 	var o := Vector2(c) * C - Vector2(0, h)
 	var base := _wall_base(c)
 	var horiz := map.is_wall(map.get_t(c + Vector2i(-1, 0))) or map.is_wall(map.get_t(c + Vector2i(1, 0)))
-	# the opening runs across the wall's thickness
+	# the opening runs across the wall's thickness (a bunker's firing slit: long and narrow, joined up)
 	var gap := Rect2(o + Vector2(3, 5), Vector2(10, 6)) if horiz else Rect2(o + Vector2(5, 3), Vector2(6, 10))
+	if map.is_bunker(c):
+		gap = Rect2(o + Vector2(0, 6), Vector2(C, 3.5)) if horiz else Rect2(o + Vector2(6, 0), Vector2(3.5, C))
+		draw_rect(gap.grow(1.2), base.darkened(0.5))
+		draw_rect(gap, Color(0.04, 0.04, 0.05))
+		return
 	var dark := Color(0.07, 0.07, 0.08)
 	draw_rect(gap.grow(0.8), base.darkened(0.55))   # shadowed reveal
 	draw_rect(gap, dark)
@@ -1385,6 +1392,15 @@ func _draw_furnishing(c: Vector2i, bi: int, kind: String) -> void:
 				_box(m + Vector2(0, 5), Vector2(3.5, 3.5), WOOD.darkened(0.2), 0.0)
 				for k in 3:  # papers strewn about
 					draw_rect(Rect2(m + Vector2(_h(c.x, k, 307) * 14 - 7, _h(k, c.y, 308) * 14 - 7), Vector2(3, 2)), Color(0.78, 0.75, 0.68, 0.8))
+		"bunker":
+			if roll < 0.35:
+				_crate(m + Vector2(-2, 1), 6.0, pick)  # ammunition boxes
+				draw_rect(Rect2(m + Vector2(-4, -1), Vector2(4, 1)), Color(0.65, 0.55, 0.25))
+			elif roll < 0.55:
+				_box(m, Vector2(12, 4), WOOD.darkened(0.1), 0.0)  # a bench
+			elif roll < 0.65:
+				_box(m, Vector2(5, 4), Color(0.25, 0.27, 0.22), 0.0)  # a field telephone
+				draw_line(m + Vector2(2.5, 0), m + Vector2(8, 5), Color(0.1, 0.1, 0.1), 0.6)
 		"warehouse":
 			if roll < 0.2:
 				_box(m, Vector2(12, 12), WOOD.darkened(0.1), _h(c.x, c.y, 309) * 0.2)  # a pallet
