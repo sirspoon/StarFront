@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.47 (2026-11-12)
+Tougher troops, clearer heavy guns, new look for the Sworn.
+- Everyone is a little harder to kill: about three hits in ten that would have wounded (from
+  shots, bursts, blasts and flames) now only graze a man or tear through his kit. He isn't hurt
+  but it frightens him, so fire pins men down more and kills them less. Battles last about a
+  quarter longer. (Close combat is as deadly as before.)
+- Heavy guns are much easier to see: longer and thicker, in lighter metal with a dark outline,
+  a perforated cooling jacket, a carry handle, a muzzle brake, a shadow under them and a bigger
+  tripod. The Sworn gun has an ammunition box with its belt feeding in; the Legion's a glowing lens
+  and a power cable.
+- The Sworn are redrawn in much more detail: a power plant on their backs with glowing exhausts
+  and cooling vanes, a sculpted breastplate with their sunburst sigil, great rounded shoulder plates
+  rimmed in gold (the sigil on the left, a rank stripe for leaders), armoured arms holding the weapon,
+  and a helmet with a grilled faceplate and glowing eye lenses. Leaders wear a cloak with a gilded
+  hem and a red crest. Every weapon is redrawn too (drum-fed carbines, triple-barrelled rotor cannons,
+  fusion carbines with glowing coils), the Pyre Warden carries twin fuel tanks, and the heavy-armoured
+  warriors are bulkier with extra plates and an armoured collar. Wounded Sworn show gouges and
+  scorching on their armour.
+- Balance: in test battles the Legion now wins about one in four (was about one in six).
+
 ## v0.46 (2026-11-12)
 A proper city to fight in.
 - The map is laid out like a city: four avenues running north-south and two cross streets, with

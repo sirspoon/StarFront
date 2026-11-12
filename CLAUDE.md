@@ -65,6 +65,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `--shot-flame` waits for a flamer's jet and centres on it (it may never come: the flamer is slow);
   `--demo-flame` (with `--shot-at=x,y`) fires a jet there every second, to look at the drawing. Test results also print men killed by
   their own side and kills by the Pyre Warden / Bastion Brother.
+- `--gallery` (with `--autotest`, `--shot-at=1290,634 --shot-time=0.2 --shot-zoom=4.5 --shot-nohud`) lines up
+  one of each kind of soldier above the chapel and pauses, to look at the soldier drawings.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

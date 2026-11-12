@@ -150,6 +150,8 @@ func _ready() -> void:
 			_test_grenades()
 		if "--demo-flame" in args:
 			_demo_flame()
+		if "--gallery" in args:
+			_gallery()
 		if "--test-touch" in args:
 			_test_touch()
 		if "--test-reach" in args:
@@ -260,6 +262,35 @@ func _test_grenades() -> void:
 	await get_tree().create_timer(3.0).timeout
 	var s0: Vector2 = grenades.screens[0].pos if not grenades.screens.is_empty() else spot
 	print("  sight through the smoke: %s (should be false); beside it: %s" % [map.los_clear(s0 - Vector2(0, 120), s0 + Vector2(0, 120)), map.los_clear(s0 + Vector2(120, -120), s0 + Vector2(120, 120))])
+
+
+## Test aid: one of each kind of soldier lined up in the chapel square, the battle paused,
+## for a screenshot (--shot-at=1280,800 --shot-time=1).
+func _gallery() -> void:
+	await get_tree().create_timer(0.3).timeout
+	var seen := {}
+	var row := [0, 0]
+	for s in soldiers:
+		if s.is_vehicle or seen.has(s.kind):
+			continue
+		seen[s.kind] = true
+		if s.state == Soldier.State.EMBARKED:
+			s.carrier.passengers.erase(s)
+			s.state = Soldier.State.READY
+			s.carrier = null
+		s.position = Vector2(map.plaza.position * BattleMap.CELL) + Vector2(40 + row[s.team] * 56, 62 - s.team * 36)
+		row[s.team] += 1
+		s.facing = 0.0
+		s.halt()
+		s.visible = true
+		if s.heavy:
+			s.setup_t = 1.0
+		if s.kind == "oathblade":
+			s.in_melee = true
+	for s in soldiers:
+		if not seen.has(s.kind) or not s.position.distance_to(Vector2(map.plaza.position * BattleMap.CELL)) < 900:
+			pass
+	paused = true
 
 
 ## Test aid: a flame jet every second at --shot-at (or the map centre), to look at the drawing.
@@ -1028,6 +1059,12 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 				if randf() < 0.4:
 					_ricochet(target.position, target.position - shooter.position, w)
 			target.morale -= 1.0
+		elif randf() > GameData.LETHALITY:
+			# only a graze, or it tore through his kit: no wound, but a nasty fright
+			if show:
+				effects.puff(target.position, Color(0.5, 0.45, 0.38), 3.0)
+			target.add_suppression(float(w.supp) * 0.5, time)
+			target.morale -= 2.0 * target.nerve
 		else:
 			var away := (target.position - shooter.position).normalized()
 			if show:
@@ -1090,7 +1127,7 @@ func resolve_flame(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vec
 			continue
 		e.add_suppression(float(w.supp) * (1.0 - d / reach * 0.4), time)
 		e.morale -= 3.0 * e.nerve  # men fear fire above all
-		var p: float = w.acc * (1.0 - map.cover_vs(e.position, shooter.position) * 0.35)  # flames get round cover
+		var p: float = w.acc * (1.0 - map.cover_vs(e.position, shooter.position) * 0.35) * GameData.LETHALITY  # flames get round cover
 		if e.posture == "prone":
 			p *= 0.85
 		if randf() < p:
@@ -1272,7 +1309,7 @@ func _blast(at: Vector2, w: Dictionary, shooter: Soldier, show: bool) -> void:
 			continue
 		o.add_suppression(w.supp * (1.0 - d / (r * 2.5)), time)
 		if d < r:
-			var chance: float = 0.85 * (1.0 - d / r) * (1.0 - map.cover_vs(o.position, at) * 0.6)
+			var chance: float = 0.85 * (1.0 - d / r) * (1.0 - map.cover_vs(o.position, at) * 0.6) * GameData.LETHALITY
 			if randf() < chance and randf() >= o.armor * (1.0 - w.ap):
 				o.take_hit(w.dmg, shooter)
 

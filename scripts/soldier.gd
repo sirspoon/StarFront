@@ -711,7 +711,7 @@ func _draw_conscript() -> void:
 	var stubber := kind == "gunner"
 	var raider := kind.begins_with("raider")
 	if big_gun:
-		_draw_heavy_gun(Color(0.18, 0.19, 0.15), Color(1.0, 0.5, 0.25), 4.2, r + 13.0)
+		_draw_heavy_gun(Color(0.42, 0.44, 0.36), Color(1.0, 0.55, 0.25), 5.5, r + 19.0)
 	elif raider:
 		draw_line(Vector2(-r * 0.2, -r * 0.75), Vector2(r * 0.5, r * 0.75), Color(0.22, 0.16, 0.1), 1.6)  # bandolier
 		draw_line(Vector2(0, 3), Vector2(r + 4.0, 3), Color(0.1, 0.09, 0.08), 2.6)  # ripper gun, short and stubby
@@ -735,88 +735,226 @@ func _draw_conscript() -> void:
 		draw_line(Vector2(-2.5, 0), Vector2(2.5, 0), trim, 2.0)  # crest
 
 
+## An ellipse (optionally turned by rot) as a polygon.
+func _ell(c: Vector2, rx: float, ry: float, n := 16, rot := 0.0) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in n:
+		var a := i * TAU / n
+		pts.append(c + Vector2(cos(a) * rx, sin(a) * ry).rotated(rot))
+	return pts
+
+
+## A piece of armour: its colour, a dark edge, and a lit crescent on the side the light
+## comes from (ld, in the body's own frame), so it reads as a curved, polished plate.
+func _plate(c: Vector2, rx: float, ry: float, col: Color, ld: Vector2, edge := 0.9, n := 16) -> void:
+	var pts := _ell(c, rx, ry, n)
+	draw_colored_polygon(pts, col)
+	draw_colored_polygon(_ell(c + ld * minf(rx, ry) * 0.2, rx * 0.75, ry * 0.75, n), col.lightened(0.06))
+	draw_colored_polygon(_ell(c + ld * minf(rx, ry) * 0.5, rx * 0.25, ry * 0.18, n), col.lightened(0.18))
+	pts.append(pts[0])
+	draw_polyline(pts, Color(0.05, 0.02, 0.02, 0.9), edge)
+
+
+## The Sworn's sigil: a small sunburst (the ashen sun over the chapel's altar).
+func _sigil(c: Vector2, size: float, col: Color) -> void:
+	for k in 8:
+		var d := Vector2.from_angle(k * TAU / 8.0)
+		draw_line(c + d * size * 0.45, c + d * size * (1.0 if k % 2 == 0 else 0.75), col, maxf(0.5, size * 0.22))
+	draw_circle(c, size * 0.42, col)
+	draw_circle(c, size * 0.2, col.darkened(0.5))
+
+
+## A gun drawn with an outline and a lit top edge.
+func _gun(r: Rect2, col: Color) -> void:
+	draw_rect(r.grow(0.7), Color(0.02, 0.02, 0.02))
+	draw_rect(r, col)
+	draw_line(r.position + Vector2(0.5, 0.6), Vector2(r.end.x - 0.5, r.position.y + 0.6), col.lightened(0.4), 0.7)
+
+
+## A Sworn warrior from above: a power plant on his back venting heat, a sculpted
+## breastplate with the sunburst sigil, great rounded pauldrons rimmed in gold, armoured
+## arms holding his weapon, and a helmet with glowing eye lenses. The heavy-armoured
+## Pyre Wardens and Bastion Brothers are bulkier still.
 func _draw_sworn() -> void:
 	var coat: Color = colors.coat
 	var arm: Color = colors.armour
 	var trim: Color = colors.trim
 	var r := radius
-	if is_leader:
-		var cape := PackedVector2Array([Vector2(-2, -r * 0.8), Vector2(-r * 1.7, -r * 0.6),
-				Vector2(-r * 1.9, 0), Vector2(-r * 1.7, r * 0.6), Vector2(-2, r * 0.8)])
-		draw_colored_polygon(cape, trim.darkened(0.35))
+	var ld := Vector2(-0.6, -0.8).rotated(-facing)  # the light, top-left on screen, in the body's frame
 	var bastion: bool = data.get("bastion", false)
+	var bulk := 1.2 if bastion else 1.0
+	var gunmetal := Color(0.24, 0.23, 0.23)
+	var dark := Color(0.05, 0.02, 0.02, 0.9)
+	var hurt := float(max_hp - hp) / float(max_hp)
+	# a leader's cloak hanging behind
+	if is_leader:
+		var cape := PackedVector2Array([Vector2(-2, -r * 0.82), Vector2(-r * 1.6, -r * 0.72), Vector2(-r * 2.0, -r * 0.2),
+				Vector2(-r * 2.05, r * 0.25), Vector2(-r * 1.6, r * 0.72), Vector2(-2, r * 0.82)])
+		draw_colored_polygon(cape, coat.darkened(0.35))
+		var hem := cape.slice(1, 5)
+		draw_polyline(hem, trim.darkened(0.15), 1.2)
+		draw_line(Vector2(-r * 0.9, -r * 0.5), Vector2(-r * 1.7, -r * 0.1), coat.darkened(0.5), 0.7)  # folds
+		draw_line(Vector2(-r * 0.9, r * 0.5), Vector2(-r * 1.7, r * 0.15), coat.darkened(0.5), 0.7)
+	# on his back: fuel tanks for the Pyre Warden, otherwise the armour's power plant
 	if kind == "pyre_warden":
-		for s in [-1.0, 1.0]:  # twin fuel tanks on his back
-			draw_circle(Vector2(-r - 1.0, s * r * 0.35), r * 0.38, Color(0.35, 0.3, 0.22))
-			draw_arc(Vector2(-r - 1.0, s * r * 0.35), r * 0.38, 0, TAU, 12, Color(0.12, 0.1, 0.08), 1.0)
-		draw_line(Vector2(-r - 1.0, 0), Vector2(r * 0.3, r * 0.5), Color(0.15, 0.13, 0.1), 1.6)  # fuel hose
+		for sgn in [-1.0, 1.0]:
+			var tc := Vector2(-r * 0.95, sgn * r * 0.38)
+			_plate(tc, r * 0.4, r * 0.34, Color(0.42, 0.36, 0.24), ld)
+			draw_line(tc + Vector2(-r * 0.15, -r * 0.3), tc + Vector2(-r * 0.15, r * 0.3), Color(0.2, 0.16, 0.1), 1.0)  # band
+		draw_line(Vector2(-r * 0.7, 0), Vector2(r * 0.3, r * 0.45), Color(0.12, 0.1, 0.08), 2.0)  # fuel hose
+		draw_line(Vector2(-r * 0.7, 0), Vector2(r * 0.3, r * 0.45), Color(0.3, 0.26, 0.2), 0.8)
 	else:
-		draw_rect(Rect2(-r - 3.0, -r * 0.6, 6.0, r * 1.2), arm.darkened(0.3))  # power pack
-	if data.get("loader", false):
-		draw_rect(Rect2(-r - 6.0, -r * 0.5, 4.0, r), Color(0.3, 0.27, 0.2))  # ammunition crate
-		draw_line(Vector2(-r - 2.0, -r * 0.3), Vector2(1, r * 0.5), Color(0.6, 0.5, 0.25), 1.2)  # belt
-	draw_circle(Vector2(-r - 1.0, -2.5), 1.3, Color(1.0, 0.55, 0.2))
-	draw_circle(Vector2(-r - 1.0, 2.5), 1.3, Color(1.0, 0.55, 0.2))
-	draw_circle(Vector2.ZERO, r * 0.85, coat)
+		var pack := PackedVector2Array([Vector2(-r * 0.4, -r * 0.6), Vector2(-r * 1.05, -r * 0.55), Vector2(-r * 1.15, 0),
+				Vector2(-r * 1.05, r * 0.55), Vector2(-r * 0.4, r * 0.6)])
+		draw_colored_polygon(pack, arm.darkened(0.15))
+		var pk := pack.duplicate()
+		pk.append(pack[0])
+		draw_polyline(pk, dark, 0.9)
+		for k in 3:  # cooling vanes
+			draw_line(Vector2(-r * (0.55 + k * 0.15), -r * 0.35), Vector2(-r * (0.55 + k * 0.15), r * 0.35), arm.darkened(0.45), 0.6)
+		for sgn in [-1.0, 1.0]:  # exhaust stacks glowing with heat
+			var ex := Vector2(-r * 1.0, sgn * r * 0.33)
+			draw_circle(ex, r * 0.2, Color(1.0, 0.5, 0.15, 0.25))
+			draw_circle(ex, r * 0.15, Color(0.08, 0.05, 0.04))
+			draw_circle(ex, r * 0.08, Color(1.0, 0.6, 0.25))
+		if data.get("loader", false):
+			_gun(Rect2(-r * 1.25, -r * 0.45, r * 0.5, r * 0.9), Color(0.36, 0.32, 0.22))  # ammunition crate
+			draw_line(Vector2(-r * 0.8, -r * 0.2), Vector2(1, r * 0.5), Color(0.75, 0.6, 0.3), 1.2)  # belt
+	# the torso: a sculpted breastplate with the sigil on it
+	_plate(Vector2.ZERO, r * 0.6 * bulk, r * 0.8 * bulk, coat, ld)
+	draw_colored_polygon(_ell(Vector2(r * 0.18, 0), r * 0.28 * bulk, r * 0.5 * bulk, 14), coat.lightened(0.08))
+	draw_line(Vector2(r * 0.05, -r * 0.55 * bulk), Vector2(r * 0.05, r * 0.55 * bulk), trim.darkened(0.25), 0.8)  # plastron edge
+	_sigil(Vector2(r * 0.3, -r * 0.28), r * 0.18, trim)
+	if bastion:
+		for k in 2:  # extra overlapping plates on the heavy armour
+			draw_arc(Vector2(-r * 0.1, 0), r * (0.45 + k * 0.15), -1.2, 1.2, 10, coat.darkened(0.35), 1.0)
+	# the arms: shoulders to hands on the weapon
 	var bladed := kind == "oathblade" or kind == "blade_champion"
+	var rear_hand := Vector2(r * 0.3, r * 0.3)
+	var fore_hand := Vector2(r * 0.85, r * 0.2) if not bladed else Vector2(r * 0.25, -r * 0.75)
+	for pair in [[Vector2(0, r * 0.62 * bulk), rear_hand], [Vector2(0, -r * 0.62 * bulk), fore_hand]]:
+		draw_line(pair[0], pair[1], dark, r * 0.36 * bulk + 1.4)
+		draw_line(pair[0], pair[1], arm, r * 0.36 * bulk)
+		draw_line(pair[0], pair[1], arm.lightened(0.2), r * 0.1)
+		draw_circle(pair[1], r * 0.2 * bulk, arm.lightened(0.05))  # gauntlet
+		draw_arc(pair[1], r * 0.2 * bulk, 0, TAU, 10, dark, 0.7)
+	# the weapon
 	if heavy:
-		_draw_heavy_gun(Color(0.13, 0.12, 0.12), trim.darkened(0.2), 6.0, r + 15.0, true)
+		_draw_heavy_gun(Color(0.4, 0.38, 0.37), trim, 7.0, r + 21.0, true)
 	elif kind == "pyre_warden":
-		draw_rect(Rect2(1, 1.0, r + 6.0, 5.0), Color(0.16, 0.14, 0.12))  # the projector
-		draw_rect(Rect2(r + 5.0, 0.5, 3.5, 6.0), trim.darkened(0.3))  # nozzle
-		draw_circle(Vector2(r + 9.5, 3.5), 1.6 + sin(walk * 3.0 + float(pool_seed % 7)) * 0.3, Color(0.5, 0.75, 1.0, 0.9))  # pilot flame
+		_gun(Rect2(r * 0.1, 1.0, r + 8.0, 5.5), gunmetal)  # the projector
+		_gun(Rect2(r + 7.0, 0.2, 4.0, 7.0), trim.darkened(0.3))  # nozzle
+		draw_circle(Vector2(r + 12.5, 3.6), 3.0, Color(0.4, 0.7, 1.0, 0.25))
+		draw_circle(Vector2(r + 12.5, 3.6), 1.6 + sin(walk * 3.0 + float(pool_seed % 7)) * 0.3, Color(0.6, 0.85, 1.0, 0.95))  # pilot flame
 	elif kind == "bastion":
 		for k in 3:  # the hail cannon's spinning barrels
-			draw_rect(Rect2(3, 0.0 + k * 2.4, r + 10.0, 1.8), Color(0.15, 0.14, 0.14))
-		draw_rect(Rect2(1, -0.6, r * 0.7, 8.0), Color(0.2, 0.18, 0.17))  # housing
-		draw_rect(Rect2(r + 9.0, -0.3, 2.5, 7.5), trim.darkened(0.2))
+			_gun(Rect2(r * 0.3, -0.6 + k * 2.6, r + 11.0, 1.8), gunmetal.lightened(0.05 * k))
+		_gun(Rect2(r * 0.05, -1.4, r * 0.75, 9.0), gunmetal.darkened(0.1))  # housing
+		_gun(Rect2(r + 10.0, -1.0, 2.5, 8.2), trim.darkened(0.2))
+		draw_circle(Vector2(r * 0.4, 9.5), r * 0.28, Color(0.34, 0.3, 0.22))  # drum
 	elif bladed:
-		draw_rect(Rect2(1, 2.5, r * 0.8, 3.0), Color(0.13, 0.12, 0.12))  # pistol
-		draw_rect(Rect2(r * 0.8, 2.0, 2.0, 4.0), trim.darkened(0.2))
+		_gun(Rect2(r * 0.3, 2.0, r * 0.75, 3.2), gunmetal)  # pistol
+		_gun(Rect2(r * 1.0, 1.6, 2.2, 4.0), trim.darkened(0.2))
 		var great := kind == "blade_champion"
-		_draw_blade(Vector2(r * 0.25, -r * 0.75), r * (2.1 if great else 1.7), 2.6 if great else 2.0,
-				Color(0.78, 0.8, 0.84), trim, true, Color(0.55, 0.8, 1.0, 0.8))
+		_draw_blade(fore_hand, r * (2.1 if great else 1.7), 2.6 if great else 2.0,
+				Color(0.8, 0.82, 0.86), trim, true, Color(0.55, 0.8, 1.0, 0.8))
+	elif data.get("loader", false):
+		_gun(Rect2(r * 0.3, 2.0, r * 0.75, 3.2), gunmetal)  # pistol
+	elif kind == "cannoneer":
+		for k in 3:
+			_gun(Rect2(r * 0.4, 0.6 + k * 2.0, r + 8.0, 1.6), gunmetal)
+		_gun(Rect2(r * 0.1, 0.0, r * 0.7, 7.0), gunmetal.darkened(0.1))
+		_gun(Rect2(r + 7.0, 0.2, 2.5, 6.8), trim.darkened(0.2))
+	elif kind == "breacher":
+		_gun(Rect2(r * 0.2, 0.8, r + 6.0, 5.0), gunmetal)
+		for k in 3:  # glowing fusion coils
+			draw_rect(Rect2(r * 0.6 + k * 3.0, 1.0, 1.2, 4.6), Color(0.55, 0.85, 1.0, 0.85))
+		draw_circle(Vector2(r + 7.5, 3.3), 3.4, Color(0.5, 0.8, 1.0, 0.25))
+		draw_circle(Vector2(r + 7.5, 3.3), 2.0, Color(0.75, 0.92, 1.0))
 	else:
-		var gun_w := 5.0 if kind == "cannoneer" else 3.5
-		draw_rect(Rect2(1, 1.5, r + 8.0, gun_w), Color(0.13, 0.12, 0.12))
-		draw_rect(Rect2(r + 6.0, 1.0, 3.0, gun_w + 1.0), trim.darkened(0.2))
-	if kind == "breacher":
-		draw_circle(Vector2(r + 9.0, 3.2), 2.2, Color(0.6, 0.85, 1.0))  # fusion glow
-	for s in [-1.0, 1.0]:
-		var p := Vector2(-1, s * r * 0.72)
-		var pad := r * (0.55 if bastion else 0.45)  # massive plate pauldrons on the heavy armour
-		draw_circle(p, pad, coat.lightened(0.08))
-		draw_arc(p, pad, 0, TAU, 14, trim, 1.6 if bastion else 1.3)
+		# mass-reactive carbine: drum magazine, top rail, gilded muzzle
+		_gun(Rect2(r * 0.15, 1.4, r + 6.5, 3.6), gunmetal)
+		draw_circle(Vector2(r * 0.55, 6.2), 2.3, Color(0.3, 0.27, 0.22))
+		draw_arc(Vector2(r * 0.55, 6.2), 2.3, 0, TAU, 10, dark, 0.6)
+		_gun(Rect2(r + 5.5, 1.0, 2.6, 4.4), trim.darkened(0.15))
+	# pauldrons: great rounded shoulder plates, rimmed in gold, the sigil on the left
+	for sgn in [-1.0, 1.0]:
+		var pc := Vector2(-r * 0.05, sgn * r * 0.72 * bulk)
+		var prx := r * 0.36 * bulk  # flatter front to back, wide across the shoulder
+		var pry := r * 0.4 * bulk
+		_plate(pc, prx, pry, coat.lightened(0.04), ld)
+		draw_arc(pc, pry * 1.02, -PI * 0.5 + sgn * PI * 0.5 - 1.3, -PI * 0.5 + sgn * PI * 0.5 + 1.3, 12, trim, 1.6 if bastion or is_leader else 1.2)
 		if bastion:
-			draw_arc(p, pad * 0.6, 0, TAU, 12, coat.darkened(0.25), 1.0)
+			draw_arc(pc, pry * 0.6, 0, TAU, 12, coat.darkened(0.3), 1.0)
+		if sgn < 0.0:
+			_sigil(pc + Vector2(0, -pry * 0.1), pry * 0.38, trim)
+		elif is_leader:
+			draw_line(pc + Vector2(-prx * 0.5, 0), pc + Vector2(prx * 0.5, 0), Color(0.95, 0.9, 0.8), 1.4)  # a rank stripe
+		if hurt > 0.0:  # battle damage: gouges and scorching
+			for k in int(hurt * 4.0) + 1:
+				var q := pc + Vector2(cos(k * 2.1 + sgn), sin(k * 1.7)) * pry * 0.5
+				draw_line(q, q + Vector2(1.6, 0.8), Color(0.08, 0.05, 0.05), 0.8)
+				draw_circle(q + Vector2(0.8, 0.4), 1.0, Color(0.05, 0.04, 0.03, 0.5))
+	# the helmet: a smooth dome with a grilled faceplate and glowing eye lenses
+	var hc := Vector2(r * 0.12, 0)
+	var hr := r * (0.32 if bastion else 0.38)
 	if bastion:
-		draw_rect(Rect2(-r * 0.4, -r * 0.25, r * 0.5, r * 0.5), trim.darkened(0.15))  # chest seal
-	draw_circle(Vector2(1, 0), r * 0.42, arm)
-	draw_line(Vector2(r * 0.32, -2.2), Vector2(r * 0.32, 2.2), Color(1.0, 0.25, 0.1), 1.8)  # eye lenses
+		draw_colored_polygon(_ell(hc - Vector2(r * 0.08, 0), hr * 1.35, hr * 1.55, 14), coat.darkened(0.25))  # armoured collar
+	_plate(hc, hr, hr * 0.92, arm, ld)
+	var face := PackedVector2Array([hc + Vector2(hr * 0.35, -hr * 0.6), hc + Vector2(hr * 1.05, -hr * 0.3),
+			hc + Vector2(hr * 1.1, 0), hc + Vector2(hr * 1.05, hr * 0.3), hc + Vector2(hr * 0.35, hr * 0.6)])
+	draw_colored_polygon(face, arm.darkened(0.35))
+	for k in 3:  # breathing grille
+		draw_line(hc + Vector2(hr * 0.85, -hr * 0.18 + k * hr * 0.18), hc + Vector2(hr * 1.05, -hr * 0.18 + k * hr * 0.18), Color(0.02, 0.01, 0.01), 0.5)
+	for sgn in [-1.0, 1.0]:
+		var eye := hc + Vector2(hr * 0.6, sgn * hr * 0.32)
+		draw_circle(eye, hr * 0.32, Color(1.0, 0.25, 0.1, 0.3))
+		draw_circle(eye, hr * 0.17, Color(1.0, 0.35, 0.15))
+		draw_circle(eye - Vector2(0, hr * 0.05), hr * 0.07, Color(1.0, 0.85, 0.6))
+	if is_leader:  # a crest of red horsehair running back over the helmet
+		draw_line(hc - Vector2(hr * 0.1, 0), hc - Vector2(hr * 1.7, 0), dark, 2.6)
+		draw_line(hc - Vector2(hr * 0.1, 0), hc - Vector2(hr * 1.7, 0), Color(0.75, 0.12, 0.08), 1.8)
+		draw_line(hc - Vector2(hr * 0.2, 0.3), hc - Vector2(hr * 1.5, 0.3), Color(0.95, 0.35, 0.25), 0.5)
+	else:
+		draw_line(hc - Vector2(hr * 0.8, 0), hc + Vector2(hr * 0.3, 0), trim.darkened(0.3), 1.0)  # a ridge
 
 
 ## A heavy gun: a long, thick barrel; standing on a tripod once it's set up (legs splay
 ## out as it goes up). Laser: a glowing lens. Bullets: a drum and belt.
 func _draw_heavy_gun(body: Color, tip: Color, w: float, length: float, belt := false) -> void:
+	var y := 2.0
+	# a shadow on the ground under the gun, so it stands out from the man
+	draw_rect(Rect2(2.0, y - w * 0.5 + 2.5, length, w), Color(0, 0, 0, 0.35))
 	if setup_t > 0.0:
 		# tripod legs splaying out: two forward, one back
-		var pivot := Vector2(length * 0.6, 2.0)
-		var reach := 8.0 * (0.4 + setup_t * 0.6)
-		for a in [-0.75 - setup_t * 0.35, 0.75 + setup_t * 0.35, PI]:
+		var pivot := Vector2(length * 0.62, y)
+		var reach := 12.0 * (0.4 + setup_t * 0.6)
+		for a in [-0.8 - setup_t * 0.35, 0.8 + setup_t * 0.35, PI]:
 			var foot: Vector2 = pivot + Vector2.from_angle(a) * reach
-			draw_line(pivot, foot, Color(0.05, 0.05, 0.05), 2.4)
-			draw_line(pivot, foot, Color(0.42, 0.4, 0.36), 1.2)
-			draw_circle(foot, 1.3, Color(0.05, 0.05, 0.05))
-	draw_rect(Rect2(-0.6, 2.0 - w * 0.5 - 0.6, length + 1.2, w + 1.2), Color(0.03, 0.03, 0.03))  # outline: reads in firelight
-	draw_rect(Rect2(0, 2.0 - w * 0.5, length, w), body)
-	draw_line(Vector2(1, 2.0 - w * 0.3), Vector2(length - 1, 2.0 - w * 0.3), body.lightened(0.35), 0.8)  # metal catching the light
-	draw_rect(Rect2(length * 0.2, 2.0 - w * 0.5 - 1.0, length * 0.3, w + 2.0), body.lightened(0.12))  # receiver
+			draw_line(pivot, foot, Color(0.03, 0.03, 0.03), 3.0)
+			draw_line(pivot, foot, Color(0.55, 0.53, 0.48), 1.5)
+			draw_circle(foot, 1.6, Color(0.03, 0.03, 0.03))
+	# outline, then the body: receiver at the back, a perforated cooling jacket, the barrel
+	draw_rect(Rect2(-0.8, y - w * 0.5 - 0.8, length + 1.6, w + 1.6), Color(0.02, 0.02, 0.02))
+	draw_rect(Rect2(0, y - w * 0.5, length, w), body)
+	draw_rect(Rect2(0, y - w * 0.5 - 1.0, length * 0.38, w + 2.0), body.lightened(0.1))  # receiver
+	draw_rect(Rect2(-0.8, y - w * 0.5 - 1.8, length * 0.38 + 1.6, w + 3.6), Color(0.02, 0.02, 0.02), false, 0.8)
+	var jx := length * 0.42
+	while jx < length * 0.88:  # cooling holes along the jacket
+		draw_circle(Vector2(jx, y), w * 0.17, body.darkened(0.6))
+		jx += w * 0.75
+	draw_line(Vector2(1, y - w * 0.32), Vector2(length - 1, y - w * 0.32), body.lightened(0.45), 0.9)  # light along the top
+	draw_rect(Rect2(length * 0.12, y - w * 0.5 - 2.6, length * 0.16, 1.6), body.darkened(0.3))  # carry handle
+	draw_rect(Rect2(length - 2.5, y - w * 0.5 - 1.2, 4.0, w + 2.4), body.lightened(0.2))  # muzzle brake
+	draw_rect(Rect2(length - 2.5, y - w * 0.5 - 1.2, 4.0, w + 2.4), Color(0.02, 0.02, 0.02), false, 0.7)
 	if belt:
-		draw_circle(Vector2(length * 0.35, 2.0 + w), w * 0.6, Color(0.3, 0.27, 0.2))  # ammo drum
-		draw_rect(Rect2(length - 3.0, 2.0 - w * 0.5 - 0.5, 3.0, w + 1.0), tip)
+		draw_rect(Rect2(length * 0.18, y + w * 0.5, w * 1.2, w * 1.0), Color(0.36, 0.32, 0.22))  # ammo box
+		for k in 4:  # the belt feeding in
+			draw_rect(Rect2(length * 0.18 + k * 1.6, y + w * 0.5 - 1.0, 1.0, 1.4), Color(0.75, 0.6, 0.3))
 	else:
-		draw_circle(Vector2(length, 2.0), w * 0.45, tip)  # the lens
-		draw_circle(Vector2(length, 2.0), w * 0.8, Color(tip, 0.25))
+		draw_circle(Vector2(length + 1.5, y), w * 0.5, tip)  # the focusing lens
+		draw_circle(Vector2(length + 1.5, y), w * 0.95, Color(tip, 0.3))
+		draw_line(Vector2(length * 0.2, y + w * 0.5 + 0.5), Vector2(-3, y + w), Color(0.15, 0.13, 0.1), 1.4)  # power cable
 
 
 ## A blade in his off hand: held point-forward ready, swept across in a blow, and

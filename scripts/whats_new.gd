@@ -5,6 +5,8 @@ extends RefCounted
 ## When a whole version is reached (1.0, 2.0 ...), start a new heading for it.
 
 const TEXT := """PROTOTYPE (before 1.0)
+- Tougher troops (more grazes and pinning, fewer quick wipe-outs); clearer heavy guns
+- The Sworn redrawn in detail: power armour, gold-rimmed pauldrons, glowing eyes and exhausts
 - A city map: streets, a chapel square, parks, walled compounds, bushes, hedges and barbed wire
 - Vehicles leave tracks and run down enemy soldiers; blood sprays further and up walls
 - Sworn Pyre Warden (flamer) and Bastion Brother (hail cannon) in very heavy armour
