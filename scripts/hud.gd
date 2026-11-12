@@ -102,7 +102,9 @@ func setup(m: Node) -> void:
 			+ "Men must stay in contact with their squad.\n" \
 			+ "Raiders and Oathblades charge enemies who come\n" \
 			+ "   close (not while Down). Up close, blades win,\n" \
-			+ "   and anyone pinned or lying Down is easy meat."
+			+ "   and anyone pinned or lying Down is easy meat.\n" \
+			+ "Heavy Gun Teams set up when stopped by cover or a\n" \
+			+ "   window, or when Down: then they're far more accurate."
 	help_panel.add_child(help)
 	if main.touch_mode:
 		help.text = "TOUCH CONTROLS  (? hides)\n" \

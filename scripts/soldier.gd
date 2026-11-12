@@ -68,6 +68,12 @@ var charge_check := 0.0
 var charge_fresh := false     # the first blow after a charge lands harder
 var resume_to = null          # where he was going before he charged
 var grenades := {}            # grenades he carries: kind -> how many
+# heavy weapons
+const SETUP_TIME := 2.5       # seconds to set a heavy gun up
+const ARC := 1.0              # once set up it covers this far either side (radians) without moving it
+var heavy := false            # carries a heavy gun (the loader takes it over if the gunner falls)
+var setup_t := 0.0            # 0..1: how far the gun is set up
+var deploy_dir := 0.0         # the way it was set up facing
 
 
 func setup(m: Node, sq: Squad, t: int, kind_id: String) -> void:
@@ -83,6 +89,7 @@ func setup(m: Node, sq: Squad, t: int, kind_id: String) -> void:
 	melee = GameData.MELEE[data.get("melee", "gun_butt")]
 	charger = data.get("charger", false)
 	grenades = data.get("grenades", {}).duplicate()
+	heavy = data.get("heavy", false)
 	hp = data.hp
 	max_hp = hp
 	armor = data.armor
@@ -142,7 +149,13 @@ func tick(dt: float, now: float) -> void:
 		_try_board()
 	flash = maxf(0.0, flash - dt)
 	# when idle, watch the way the squad was told to look
-	if not moving and burst_left == 0 and flash <= 0.0 and squad.facing != Vector2.ZERO:
+	if heavy and setup_t > 0.0 and not moving and burst_left == 0 and flash <= 0.0:
+		# a set-up gun stays laid on its arc; told to face well away, the team shifts it round
+		if squad.facing != Vector2.ZERO and absf(wrapf(squad.facing.angle() - deploy_dir, -PI, PI)) > ARC:
+			deploy_dir = squad.facing.angle()
+			setup_t = minf(setup_t, 0.5)
+		facing = lerp_angle(facing, deploy_dir, minf(1.0, dt * 3.0))
+	elif not moving and burst_left == 0 and flash <= 0.0 and squad.facing != Vector2.ZERO:
 		facing = lerp_angle(facing, squad.facing.angle(), minf(1.0, dt * 3.0))
 	var under_fire := now - last_hit_time < 3.0
 	# caught in a crossfire, nowhere feels safe: fear fades slower and nerves fray faster
@@ -171,6 +184,8 @@ func tick(dt: float, now: float) -> void:
 		in_melee = false
 		melee_target = null
 		charging = null
+	if heavy:
+		_update_setup(dt)
 	_update_posture(dt)
 	if bleeding > 0.0:
 		bleeding -= dt
@@ -203,6 +218,8 @@ func _update_posture(dt: float) -> void:
 		posture = "prone"
 	elif in_melee or charging != null:
 		posture = "stand"
+	elif heavy and setup_t > 0.0:
+		posture = "prone" if squad.prone else "crouch"
 	elif squad.prone and not (running and moving):
 		posture = "crouch" if behind_low else "prone"
 	elif (in_cover or behind_low) and not moving:
@@ -219,6 +236,41 @@ func _update_posture(dt: float) -> void:
 			lean_side = 1.0 if right_open else -1.0
 		want = lean_side
 	lean = move_toward(lean, want, dt * 6.0)
+
+
+## Is there something to rest a heavy gun on here: the team lying Down, a window, low
+## cover or rubble just in front, or the lip of a crater or rubble heap he's in?
+func can_brace() -> bool:
+	if squad.prone:
+		return true
+	var own := map.get_t(map.cell_of(position))
+	if own == BattleMap.T.CRATER or own == BattleMap.T.RUBBLE:
+		return true
+	for off in [0.0, -0.8, 0.8]:
+		var t := map.get_t(map.cell_of(position + Vector2.from_angle(facing + off) * BattleMap.CELL))
+		if t == BattleMap.T.LOW or t == BattleMap.T.WINDOW or t == BattleMap.T.RUBBLE or t == BattleMap.T.WRECK \
+				or t == BattleMap.T.WALL:
+			return true
+	return false
+
+
+func is_set_up() -> bool:
+	return heavy and setup_t >= 1.0
+
+
+## Heavy guns: set up over a couple of seconds when he's stopped somewhere he can brace
+## it (slower without his loader); packed up the moment he moves.
+func _update_setup(dt: float) -> void:
+	if moving or state == State.ROUTING or in_melee:
+		setup_t = 0.0
+		return
+	if not can_brace():
+		setup_t = maxf(0.0, setup_t - dt)
+		return
+	if setup_t <= 0.0:
+		deploy_dir = facing
+	var helped := squad.members.any(func(m): return m != self and m.is_effective() and m.position.distance_to(position) < 45.0)
+	setup_t = minf(1.0, setup_t + dt / (SETUP_TIME * (1.0 if helped else 1.6)))
 
 
 func _update_state(under_fire: bool) -> void:
@@ -318,9 +370,17 @@ func _fight(dt: float, now: float) -> void:
 			main.resolve_point_shot(self, bp, weapon, muzzle_pos())
 			cooldown = weapon.cooldown * randf_range(0.9, 1.15) * (2.5 if state == State.PINNED else 1.0)
 			return
+	if heavy and moving:
+		return  # can't fire a heavy gun on the move
 	var t := pick_target(weapon, position)
 	if t == null:
 		cooldown = randf_range(0.3, 0.6)
+		return
+	if is_set_up() and absf(wrapf((t.position - position).angle() - deploy_dir, -PI, PI)) > ARC:
+		setup_t = 0.5  # outside its arc: shift the gun round first
+		deploy_dir = (t.position - position).angle()
+		facing = deploy_dir
+		cooldown = 0.4
 		return
 	burst_target = t
 	burst_left = weapon.burst
@@ -328,6 +388,8 @@ func _fight(dt: float, now: float) -> void:
 	var cd: float = weapon.cooldown * randf_range(0.85, 1.2)
 	if state == State.PINNED:
 		cd *= 2.5
+	if heavy and not squad.members.any(func(m): return m != self and m.is_effective() and m.position.distance_to(position) < 45.0):
+		cd *= 1.6  # no loader feeding it
 	cooldown = cd
 
 
@@ -605,13 +667,21 @@ func _draw_conscript() -> void:
 	var arm: Color = colors.armour
 	var trim: Color = colors.trim
 	var r := radius
-	if not kind.begins_with("raider"):
+	if data.get("loader", false):
+		draw_rect(Rect2(-r - 3.0, -4.0, 6.0, 8.0), Color(0.28, 0.26, 0.16))  # power cells for the heavy gun
+		draw_line(Vector2(-r - 3.0, 0), Vector2(-r + 3.0, 0), Color(1.0, 0.55, 0.25, 0.8), 1.0)
+	elif heavy:
+		draw_rect(Rect2(-r - 2.0, -3.5, 5.0, 7.0), Color(0.22, 0.22, 0.17))  # the gun's power pack
+	elif not kind.begins_with("raider"):
 		draw_rect(Rect2(-r - 1.0, -3.0, 4.0, 6.0), arm.darkened(0.2))  # pack and bedroll (raiders travel light)
 	draw_circle(Vector2.ZERO, r, coat.darkened(0.25) if kind.begins_with("raider") else coat)
 	draw_arc(Vector2.ZERO, r, 0, TAU, 16, coat.darkened(0.45), 1.0)
-	var heavy := kind == "gunner"
+	var big_gun := heavy
+	var stubber := kind == "gunner"
 	var raider := kind.begins_with("raider")
-	if raider:
+	if big_gun:
+		_draw_heavy_gun(Color(0.18, 0.19, 0.15), Color(1.0, 0.5, 0.25), 4.2, r + 13.0)
+	elif raider:
 		draw_line(Vector2(-r * 0.2, -r * 0.75), Vector2(r * 0.5, r * 0.75), Color(0.22, 0.16, 0.1), 1.6)  # bandolier
 		draw_line(Vector2(0, 3), Vector2(r + 4.0, 3), Color(0.1, 0.09, 0.08), 2.6)  # ripper gun, short and stubby
 		draw_rect(Rect2(r * 0.4, 3.5, 2.5, 3.5), Color(0.15, 0.13, 0.1))  # drum
@@ -621,8 +691,8 @@ func _draw_conscript() -> void:
 		draw_line(Vector2(-r - 2.0, -3), Vector2(r + 6.0, -3), Color(0.2, 0.22, 0.16), 4.5)  # launcher tube
 		draw_circle(Vector2(r + 7.0, -3), 2.6, Color(0.45, 0.35, 0.2))  # warhead
 	else:
-		draw_line(Vector2(0, 3), Vector2(r + (10.0 if heavy else 9.0), 3), Color(0.1, 0.09, 0.08), 3.5 if heavy else 2.0)
-	if heavy:
+		draw_line(Vector2(0, 3), Vector2(r + (10.0 if stubber else 9.0), 3), Color(0.1, 0.09, 0.08), 3.5 if stubber else 2.0)
+	if stubber:
 		draw_rect(Rect2(1, 4, 4, 4), Color(0.3, 0.27, 0.15))  # ammo box
 	draw_circle(Vector2(r * 0.6, 3.5), 1.8, coat.darkened(0.2))
 	draw_circle(Vector2(0.5, 0), r * 0.58, arm)
@@ -644,11 +714,16 @@ func _draw_sworn() -> void:
 				Vector2(-r * 1.9, 0), Vector2(-r * 1.7, r * 0.6), Vector2(-2, r * 0.8)])
 		draw_colored_polygon(cape, trim.darkened(0.35))
 	draw_rect(Rect2(-r - 3.0, -r * 0.6, 6.0, r * 1.2), arm.darkened(0.3))  # power pack
+	if data.get("loader", false):
+		draw_rect(Rect2(-r - 6.0, -r * 0.5, 4.0, r), Color(0.3, 0.27, 0.2))  # ammunition crate
+		draw_line(Vector2(-r - 2.0, -r * 0.3), Vector2(1, r * 0.5), Color(0.6, 0.5, 0.25), 1.2)  # belt
 	draw_circle(Vector2(-r - 1.0, -2.5), 1.3, Color(1.0, 0.55, 0.2))
 	draw_circle(Vector2(-r - 1.0, 2.5), 1.3, Color(1.0, 0.55, 0.2))
 	draw_circle(Vector2.ZERO, r * 0.85, coat)
 	var bladed := kind == "oathblade" or kind == "blade_champion"
-	if bladed:
+	if heavy:
+		_draw_heavy_gun(Color(0.13, 0.12, 0.12), trim.darkened(0.2), 6.0, r + 15.0, true)
+	elif bladed:
 		draw_rect(Rect2(1, 2.5, r * 0.8, 3.0), Color(0.13, 0.12, 0.12))  # pistol
 		draw_rect(Rect2(r * 0.8, 2.0, 2.0, 4.0), trim.darkened(0.2))
 		var great := kind == "blade_champion"
@@ -666,6 +741,30 @@ func _draw_sworn() -> void:
 		draw_arc(p, r * 0.45, 0, TAU, 14, trim, 1.3)
 	draw_circle(Vector2(1, 0), r * 0.42, arm)
 	draw_line(Vector2(r * 0.32, -2.2), Vector2(r * 0.32, 2.2), Color(1.0, 0.25, 0.1), 1.8)  # eye lenses
+
+
+## A heavy gun: a long, thick barrel; standing on a tripod once it's set up (legs splay
+## out as it goes up). Laser: a glowing lens. Bullets: a drum and belt.
+func _draw_heavy_gun(body: Color, tip: Color, w: float, length: float, belt := false) -> void:
+	if setup_t > 0.0:
+		# tripod legs splaying out: two forward, one back
+		var pivot := Vector2(length * 0.6, 2.0)
+		var reach := 8.0 * (0.4 + setup_t * 0.6)
+		for a in [-0.75 - setup_t * 0.35, 0.75 + setup_t * 0.35, PI]:
+			var foot: Vector2 = pivot + Vector2.from_angle(a) * reach
+			draw_line(pivot, foot, Color(0.05, 0.05, 0.05), 2.4)
+			draw_line(pivot, foot, Color(0.42, 0.4, 0.36), 1.2)
+			draw_circle(foot, 1.3, Color(0.05, 0.05, 0.05))
+	draw_rect(Rect2(-0.6, 2.0 - w * 0.5 - 0.6, length + 1.2, w + 1.2), Color(0.03, 0.03, 0.03))  # outline: reads in firelight
+	draw_rect(Rect2(0, 2.0 - w * 0.5, length, w), body)
+	draw_line(Vector2(1, 2.0 - w * 0.3), Vector2(length - 1, 2.0 - w * 0.3), body.lightened(0.35), 0.8)  # metal catching the light
+	draw_rect(Rect2(length * 0.2, 2.0 - w * 0.5 - 1.0, length * 0.3, w + 2.0), body.lightened(0.12))  # receiver
+	if belt:
+		draw_circle(Vector2(length * 0.35, 2.0 + w), w * 0.6, Color(0.3, 0.27, 0.2))  # ammo drum
+		draw_rect(Rect2(length - 3.0, 2.0 - w * 0.5 - 0.5, 3.0, w + 1.0), tip)
+	else:
+		draw_circle(Vector2(length, 2.0), w * 0.45, tip)  # the lens
+		draw_circle(Vector2(length, 2.0), w * 0.8, Color(tip, 0.25))
 
 
 ## A blade in his off hand: held point-forward ready, swept across in a blow, and

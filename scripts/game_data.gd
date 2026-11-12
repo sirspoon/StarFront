@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.40"
+const VERSION := "0.41"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -31,6 +31,10 @@ const WEAPONS := {
 		"acc": 0.22, "ap": 0.0, "dmg": 1, "pen": 1, "supp": 5.0, "tracer": Color(1.0, 0.8, 0.45), "width": 1.1},
 	"mass_pistol": {"name": "Mass-reactive pistol", "range": 190.0, "cooldown": 1.5, "burst": 2, "gap": 0.12,
 		"acc": 0.2, "ap": 0.3, "dmg": 2, "pen": 2, "supp": 6.0, "tracer": Color(0.6, 0.85, 1.0), "width": 1.8},
+	"heavy_lumen": {"name": "Heavy lumen gun", "range": 480.0, "cooldown": 2.2, "burst": 5, "gap": 0.12,
+		"acc": 0.19, "ap": 0.55, "dmg": 2, "pen": 3, "vdmg": 1, "supp": 12.0, "tracer": Color(1.0, 0.42, 0.2), "width": 2.2},
+	"heavy_mass_gun": {"name": "Heavy mass-reactive gun", "range": 470.0, "cooldown": 2.6, "burst": 4, "gap": 0.14,
+		"acc": 0.11, "ap": 0.45, "dmg": 2, "pen": 4, "vdmg": 2, "supp": 16.0, "tracer": Color(0.6, 0.85, 1.0), "width": 2.8},
 	"fusion_cannon": {"name": "Fusion cannon", "range": 540.0, "cooldown": 6.0, "burst": 1, "gap": 0.0,
 		"acc": 0.55, "ap": 0.9, "dmg": 4, "pen": 9, "vdmg": 6, "blast": 24.0, "wall": 70.0, "supp": 40.0,
 		"tracer": Color(0.7, 0.9, 1.0), "width": 5.0},
@@ -57,6 +61,11 @@ const GRENADES := {
 	"smoke": {"name": "Smoke grenade", "r": 42.0, "duration": 28.0},
 }
 
+## "heavy": true marks a heavy weapon gunner: it must be set up (next to cover or a window,
+## or with the team Down) to fire well; see Soldier.SETUP_TIME and HEAVY_SET_UP / HEAVY_LOOSE.
+const HEAVY_SET_UP := 2.4   # accuracy multiplier once set up
+const HEAVY_LOOSE := 0.4    # ...and when firing it unbraced
+
 ## nerve multiplies morale loss (higher = panics sooner). Optional traits for later units:
 ## "steadfast": true ignores being flanked or caught in crossfire; "flank_bonus": 1.5 makes
 ## their fire from a flank count for more.
@@ -73,6 +82,10 @@ const SOLDIERS := {
 		"radius": 7.0, "weapon": "ripper_smg", "melee": "trench_knife", "charger": true, "grenades": {"he": 1, "ap": 1}},
 	"raider_sgt": {"name": "Raider Sergeant", "hp": 1, "armor": 0.2, "speed": 54.0, "morale": 85.0, "nerve": 0.8,
 		"radius": 7.0, "weapon": "ripper_smg", "melee": "hook_sabre", "charger": true, "leader": true, "grenades": {"he": 1, "smoke": 2, "ap": 1}},
+	"hw_gunner": {"name": "Heavy Gunner", "hp": 1, "armor": 0.1, "speed": 36.0, "morale": 70.0, "nerve": 1.0,
+		"radius": 7.0, "weapon": "heavy_lumen", "heavy": true, "grenades": {}},
+	"hw_loader": {"name": "Loader", "hp": 1, "armor": 0.1, "speed": 42.0, "morale": 70.0, "nerve": 1.0,
+		"radius": 7.0, "weapon": "lumen_rifle", "loader": true, "grenades": {"he": 1}},
 	"brother": {"name": "Sworn Brother", "hp": 3, "armor": 0.5, "speed": 38.0, "morale": 95.0, "nerve": 0.5,
 		"radius": 10.0, "weapon": "mass_carbine", "grenades": {"he": 1, "ap": 1}},
 	"cannoneer": {"name": "Sworn Cannoneer", "hp": 3, "armor": 0.5, "speed": 34.0, "morale": 95.0, "nerve": 0.5,
@@ -81,6 +94,10 @@ const SOLDIERS := {
 		"radius": 10.0, "weapon": "fusion_carbine", "grenades": {"ap": 1}},
 	"champion": {"name": "Sworn Champion", "hp": 4, "armor": 0.6, "speed": 38.0, "morale": 110.0, "nerve": 0.4,
 		"radius": 10.0, "weapon": "mass_carbine", "leader": true, "grenades": {"he": 1, "smoke": 2}},
+	"hw_gunner_s": {"name": "Sworn Heavy Gunner", "hp": 2, "armor": 0.4, "speed": 32.0, "morale": 95.0, "nerve": 0.5,
+		"radius": 10.0, "weapon": "heavy_mass_gun", "heavy": true, "grenades": {}},
+	"hw_loader_s": {"name": "Sworn Loader", "hp": 2, "armor": 0.4, "speed": 36.0, "morale": 95.0, "nerve": 0.5,
+		"radius": 10.0, "weapon": "mass_pistol", "loader": true, "grenades": {"he": 1}},
 	"oathblade": {"name": "Sworn Oathblade", "hp": 3, "armor": 0.5, "speed": 47.0, "morale": 100.0, "nerve": 0.45,
 		"radius": 10.0, "weapon": "mass_pistol", "melee": "edict_blade", "charger": true, "grenades": {"he": 1, "ap": 1}},
 	"blade_champion": {"name": "Oathblade Champion", "hp": 4, "armor": 0.6, "speed": 47.0, "morale": 115.0, "nerve": 0.4,
@@ -116,6 +133,7 @@ const FACTIONS := {
 			{"name": "Conscript Squad", "members": ["sergeant", "conscript", "conscript", "conscript", "conscript", "conscript", "gunner"]},
 			{"name": "Conscript Squad", "members": ["sergeant", "conscript", "conscript", "conscript", "conscript", "conscript", "gunner"]},
 			{"name": "Raider Squad", "members": ["raider_sgt", "raider", "raider", "raider", "raider", "raider", "raider", "raider"]},
+			{"name": "Heavy Gun Team", "members": ["hw_gunner", "hw_loader"]},
 			{"name": "Stubber Team", "members": ["sergeant", "gunner", "gunner"]},
 			{"name": "Lance Team", "members": ["sergeant", "lancer", "lancer"]},
 			{"vehicle": "vigil"},
@@ -130,6 +148,7 @@ const FACTIONS := {
 			{"name": "Sworn Talon", "carrier": "pilgrim", "members": ["champion", "brother", "brother", "cannoneer"]},
 			{"name": "Sworn Talon", "members": ["champion", "brother", "brother", "cannoneer"]},
 			{"name": "Oathblade Talon", "members": ["blade_champion", "oathblade", "oathblade"]},
+			{"name": "Heavy Gun Team", "members": ["hw_gunner_s", "hw_loader_s"]},
 			{"name": "Breacher Talon", "members": ["champion", "brother", "breacher", "breacher"]},
 			{"vehicle": "verdict"},
 		],

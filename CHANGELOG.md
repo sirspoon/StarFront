@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.41 (2026-11-12)
+Heavy Gun Teams.
+- Each side gets a two-man Heavy Gun Team: a gunner and a loader. The Legion's heavy lumen gun
+  fires bursts of searing laser bolts; the Sworn's heavy mass-reactive gun fires bursts of
+  exploding rounds.
+- The gun has to be set up to fire well. Stopped next to a window, low cover, rubble or a wall
+  edge (or in a crater), or with the team in the Down stance, the gunner sets it on its tripod
+  over about 2.5 seconds (longer without his loader). Set up, it's far more accurate (about six
+  times as accurate as firing it loose); it can't be fired at all on the move.
+- A set-up gun covers an arc in front of it; a target well outside it (or a Face order well away)
+  means shifting the gun round first, which takes a moment. Moving packs it up.
+- Without the loader beside him the gunner fires more slowly. If the gunner falls, the loader
+  picks up the gun.
+- The squad card shows "Setting up" and "Set up". The computer stops its team in range of the
+  enemy and sets up, lying Down if there's nothing to rest the gun on.
+- The Sworn gun crew wear lighter armour than other Sworn (two wounds each) to keep the sides
+  balanced.
+
 ## v0.40 (2026-11-12)
 - Crash tracking: the game notes how far it got every 20 seconds during a battle too (not just
   while loading). Add `?debug` to the address to see where the last visit got to on the title

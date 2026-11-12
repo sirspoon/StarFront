@@ -75,6 +75,9 @@ func _think(sq: Squad) -> void:
 	if ready.any(func(m): return m.charger):
 		_think_assault(sq, ready, c)
 		return
+	if ready.any(func(m): return m.heavy):
+		if _think_heavy(sq, ready, c):
+			return
 	var rng: float = ready[0].weapon.range
 	var busy := ready.any(func(m): return m.moving)
 	var enemy: Soldier = main.nearest_seen_enemy(team, c)
@@ -176,4 +179,22 @@ func _grenade(sq: Squad, ready: Array) -> bool:
 			if randf() < (0.5 if cover > 0.2 or e.grounded() else 0.2):
 				main.grenades.order(sq, e.position)
 				return true
+	return false
+
+
+## Heavy gun teams: in range of the enemy, stop and get the gun set up (lying Down if
+## there's nothing to rest it on); otherwise get up and move like anyone else.
+func _think_heavy(sq: Squad, ready: Array, c: Vector2) -> bool:
+	var gunner = ready.filter(func(m): return m.heavy)[0]
+	var enemy: Soldier = main.nearest_seen_enemy(team, c)
+	var rng: float = gunner.weapon.range
+	if enemy != null and c.distance_to(enemy.position) < rng * 0.85:
+		sq.facing = (enemy.position - c).normalized()
+		if ready.any(func(m): return m.moving):
+			sq.order_move(main.map, c, false)  # stop here
+		elif not gunner.can_brace() and not sq.prone:
+			sq.set_prone(true)
+		return true
+	if sq.prone:
+		sq.set_prone(false)
 	return false

@@ -131,6 +131,12 @@ func status() -> String:
 	if mov:
 		return "Running" if running else "Moving"
 	for m in al:
+		if m.heavy:
+			if m.is_set_up():
+				return "Firing" if m.burst_left > 0 or m.flash > 0.0 else "Set up"
+			if m.setup_t > 0.0:
+				return "Setting up"
+	for m in al:
 		if m.burst_left > 0 or m.flash > 0.0:
 			return "Firing"
 	return "Ready"

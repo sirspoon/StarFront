@@ -190,6 +190,28 @@ def laser(rng):
     return finish(x, peak=0.8, fade=0.1)
 
 
+def heavy_laser(rng, shots=5, gap=0.12):
+    """The heavy lumen gun: a rapid string of deeper, heavier laser cracks with a
+    capacitor whine underneath, building and dying with the burst."""
+    dur = shots * gap + 1.0
+    n = int(dur * SR)
+    x = np.zeros(n)
+    for k in range(shots):
+        sn = int(0.45 * SR)
+        f0 = rng.uniform(1300, 1700)
+        tone = chirp(0.45, f0, rng.uniform(180, 240), 10)
+        tone = (tone + 0.35 * np.sin(2 * np.arcsin(np.clip(tone, -1, 1)))) * env(sn, 0.0005, 0.05)
+        pop = filt(noise(sn, rng), lo=300, hi=4000) * env(sn, 0.0002, 0.014) * 1.8
+        thump = chirp(0.45, 140, 60, 6) * env(sn, 0.001, 0.05) * 1.3
+        place(x, (tone * 0.8 + pop + thump) * rng.uniform(0.85, 1.0), k * gap + rng.uniform(-0.005, 0.005) * (k > 0))
+    t = T(dur)
+    on = np.clip(t / 0.08, 0, 1) * np.clip((shots * gap + 0.2 - t) / 0.3, 0, 1)
+    x += np.sin(2 * np.pi * np.cumsum(420 + 160 * on) / SR) * on * 0.12
+    x = sat(x / np.max(np.abs(x)), 1.9)
+    x = reverb(x, 1.1, 0.3, rng, bright=5000, slap=[(0.18, 0.18), (0.5, 0.08)])
+    return finish(x, fade=0.35)
+
+
 def round_(rng, weight, n):
     """One heavy round firing: crack, blast body, low thump and the bolt's clack."""
     crack = filt(noise(n, rng), lo=2000) * env(n, 0.0002, 0.008) * 1.5
@@ -459,6 +481,8 @@ def main():
         "melee_blunt": (3, blunt_hit),
         "melee_power": (3, power_blade),
         "smoke": (2, smoke_pop),
+        "heavy_laser": (2, heavy_laser),
+        "heavy_mass": (2, lambda r: burst(r, 4, 0.14, 1.8, explosive=True, tail=1.6)),
     }
     only = sys.argv[1:]  # e.g. make_sounds.py smg pistol: just those
     for name, (count, fn) in makers.items():
