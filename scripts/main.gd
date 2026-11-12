@@ -129,6 +129,10 @@ func _ready() -> void:
 			_test_carrier()
 		if "--test-follow" in args:
 			_test_follow()
+		if "--test-touch" in args:
+			_test_touch()
+		if "--test-reach" in args:
+			_test_reach()
 		if "--prone" in args:  # test aid: the Legion fights in the Down stance
 			for sq in _player_squads():
 				sq.set_prone(true)
@@ -214,10 +218,12 @@ func _test_carrier() -> void:
 ## seconds and report any soldier who didn't go, and why.
 func _test_follow() -> void:
 	ais = ais.filter(func(ai): return ai.team != 0)
+	if "--no-enemy" in OS.get_cmdline_user_args():
+		ais.clear()  # nobody fights: checks orders away from any combat
 	var stuck_total := 0
 	var orders := 0
 	for round_i in 30:
-		await get_tree().create_timer(4.0).timeout
+		await get_tree().create_timer(0.5 if round_i == 0 else 4.0).timeout
 		if over:
 			break
 		for sq in _player_squads():
@@ -234,9 +240,66 @@ func _test_follow() -> void:
 			for m in sq.alive():
 				if before.has(m) and m.position.distance_to(before[m]) < 6.0 and m.position.distance_to(dest) > 60.0:
 					stuck_total += 1
-					print("STUCK %s state=%s supp=%d path=%d/%d sub=%d board=%s dist_to_dest=%d" % [sq.name, Soldier.State.keys()[m.state],
-							m.suppression, m.path_i, m.path.size(), sq.sub.size(), m.board_vehicle != null, m.position.distance_to(dest)])
+					print("STUCK t=%d %s state=%s supp=%d path=%d/%d wait=%s pos=%s cell=%s dist_to_dest=%d" % [time, sq.name, Soldier.State.keys()[m.state],
+							m.suppression, m.path_i, m.path.size(), m.wait_for_squad, m.position, map.get_t(map.cell_of(m.position)), m.position.distance_to(dest)])
 	print("FOLLOW orders=%d stuck=%d" % [orders, stuck_total])
+
+
+## Test aid: give orders the way a phone does (tap a soldier, then double-tap or
+## hold-drag a destination) with nobody fighting, and report anyone who didn't go.
+func _test_touch() -> void:
+	ais.clear()
+	touch_mode = true
+	var stuck := 0
+	var n := 0
+	for round_i in 6:
+		for sq in _player_squads():
+			if sq.vehicle() != null or sq.carrier() != null or sq.alive().size() < 2:
+				continue
+			await get_tree().create_timer(0.3).timeout
+			var tapped: Soldier = sq.alive()[randi() % sq.alive().size()]
+			_tap(tapped.position, Vector2(100, 100))
+			var dest := sq.center() + Vector2(randf_range(100, 250), randf_range(-150, 150))
+			var how: String = ["double", "line", "hold"][round_i % 3]
+			match how:
+				"double":
+					_double_tap(dest)
+				"line":
+					_plan("line", dest - Vector2(0, 50), dest + Vector2(0, 50), true)
+				"hold":
+					_plan("move", dest, dest, false)
+			var before := {}
+			for m in sq.alive():
+				before[m] = m.position
+			await get_tree().create_timer(4.0).timeout
+			n += 1
+			for m in sq.alive():
+				if m.position.distance_to(before[m]) < 6.0 and m.position.distance_to(dest) > 70.0:
+					stuck += 1
+					print("TSTUCK %s via %s state=%s path=%d/%d wait=%s sub=%d selected=%s prone=%s dist=%d" % [sq.name, how,
+							Soldier.State.keys()[m.state], m.path_i, m.path.size(), m.wait_for_squad, sq.sub.size(), sq.selected, sq.prone, m.position.distance_to(dest)])
+	print("TOUCH orders=%d stuck=%d" % [n, stuck])
+
+
+## Test aid: send a squad's men to spots all over the map and count spots they
+## can't reach (which would leave a man standing still).
+func _test_reach() -> void:
+	ais.clear()
+	var sq: Squad = _player_squads().filter(func(q): return q.vehicle() == null and q.carrier() == null and q.members.size() >= 5)[0]
+	var bad := 0
+	var total := 0
+	var kinds := {}
+	for i in 300:
+		var dest := Vector2(randf_range(100, map.world_size().x - 100), randf_range(60, map.world_size().y - 60))
+		for slot in sq.pick_slots(map, dest, sq.members.size()):
+			total += 1
+			var p := map.find_path(sq.members[0].position, slot)
+			if p.is_empty():
+				bad += 1
+				var t: int = map.get_t(map.cell_of(slot))
+				kinds[t] = kinds.get(t, 0) + 1
+	print("REACH %d of %d spots unreachable, by terrain %s" % [bad, total, kinds])
+	get_tree().quit()
 
 
 ## Test aid: shell the chapel's west wall so screenshots show every damage stage.

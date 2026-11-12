@@ -51,6 +51,9 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   screenshot on the player's Nth squad.
 - `--test-follow` orders the player's squads to move every few seconds during a real battle and prints any
   soldier who didn't go, with his state.
+- `--test-touch` gives orders the way a phone does (tap, double-tap, hold-drag, hold) with nobody fighting;
+  `--no-enemy` with `--test-follow` does the same for direct orders; `--test-reach` counts unreachable
+  destination spots. All print anyone who did not move.
 - `--test-carrier` checks one tap on a carrier selects it and a double tap boards the selected infantry.
 - `--test-orders` (with `--autotest`, headless is fine) runs a line order and a picked-soldier move and
   prints where the men ended up and whether the squad stayed in contact. `--shot-select` selects the
