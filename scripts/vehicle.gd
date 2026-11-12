@@ -19,6 +19,8 @@ var turret_angle := 0.0
 var recoil := 0.0
 var shaken := 0.0
 var track_phase := 0.0
+var last_track := Vector2.INF  # where the last track mark was laid
+var crushed := {}             # soldiers already run over (so it counts once each time)
 var smoke_timer := 0.0
 var engine_sound: AudioStreamPlayer2D
 var was_moving := false
@@ -204,6 +206,11 @@ func tick(dt: float, now: float) -> void:
 		was_moving = moving
 	recoil = maxf(0.0, recoil - dt * 3.0)
 	_drive(dt)
+	if last_track == Vector2.INF:
+		last_track = position
+	elif position.distance_to(last_track) > 10.0:
+		main.decals.add_track(last_track, position, width * 0.72, width * 0.2)  # ruts in the dirt
+		last_track = position
 	_aim_and_fire(dt, now)
 	smoke_timer -= dt
 	if smoke_timer <= 0.0:
@@ -235,8 +242,36 @@ func _drive(dt: float) -> void:
 		var step := minf(spd * dt, dist)
 		position += Vector2.from_angle(facing) * step
 		track_phase += step
+		_run_over(step / maxf(dt, 0.001))
 	else:
 		track_phase += turn * 12.0
+
+
+## Men in the vehicle's path are shoved aside; going fast, it hits enemy soldiers it
+## drives into (the crew steer clear of their own men).
+func _run_over(spd: float) -> void:
+	var now: float = main.time
+	for s in main.soldiers:
+		if s.is_vehicle or not s.is_alive() or s.state == State.EMBARKED:
+			continue
+		var rel: Vector2 = (s.position - position).rotated(-facing)
+		var half_w: float = width * 0.5 + s.radius
+		if rel.x < -length * 0.5 or rel.x > length * 0.5 + s.radius or absf(rel.y) > half_w:
+			continue
+		# shove him out to the nearer side
+		var side := Vector2(0, 1 if rel.y >= 0.0 else -1).rotated(facing)
+		var push: float = (half_w - absf(rel.y)) + 1.0
+		var to: Vector2 = s.position + side * push
+		if map.walkable(map.cell_of(to)):
+			s.position = to
+		else:
+			s.position -= side * push  # pinned against a wall: the other way
+		if s.team != team and spd > 40.0 and rel.x > length * 0.15 and now - float(crushed.get(s, -99.0)) > 1.5:
+			crushed[s] = now
+			s.add_suppression(35.0, now)
+			if randf() < clampf((spd - 40.0) / 40.0 + 0.45, 0.0, 0.9) and randf() >= s.armor * 0.5:
+				s.take_hit(2 if role == "tank" else 1, self)
+				main.decals.add_smear(s.position, Vector2.from_angle(facing), 14.0, Color(s.colors.blood))
 
 
 func _mount_pos(sl: Dictionary) -> Vector2:

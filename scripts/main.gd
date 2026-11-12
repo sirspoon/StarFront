@@ -1033,7 +1033,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 			if show:
 				effects.puff(target.position, Color(target.colors.blood), 5.0)
 			if target.max_hp == 1 or randf() < 0.5:
-				decals.add_blood(target.position + away * 2.0, away, 0.7 + float(w.dmg) * 0.2, Color(target.colors.blood))
+				spray_blood(target, away, 0.7 + float(w.dmg) * 0.2)
 			target.take_hit(w.dmg, shooter)
 	else:
 		# the miss lands somewhere: off cover or a wall it may glance, in the open it scorches the ground
@@ -1045,6 +1045,18 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 				_ricochet(end, end - muzzle, w)
 		if randf() < (0.5 if float(w.get("pen", 0)) >= 2.0 else 0.2):
 			decals.add_burn(end, 1.2 + float(w.get("pen", 0)) * 0.25)
+
+
+## Blood sprayed away from a hit (away: the direction the blow or round was travelling),
+## splashed up a wall too if he was standing close in front of one.
+func spray_blood(s: Soldier, away: Vector2, amount: float) -> void:
+	var col := Color(s.colors.blood)
+	decals.add_blood(s.position + away * 2.0, away, amount, col)
+	for d in [8.0, 13.0, 18.0, 24.0, 30.0]:
+		var p: Vector2 = s.position + away * d
+		if map.blocks(map.get_t(map.cell_of(p))):
+			decals.add_wall_blood(s.position + away * (d - 3.0), away, amount * (1.3 - d / 40.0), col)
+			break
 
 
 ## A jet of fire: it fills a narrow cone out to its reach (stopped by walls), licking round
@@ -1108,7 +1120,7 @@ func resolve_blow(attacker: Soldier, foe: Soldier, m: Dictionary, landed: bool) 
 	var away := (foe.position - attacker.position).normalized()
 	if show:
 		effects.puff(foe.position, Color(foe.colors.blood), 5.0)
-	decals.add_blood(foe.position + away * 2.0, away, 0.8 + float(m.dmg) * 0.2, Color(foe.colors.blood))
+	spray_blood(foe, away, 0.8 + float(m.dmg) * 0.2)
 	foe.take_hit(int(m.dmg), attacker)
 	if not foe.is_alive():
 		melee_kills[attacker.team] += 1

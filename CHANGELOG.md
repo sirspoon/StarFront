@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.45 (2026-11-12)
+Tracks, running men down, and more blood.
+- Vehicles leave track marks in the dirt wherever they drive (two treads with the plates' imprint).
+- Vehicles shove men out of their way. Driving fast (a carrier at normal speed, a tank in Assault)
+  into enemy soldiers, they knock them down and can kill them; the crews steer round their own men.
+- Blood sprays much further from a hit, so it's easier to see, and a man shot or cut down with a
+  wall close behind him splashes it up the wall (a splat, droplets and runs).
+
 ## v0.44 (2026-11-12)
 - The Pyre Warden's flame jet looks like fire now: soft billowing flames with a hot yellow core near
   the nozzle, orange further out and smoky red at the edges, instead of a flat yellow wedge.
