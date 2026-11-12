@@ -941,6 +941,14 @@ func _process(dt: float) -> void:
 		return
 	time += dt
 	var crumb := 5.0 if phone else 20.0
+	if "--log-mem" in OS.get_cmdline_user_args() and int(time / 30.0) != int((time - dt) / 30.0):
+		# test aid: what grows over a long battle
+		print("MEM %d:%02d video %d MB  static %d MB  objects %d  nodes %d  resources %d  orphans %d  patches %d/%d  canvas items %d" % [
+				int(time) / 60, int(time) % 60, int(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0),
+				int(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0), Performance.get_monitor(Performance.OBJECT_COUNT),
+				Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT),
+				Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT), map_view.patch_order.size(), map_view.patches_stored,
+				Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)])
 	if int(time / crumb) != int((time - dt) / crumb):
 		# breadcrumbs in battle too, in case the browser's graphics give out mid-fight
 		Settings.stage("in battle at %d:%02d: %d lights lit, %d tracers, %d ground marks, %d smoke screens, %d fires, %d map patches live / %d stored, graphics memory %d MB (%s)" % [int(time) / 60, int(time) % 60,

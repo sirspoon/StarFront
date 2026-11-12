@@ -93,6 +93,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `--trenches=1` turns on the trench lines option for a test.
 - `--shot-beam` waits until the Legion tank's lumen lance has been firing a few frames and centres on the
   beam; `--shot-tank --shot-team=0|1 --shot-zoom=5` for a close look at either tank.
+- `--log-mem` prints graphics memory, object / node / resource counts and map patches every 30 s of battle time,
+  to find what grows over a long battle (try with `--phonetest`).
 - `--log-guns` prints each change of a tank's main gun setting (beam / pulse, AP / HE).
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
