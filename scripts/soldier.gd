@@ -52,6 +52,7 @@ var corner_cover := false  # a wall or wreck between him and the threat (leans o
 var posture := "stand"     # stand, crouch or prone (how he's drawn, and how hard he is to hit)
 var lean := 0.0            # leaning out round cover to fire: -1..1 sideways
 var lean_side := 1.0
+var peek_t := 0.0          # leaning out round cover to shoot, for this long
 var strength := 1         # how much this unit counts towards its side's strength
 var board_vehicle = null  # carrier this soldier is walking to
 var carrier = null        # carrier this soldier is riding in
@@ -121,7 +122,17 @@ func is_present() -> bool:
 
 
 func muzzle_pos() -> Vector2:
-	return position + Vector2.from_angle(facing) * (radius + 9.0)
+	return exposed_pos() + Vector2.from_angle(facing) * (radius + 9.0)
+
+
+## Leaning out round cover: how far his body is shifted sideways.
+func lean_offset() -> Vector2:
+	return Vector2.from_angle(facing).orthogonal() * lean * radius * 1.9
+
+
+## Where he can be seen and shot from: his position, or where he's leaning out to.
+func exposed_pos() -> Vector2:
+	return position + lean_offset() if lean != 0.0 else position
 
 
 func go_to(p: Vector2, run: bool) -> void:
@@ -253,7 +264,10 @@ func _update_posture(dt: float) -> void:
 		posture = "stand"
 	var firing := burst_left > 0 or flash > 0.0
 	var want := 0.0
-	if firing and corner_cover and not moving:
+	peek_t = maxf(0.0, peek_t - dt)
+	if peek_t > 0.0 and not moving and state != State.ROUTING:
+		want = lean_side
+	elif firing and corner_cover and not moving:
 		if lean == 0.0:
 			# lean towards whichever side is open
 			var side := Vector2.from_angle(facing).orthogonal()
@@ -422,6 +436,19 @@ func _fight(dt: float, now: float) -> void:
 			ammo = MAG
 		return
 	var t := pick_target(weapon, position)
+	if t == null and not moving and state == State.READY and not heavy and _squad_engaged(now):
+		# a wall in the way while his mates are fighting: lean out round it to either side
+		var side := Vector2.from_angle(facing).orthogonal()
+		for sgn in ([1.0, -1.0] if randf() < 0.5 else [-1.0, 1.0]):
+			var lp: Vector2 = position + side * sgn * radius * 1.5
+			if map.blocks(map.get_t(map.cell_of(lp))):
+				continue
+			t = pick_target(weapon, lp)
+			if t != null:
+				lean_side = sgn
+				main.peeks[team] += 1
+				peek_t = float(weapon.burst) * float(weapon.gap) + 1.2  # stays out for the burst
+				break
 	if t == null:
 		cooldown = randf_range(0.3, 0.6)
 		return
@@ -573,6 +600,14 @@ func _strike(foe: Soldier, now: float) -> void:
 	main.resolve_blow(self, foe, m, randf() < p)
 
 
+## Is his squad in a fight (someone fired or was shot at in the last few seconds)?
+func _squad_engaged(now: float) -> bool:
+	for m in squad.members:
+		if m.is_alive() and (now - m.last_fire_time < 3.0 or now - m.last_hit_time < 3.0):
+			return true
+	return false
+
+
 func can_breach() -> bool:
 	return weapon.get("blast", 0.0) > 0.0
 
@@ -595,7 +630,7 @@ func hurt_by(_w: Dictionary) -> bool:
 
 func _can_hit(e: Soldier, w: Dictionary, from: Vector2) -> bool:
 	return e.is_alive() and e.seen_by[team] and e.hurt_by(w) \
-			and from.distance_to(e.position) <= w.range and map.los_clear(from, e.position)
+			and from.distance_to(e.position) <= w.range and map.los_clear(from, e.exposed_pos())
 
 
 ## Best enemy for weapon w fired from `from`: the squad's ordered target if possible,
@@ -624,7 +659,7 @@ func pick_target(w: Dictionary, from: Vector2) -> Soldier:
 		cands.append([score, e])
 	cands.sort_custom(func(a, b): return a[0] < b[0])
 	for c in cands:
-		if map.los_clear(from, c[1].position):
+		if map.los_clear(from, c[1].exposed_pos()):
 			return c[1]
 	return null
 
@@ -668,16 +703,21 @@ func _draw_body() -> void:
 	var prone := posture == "prone"
 	var crouch := posture == "crouch"
 	var r := radius
-	var off := Vector2.from_angle(facing).orthogonal() * lean * r * 0.9  # leaning out round cover
+	var off := lean_offset()  # leaning out round cover
 	var leg: Color = Color(colors.coat).darkened(0.18)
 	# shadow: long and low when lying flat, small when kneeling
 	if prone:
 		draw_set_transform(off + Vector2(2, 3) - Vector2.from_angle(facing) * r * 0.6, facing, Vector2(1.9, 0.8))
 	else:
-		draw_set_transform(off + Vector2(3, 4), 0, Vector2(0.85, 0.7) if crouch else Vector2(1, 0.8))
-	draw_circle(Vector2.ZERO, r + 1.0, Color(0, 0, 0, 0.35))
+		draw_set_transform(Vector2(3, 4), 0, Vector2(0.85, 0.7) if crouch else Vector2(1, 0.8))
+	draw_circle(Vector2.ZERO, r + 1.0, Color(0, 0, 0, 0.35))  # stays where he stands: leaning out, his body pulls away from it
+	if absf(lean) > 0.05:
+		# leaning out round cover: his body stretched from where he stands to where he looks out
+		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+		draw_line(Vector2.ZERO, off, Color(Color(colors.coat).darkened(0.2), 0.6), r * 1.1)
+		draw_circle(Vector2.ZERO, r * 0.55, Color(Color(colors.coat).darkened(0.25), 0.6))
 	# a blow twists his body into it: a slash with a blade, a jab with a gun butt
-	var fa := facing + sin(swing * PI) * (0.45 if melee.get("blade", false) else 0.8)
+	var fa := facing + sin(swing * PI) * (0.45 if melee.get("blade", false) else 0.8) + lean * 0.35  # leaning out: the body twists round the corner
 	draw_set_transform(off, fa, Vector2.ONE)
 	if prone:
 		# legs stretched out behind him, shuffling when he crawls

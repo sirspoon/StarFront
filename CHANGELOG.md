@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.55 (2026-11-12)
+Leaning out round cover.
+- A man with a wall in front of him, while his squad is fighting, now looks for a shot by leaning out
+  to either side, and if he finds one, leans out and fires (before, a man whose view was blocked
+  just waited). He stays leaned out for the whole burst.
+- It's clear on screen: he leans further out, his body twists round the corner and stretches from
+  where he's standing (his shadow stays there) to where he looks out.
+- Leaning out is a risk: while he's out, enemies can see and shoot him there, with only part of the
+  wall's cover. Shots snatched this way are less accurate than from a steady position.
+- In test battles men lean out a few hundred times a battle; the balance and battle length are
+  unchanged.
+
 ## v0.54 (2026-11-12)
 Seeing cover, sight and range.
 - Cover view (the Cover button, or C on a PC): colours the ground by what it gives your men. Green:

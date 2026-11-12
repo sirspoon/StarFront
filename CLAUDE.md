@@ -84,6 +84,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   kills by kind of killer (`/melee` for close combat), for seeing what drives casualties.
 - `--shot-cover` turns on the Cover view for a screenshot; `--shot-pick` (with `--shot-squad=N`) selects
   that squad, to see its sight area and weapon range rings.
+- `--shot-peek` waits for a man leaning right out round cover and firing, and centres on him. Test results
+  print `peeks=[legion, sworn]`: how often men leaned out to shoot.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

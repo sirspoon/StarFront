@@ -21,6 +21,7 @@ var cover_view: CoverView  # the next click / tap picks where to throw grenades
 var grenades_thrown := [0, 0]
 var heavy_kills := [0, 0]
 var friendly_kills := [0, 0]
+var peeks := [0, 0]  # men leaning out round cover to shoot
 var kill_sources := {}  # test aid: what killed whom ("kind" or "kind/melee")   # men killed by their own side (stray grenades, shells)
 var bastion_kills := [0, 0]    # kills by the Sworn's heavy-armoured flamers and hail cannons: [flamer, hail]
 var heavy_time := [0.0, 0.0]   # seconds a heavy gun was on the field, per side...
@@ -941,8 +942,17 @@ func _process(dt: float) -> void:
 	_check_end()
 	if shot_path != "" and time >= shot_time and (not "--shot-melee" in OS.get_cmdline_user_args() or _melee_spot() != null) \
 			and (not "--shot-heavy" in OS.get_cmdline_user_args() or _heavy_spot() != null) \
+			and (not "--shot-peek" in OS.get_cmdline_user_args() or _peek_spot() != null) \
 			and (not "--shot-flame" in OS.get_cmdline_user_args() or effects.flames.any(func(f): return f.t > 0.12)):
 		_take_shot()
+
+
+## Test aid: a man leaning right out round cover and firing, or null.
+func _peek_spot():
+	for s in soldiers:
+		if s.is_alive() and not s.is_vehicle and s.peek_t > 0.0 and absf(s.lean) > 0.95 and s.flash > 0.0:
+			return s.position
+	return null
 
 
 ## Test aid: a heavy gun set up and firing (of the side given by --shot-team, if any), or null.
@@ -999,6 +1009,8 @@ func _take_shot() -> void:
 		camera.position = _melee_spot()
 	if "--shot-heavy" in OS.get_cmdline_user_args():
 		camera.position = _heavy_spot()
+	if "--shot-peek" in OS.get_cmdline_user_args():
+		camera.position = _peek_spot()
 	if "--shot-flame" in OS.get_cmdline_user_args():
 		var fl: Dictionary = effects.flames.filter(func(f): return f.t > 0.12)[0]
 		camera.position = (fl.from + fl.to) * 0.5
@@ -1083,7 +1095,7 @@ func _update_spotting() -> void:
 					os = minf(SIGHT, sight * 1.7)  # a gun team watching its arc picks out men in cover further off
 				if d2 > os * os:
 					continue
-				if d2 < 2500.0 or map.los_clear(o.position, s.position):
+				if d2 < 2500.0 or map.los_clear(o.position, s.exposed_pos()):
 					seen = true
 					break
 			s.seen_by[team] = seen
@@ -1114,7 +1126,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 	if target.is_vehicle:
 		p = minf(0.95, p * 1.6)  # big target, and it can't hide in a crater
 	else:
-		p *= 1.0 - map.cover_vs(target.position, shooter.position)
+		p *= 1.0 - map.cover_vs(target.exposed_pos(), shooter.position)
 	if shooter.moving:
 		p *= 0.3 if shooter.running else 0.5  # assaulting: firing on the run
 	if target.charging != null:
@@ -1123,6 +1135,8 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 		p *= 1.25  # lying flat, braced: a steadier aim
 	if shooter.state == Soldier.State.PINNED:
 		p *= 0.5
+	if not shooter.is_vehicle and shooter.peek_t > 0.0:
+		p *= 0.6  # snatching a shot leaning out round cover
 	if shooter.heavy and not shooter.is_vehicle:
 		p *= GameData.HEAVY_SET_UP if shooter.is_set_up() else GameData.HEAVY_LOOSE  # braced on its tripod, or wild
 	p *= 1.0 - shooter.suppression / 200.0
@@ -1131,7 +1145,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 	var flank := 0.0
 	if not target.is_vehicle:
 		flank = target.squad.note_fire(shooter.position - target.position, time)
-		if map.cover_vs(target.position, shooter.position) >= 0.25 or target.data.get("steadfast", false) or no_flank:
+		if map.cover_vs(target.exposed_pos(), shooter.position) >= 0.25 or target.data.get("steadfast", false) or no_flank:
 			flank = 0.0
 		flank *= float(shooter.data.get("flank_bonus", 1.0)) if not shooter.is_vehicle else 1.0
 		p *= 1.0 + 0.25 * flank
@@ -1152,7 +1166,7 @@ func resolve_shot(shooter: Soldier, target: Soldier, w: Dictionary, muzzle: Vect
 		end += Vector2.from_angle(randf() * TAU) * randf_range(8.0, 24.0) * (2.0 if w.get("blast", 0.0) > 0.0 else 1.0)
 	var show := shooter.visible or target.visible
 	# a miss on a man behind low cover usually strikes the cover, chewing it up
-	var lc := Vector2i(-1, -1) if target.is_vehicle else map.cover_cell(target.position, shooter.position)
+	var lc := Vector2i(-1, -1) if target.is_vehicle else map.cover_cell(target.exposed_pos(), shooter.position)
 	if not hit and lc.x >= 0 and randf() < 0.75:
 		cover_blocks[target.team] += 1
 		end = map.center_of(lc) + Vector2(randf_range(-5, 5), randf_range(-5, 5))
@@ -1601,9 +1615,9 @@ func _end(winner: int, reason: String) -> void:
 		else:
 			fled[s.team] += 1
 	if autotest:
-		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d cover=%d%%/%d%% blocked=%s flank=%s crossfire=%d%%/%d%% blows=%s mkills=%s raider_kills=%d blade_kills=%d grenades=%s heavy_kills=%s heavy_set=%d%%/%d%% own_side_kills=%s flamer_hail_kills=%s %s" % [
+		print("RESULT winner=%s time=%d shots=%s hits=%s left=%s/%s dead=%s/%s fled=%s/%s vehicles_lost=%s/%s walls=%d cover=%d%%/%d%% blocked=%s flank=%s crossfire=%d%%/%d%% blows=%s mkills=%s raider_kills=%d blade_kills=%d grenades=%s heavy_kills=%s heavy_set=%d%%/%d%% own_side_kills=%s flamer_hail_kills=%s peeks=%s %s" % [
 				factions[winner] if winner >= 0 else "draw", int(time), shots, hits,
-				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, flank_shots, int(100 * crossfire_time[0] / maxf(field_time[0], 1)), int(100 * crossfire_time[1] / maxf(field_time[1], 1)), blows, melee_kills, assault_kills[0], assault_kills[1], grenades_thrown, heavy_kills, int(100 * heavy_set_time[0] / maxf(heavy_time[0], 1)), int(100 * heavy_set_time[1] / maxf(heavy_time[1], 1)), friendly_kills, bastion_kills, reason])
+				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, flank_shots, int(100 * crossfire_time[0] / maxf(field_time[0], 1)), int(100 * crossfire_time[1] / maxf(field_time[1], 1)), blows, melee_kills, assault_kills[0], assault_kills[1], grenades_thrown, heavy_kills, int(100 * heavy_set_time[0] / maxf(heavy_time[0], 1)), int(100 * heavy_set_time[1] / maxf(heavy_time[1], 1)), friendly_kills, bastion_kills, peeks, reason])
 		print("KILLS " + JSON.stringify(kill_sources))
 		get_tree().quit()
 		return

@@ -5,6 +5,7 @@ extends RefCounted
 ## When a whole version is reached (1.0, 2.0 ...), start a new heading for it.
 
 const TEXT := """PROTOTYPE (before 1.0)
+- Men behind walls lean out round them to shoot (and can be shot while they do)
 - Cover view (C) showing what's standing and where to take cover; sight and weapon ranges for selected squads
 - Longer battles (around 10 minutes): fire pins more and kills less, broken men can rally
 - Options menu (graphics and sound), and a battle menu to restart or start a new battle
