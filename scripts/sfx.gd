@@ -8,11 +8,13 @@ const VARIANTS := {
 	"explosion_big": 3, "explosion_small": 3, "cannon": 2, "fusion": 2, "fusion_small": 2,
 	"laser": 4, "stubber": 2, "carbine": 3, "rotor": 2, "ricochet": 4, "ricochet_bullet": 4, "clang": 2,
 	"collapse": 2, "lance": 2, "engine_rev": 2,
+	"sworn_move": 6, "sworn_attack": 6, "sworn_death": 6,
 }
 const VOLUME := {  # dB, to balance them against each other
 	"explosion_big": 2.0, "explosion_small": -2.0, "cannon": 1.0, "fusion": 0.0, "fusion_small": -4.0,
 	"laser": -9.0, "stubber": -5.0, "carbine": -4.0, "rotor": -3.0, "ricochet": -13.0, "ricochet_bullet": -12.0, "clang": -7.0,
 	"collapse": -1.0, "lance": -5.0, "engine_rev": -6.0,
+	"sworn_move": -2.0, "sworn_attack": -1.0, "sworn_death": -3.0,
 }
 ## Which sound each weapon makes (once per burst).
 const WEAPON_SOUND := {
@@ -30,6 +32,8 @@ var pool: Array[AudioStreamPlayer2D] = []
 var next := 0
 var recent := {}  # name -> [msec, position]
 var engine_stream: AudioStreamWAV
+var radio: AudioStreamPlayer  # acknowledgements: heard wherever the camera is
+var last_line := ""
 
 
 ## The sound for a weapon (looked up by the weapon's data, whose key isn't stored in it).
@@ -59,6 +63,8 @@ func setup(camera: Camera2D) -> void:
 		p.panning_strength = 0.7
 		add_child(p)
 		pool.append(p)
+	radio = AudioStreamPlayer.new()
+	add_child(radio)
 	var ear := AudioListener2D.new()
 	camera.add_child(ear)
 	ear.make_current()
@@ -81,6 +87,24 @@ func play(n: String, pos: Vector2, vol_db := 0.0, pitch_var := 0.07) -> void:
 	p.volume_db = VOLUME.get(n, 0.0) + vol_db
 	p.pitch_scale = 1.0 + randf_range(-pitch_var, pitch_var)
 	p.play()
+
+
+## A squad acknowledging an order over the vox. One line at a time: a new order
+## cuts off the last reply, and the same line isn't repeated back to back.
+func voice(n: String) -> void:
+	if not enabled or not streams.has(n):
+		return
+	var vs: Array = streams[n]
+	var pick: AudioStream = vs[randi() % vs.size()]
+	for i in 4:
+		if pick.resource_path != last_line:
+			break
+		pick = vs[randi() % vs.size()]
+	last_line = pick.resource_path
+	radio.stream = pick
+	radio.volume_db = VOLUME.get(n, 0.0)
+	radio.pitch_scale = randf_range(0.97, 1.03)
+	radio.play()
 
 
 func _free_player() -> AudioStreamPlayer2D:

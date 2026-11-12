@@ -118,7 +118,7 @@ func _ready() -> void:
 	if autotest:
 		battle_length = 600.0  # test battles still end
 		print("StarFront autotest, seed %d" % seed_value)
-		start_battle("legion")
+		start_battle("sworn" if "--side=sworn" in args else "legion")
 		if "--demo-damage" in args:
 			_demo_damage()
 		if "--perf-blast" in args:
@@ -129,6 +129,8 @@ func _ready() -> void:
 			_test_carrier()
 		if "--test-follow" in args:
 			_test_follow()
+		if "--test-voice" in args:
+			_test_voice()
 		if "--test-touch" in args:
 			_test_touch()
 		if "--test-reach" in args:
@@ -300,6 +302,20 @@ func _test_reach() -> void:
 				kinds[t] = kinds.get(t, 0) + 1
 	print("REACH %d of %d spots unreachable, by terrain %s" % [bad, total, kinds])
 	get_tree().quit()
+
+
+## Test aid (with --side=sworn): a move order and a target order each get a spoken reply.
+func _test_voice() -> void:
+	await get_tree().create_timer(0.5).timeout
+	var sq: Squad = _player_squads().filter(func(q): return q.vehicle() == null and q.carrier() == null)[0]
+	select_squad(sq, false)
+	_plan("move", sq.center() + Vector2(120, 0), sq.center() + Vector2(120, 0), true)
+	print("VOICE after move order: %s %s" % [sfx.radio.playing, sfx.radio.stream.resource_path if sfx.radio.stream else "-"])
+	await get_tree().create_timer(2.0).timeout
+	var enemy: Soldier = soldiers.filter(func(x): return x.team != player_team and not x.is_vehicle)[0]
+	enemy.visible = true
+	_order(enemy.position, false)
+	print("VOICE after target order: %s %s" % [sfx.radio.playing, sfx.radio.stream.resource_path if sfx.radio.stream else "-"])
 
 
 ## Test aid: shell the chapel's west wall so screenshots show every damage stage.
@@ -1055,6 +1071,8 @@ func on_vehicle_destroyed(v: Vehicle, killer: Soldier) -> void:
 
 
 func on_death(s: Soldier, killer: Soldier) -> void:
+	if s.faction == "sworn" and not s.is_vehicle:
+		sfx.play("sworn_death", s.position, 0.0, 0.04)
 	for o in soldiers:
 		if not o.is_alive() or o.team != s.team:
 			continue
@@ -1359,11 +1377,18 @@ func _plan(kind: String, a: Vector2, b: Vector2, final: bool, face_override := V
 			orders.append([mover, {"kind": "move", "a": a + off, "b": a + off, "face": Vector2.ZERO, "run": run_toggle}])
 	for o in orders:
 		o[0].enqueue(map, o[1], plan_fresh)
+	_acknowledge("move")
 	plan_fresh = final
 	var col := Color(1.0, 0.8, 0.3) if run_toggle else Color(0.5, 1.0, 0.5)
 	effects.marker(a, col)
 	if kind == "line":
 		effects.marker(b, col)
+
+
+## The selected squads answer an order (only the Sworn have voices so far).
+func _acknowledge(kind: String) -> void:
+	if _player_squads().any(func(q): return q.selected and q.faction == "sworn" and (not q.alive().is_empty() or q.carrier() != null)):
+		sfx.voice("sworn_" + kind)
 
 
 func _has_selection() -> bool:
@@ -1406,6 +1431,7 @@ func _order(wp: Vector2, run: bool) -> void:
 				boarding = true
 		if boarding:
 			effects.marker(own.position, Color(0.5, 0.8, 1.0))
+			_acknowledge("move")
 			return
 	var enemy := _soldier_at(wp, 1 - player_team)
 	if enemy == null and map.get_t(map.cell_of(wp)) == BattleMap.T.WALL:
@@ -1416,11 +1442,13 @@ func _order(wp: Vector2, run: bool) -> void:
 				shelling = true
 		if shelling:
 			effects.marker(wp, Color(1.0, 0.6, 0.2))
+			_acknowledge("attack")
 			return
 	if enemy != null:
 		for sq in sel:
 			sq.focus = enemy
 		effects.marker(enemy.position, Color(1.0, 0.3, 0.2))
+		_acknowledge("attack")
 		return
 	var group_c := Vector2.ZERO
 	for sq in sel:

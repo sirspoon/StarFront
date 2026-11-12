@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.31 (2026-11-12)
+- The Sworn answer your orders in a deep, armoured, robotic British voice over the vox: "Confirmed",
+  "On our way" or "Your will" for a move, and "On my mark", "Fire!" or "Unleash hell!" when told to
+  target an enemy or shell a wall. Sworn infantry grunt as they die.
+- The voices are made by `tools/make_voices.py` (a neural text-to-speech voice, then processed).
+
 ## v0.30 (2026-11-12)
 PC controls brought in line with the phone.
 - Right click: move. Shift + right click: add a waypoint (Shift + right-drag adds a line at the end
