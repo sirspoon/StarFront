@@ -915,6 +915,17 @@ func _add_ash() -> void:
 
 func start_battle(player_faction: String) -> void:
 	factions = [player_faction, "sworn" if player_faction == "legion" else "legion"]
+	# the player's force as picked (saved for next time); the computer picks its own
+	var saved = Settings.saved("army_" + player_faction, [])
+	if not autotest and saved is Array and not saved.is_empty():
+		armies[0] = saved
+	if not autotest or "--random-armies" in OS.get_cmdline_user_args():
+		armies[1] = GameData.random_army(factions[1], current_seed * 7 + 1)
+		if autotest:
+			armies[0] = GameData.random_army(factions[0], current_seed * 7 + 2)
+	if autotest and "--random-armies" in OS.get_cmdline_user_args():
+		for t in 2:
+			print("ARMY %s %d pts: %s" % [factions[t], GameData.army_cost(factions[t], armies[t]), armies[t]])
 	for t in 2:
 		_spawn_team(t)
 	ais.append(AICommander.new(self, 1))
@@ -936,9 +947,14 @@ func start_battle(player_faction: String) -> void:
 	log_message("Scouts report %s advancing from the east. Take the %s!" % [f.name, map.objective_word()])
 
 
+var armies := [[], []]  # each side's force as unit ids (see GameData.units); empty: the standard one
+
+
 func _spawn_team(team: int) -> void:
 	var f: Dictionary = GameData.FACTIONS[factions[team]]
 	var defs: Array = f.squads
+	if not armies[team].is_empty():
+		defs = GameData.army_defs(factions[team], armies[team])
 	var counts := {}
 	for i in defs.size():
 		var def: Dictionary = defs[i]

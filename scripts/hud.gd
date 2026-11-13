@@ -750,6 +750,8 @@ func show_menu() -> void:
 	if "--shot-whatsnew" in OS.get_cmdline_user_args() or "--shot-menu" in OS.get_cmdline_user_args() \
 			or "--shot-options" in OS.get_cmdline_user_args():
 		_shot_whats_new.call_deferred()
+	if "--shot-army" in OS.get_cmdline_user_args():
+		show_army.call_deferred("sworn" if "--side=sworn" in OS.get_cmdline_user_args() else "legion")
 	var info := Label.new()
 	info.text = "Graphics: " + Settings.summary()
 	info.add_theme_font_size_override("font_size", 11)
@@ -772,7 +774,7 @@ func show_menu() -> void:
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		b.custom_minimum_size = Vector2(620, 72)
 		b.focus_mode = Control.FOCUS_NONE
-		b.pressed.connect(func(): _choose(key))
+		b.pressed.connect(func(): show_army(key))
 		v.add_child(b)
 	var ob := Button.new()
 	ob.text = "Options"
@@ -808,6 +810,127 @@ func _show_whats_new() -> void:
 
 func _map_ready() -> bool:
 	return main.map_view.ready_drawn or not main.map_view.enabled
+
+
+## Picking the force: each unit costs points; spend up to the budget. Starts from the force
+## picked last time (or the standard one). The computer picks its own.
+var army_panel: PanelContainer = null
+var army: Array = []
+
+
+func show_army(key: String) -> void:
+	menu_panel.visible = false
+	var saved = Settings.saved("army_" + key, [])
+	army = saved.duplicate() if saved is Array and not saved.is_empty() else GameData.default_army(key)
+	army_panel = _centre_panel()
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	army_panel.add_child(v)
+	var title := Label.new()
+	title.text = "MUSTER: %s" % GameData.FACTIONS[key].name.to_upper()
+	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_color_override("font_color", Color(0.85, 0.7, 0.4))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(title)
+	var pts := Label.new()
+	pts.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(pts)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(640, 330 if main.touch_mode else 420)
+	v.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 4)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	var rows := []
+	var start := Button.new()
+	var refresh := func():
+		var cost := GameData.army_cost(key, army)
+		pts.text = "Points: %d / %d      Units: %d / %d" % [cost, GameData.BUDGET, army.size(), GameData.MAX_UNITS]
+		pts.add_theme_color_override("font_color", Color(1.0, 0.45, 0.35) if cost > GameData.BUDGET else Color(0.85, 0.82, 0.7))
+		for r in rows:
+			var n := army.filter(func(x): return x == r.u.id).size()
+			r.count.text = str(n)
+			r.minus.disabled = n == 0
+			r.plus.disabled = n >= int(r.u.max) or cost + int(r.u.cost) > GameData.BUDGET or army.size() >= GameData.MAX_UNITS
+		start.disabled = army.is_empty() or cost > GameData.BUDGET
+	var bh := 40.0 if main.touch_mode else 28.0
+	for u in GameData.units(key):
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		list.add_child(row)
+		var info := VBoxContainer.new()
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.add_theme_constant_override("separation", 0)
+		row.add_child(info)
+		var nm := Label.new()
+		nm.text = "%s   (%d pts, up to %d)" % [u.name, u.cost, u.max]
+		info.add_child(nm)
+		var ab := Label.new()
+		ab.text = u.about
+		ab.add_theme_font_size_override("font_size", 11)
+		ab.add_theme_color_override("font_color", Color(0.65, 0.62, 0.55))
+		ab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		info.add_child(ab)
+		var minus := Button.new()
+		minus.text = " - "
+		minus.custom_minimum_size = Vector2(bh, bh)
+		minus.focus_mode = Control.FOCUS_NONE
+		row.add_child(minus)
+		var count := Label.new()
+		count.custom_minimum_size = Vector2(24, 0)
+		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		row.add_child(count)
+		var plus := Button.new()
+		plus.text = " + "
+		plus.custom_minimum_size = Vector2(bh, bh)
+		plus.focus_mode = Control.FOCUS_NONE
+		row.add_child(plus)
+		var id: String = u.id
+		minus.pressed.connect(func():
+			army.erase(id)
+			refresh.call())
+		plus.pressed.connect(func():
+			army.append(id)
+			refresh.call())
+		rows.append({"u": u, "count": count, "minus": minus, "plus": plus})
+	var bar := HBoxContainer.new()
+	bar.add_theme_constant_override("separation", 8)
+	bar.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(bar)
+	for spec in [["Standard force", func():
+				army = GameData.default_army(key)
+				refresh.call()],
+			["Random", func():
+				army = GameData.random_army(key, randi())
+				refresh.call()],
+			["Clear", func():
+				army = []
+				refresh.call()],
+			["Back", func():
+				army_panel.queue_free()
+				army_panel = null
+				menu_panel.visible = true]]:
+		var b := Button.new()
+		b.text = spec[0]
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(0, bh)
+		b.pressed.connect(spec[1])
+		bar.add_child(b)
+	start.text = "To battle"
+	start.focus_mode = Control.FOCUS_NONE
+	start.custom_minimum_size = Vector2(0, bh + 6)
+	start.pressed.connect(func():
+		Settings.save_option("army_" + key, army.duplicate())
+		army_panel.queue_free()
+		army_panel = null
+		menu_panel.visible = true
+		_choose(key))
+	v.add_child(start)
+	refresh.call()
+	if "--shot-army" in OS.get_cmdline_user_args():
+		_shot_whats_new.call_deferred()
 
 
 func _choose(key: String) -> void:

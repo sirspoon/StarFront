@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.89"
+const VERSION := "0.90"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -210,5 +210,112 @@ const FACTIONS := {
 		],
 	},
 }
+
+## Forces: what each unit costs, how many of it a force may have, and the points each side
+## has to spend. Units are the squads in FACTIONS (matched by name, and carrier if any).
+const BUDGET := 1300
+const MAX_UNITS := 14
+const COSTS := {
+	"legion": [
+		["Conscript Squad", "drudge", 170, 2, "Seven conscripts with lumen rifles and a stubber, riding a Drudge carrier"],
+		["Conscript Squad", "", 100, 5, "Seven conscripts: a sergeant, five lumen rifles and a stubber gunner"],
+		["Raider Squad", "", 130, 2, "Eight trench raiders with ripper guns and knives: assault troops"],
+		["Heavy Gun Team", "", 70, 4, "A heavy lumen gun and its loader: long-range fire once set up"],
+		["Stubber Team", "", 60, 3, "A sergeant and two stubber gunners"],
+		["Lance Team", "", 70, 3, "A sergeant and two lance launchers: anti-armour"],
+		["Mortar Team", "", 110, 2, "Three mortars and their loaders: indirect fire, HE and smoke"],
+		["vigil", "", 250, 2, "Vigil Tank: the lumen lance (beam or pulse) and a heavy stubber"],
+	],
+	"sworn": [
+		["Sworn Talon", "pilgrim", 200, 2, "A champion, two brothers and a cannoneer, riding a Pilgrim carrier"],
+		["Sworn Talon", "", 130, 4, "A champion, two brothers with carbines and a cannoneer"],
+		["Oathblade Talon", "", 120, 2, "A champion and two oathblades: assault troops with power blades"],
+		["Heavy Gun Team", "", 80, 3, "A heavy mass-reactive gun and its loader"],
+		["Pyre Warden", "", 90, 2, "A bastion-armoured flamer"],
+		["Bastion Brother", "", 90, 2, "A bastion-armoured hail cannon"],
+		["Breacher Talon", "", 140, 2, "A champion, a brother and two breachers with fusion carbines: anti-armour"],
+		["Outrider Squadron", "", 200, 2, "Three fast gun buggies"],
+		["verdict", "", 250, 2, "Verdict Tank: the fusion cannon (AP or HE) and a rotor cannon"],
+	],
+}
+
+
+## The units a faction can field: [{id, name, cost, max, about, def}], def as in FACTIONS.squads.
+static func units(faction: String) -> Array:
+	var out: Array = []
+	for c in COSTS[faction]:
+		var def := {}
+		for sq in FACTIONS[faction].squads:
+			var nm: String = sq.get("name", "")
+			if sq.has("vehicle") and sq.vehicle == c[0]:
+				def = sq
+			elif nm == c[0] and str(sq.get("carrier", "")) == c[1]:
+				def = sq
+		var label: String = VEHICLES[c[0]].name if VEHICLES.has(c[0]) else c[0]
+		if c[1] != "":
+			label += " + " + VEHICLES[c[1]].name.split(" ")[0]
+		out.append({"id": c[0] + ("+" + c[1] if c[1] != "" else ""), "name": label, "cost": c[2], "max": c[3], "about": c[4], "def": def})
+	return out
+
+
+## The standard force (the squads listed in FACTIONS), as unit ids.
+static func default_army(faction: String) -> Array:
+	var ids: Array = []
+	for sq in FACTIONS[faction].squads:
+		if sq.has("vehicle"):
+			ids.append(sq.vehicle)
+		else:
+			ids.append(sq.name + ("+" + sq.carrier if sq.has("carrier") else ""))
+	return ids
+
+
+static func army_cost(faction: String, ids: Array) -> int:
+	var by := {}
+	for u in units(faction):
+		by[u.id] = u.cost
+	var t := 0
+	for i in ids:
+		t += int(by.get(i, 0))
+	return t
+
+
+## A force the computer picks for itself: a core of infantry, then whatever it can afford,
+## at random, within each unit's limit (seeded, so a restarted battle gets the same force).
+static func random_army(faction: String, seed_value: int) -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var us := units(faction)
+	var ids: Array = []
+	var spent := 0
+	var count := func(id: String) -> int: return ids.filter(func(x): return x == id).size()
+	# two or three line infantry squads first (the cheapest that isn't in a vehicle)
+	var line: Dictionary = us[1]
+	for k in rng.randi_range(2, 3):
+		ids.append(line.id)
+		spent += int(line.cost)
+	for tries in 200:
+		var u: Dictionary = us[rng.randi() % us.size()]
+		if spent + int(u.cost) <= BUDGET and count.call(u.id) < int(u.max) and ids.size() < MAX_UNITS:
+			ids.append(u.id)
+			spent += int(u.cost)
+		if BUDGET - spent < 60:
+			break
+	return ids
+
+
+## Squad definitions (for spawning) from unit ids, in a sensible order: infantry, then vehicles.
+static func army_defs(faction: String, ids: Array) -> Array:
+	var by := {}
+	for u in units(faction):
+		by[u.id] = u.def
+	var out: Array = []
+	for i in ids:
+		if by.has(i) and not by[i].has("vehicle") and not by[i].has("vehicles"):
+			out.append(by[i])
+	for i in ids:
+		if by.has(i) and (by[i].has("vehicle") or by[i].has("vehicles")):
+			out.append(by[i])
+	return out
+
 
 const NUMERALS := ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]

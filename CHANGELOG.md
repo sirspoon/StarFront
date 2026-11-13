@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.90 (2026-11-13)
+Pick your force.
+- After choosing a side, the Muster screen lists every unit with its points cost, a short description
+  and how many a force may have; + and - add and remove them. Spend up to 1300 points on up to 14
+  units. "Standard force" puts back the usual line-up (exactly 1300 points on both sides), "Random"
+  rolls one, "Clear" empties it. Your force is remembered for next time (and for restarts).
+- Costs: Legion: Conscript Squad 100 (with a Drudge carrier 170), Raider Squad 130, Heavy Gun Team 70,
+  Stubber Team 60, Lance Team 70, Mortar Team 110, Vigil Tank 250. Sworn: Sworn Talon 130 (with a
+  Pilgrim carrier 200), Oathblade Talon 120, Heavy Gun Team 80, Pyre Warden 90, Bastion Brother 90,
+  Breacher Talon 140, Outrider Squadron 200, Verdict Tank 250.
+- The computer picks its own force: two or three line squads, then whatever it can afford at random
+  (the same force if the battle is restarted).
+
 ## v0.89 (2026-11-13)
 Fix: blinding light from the Outrider buggies.
 - The buggies' turret stubber was treated as a tank's main gun: every burst set off the big-gun
