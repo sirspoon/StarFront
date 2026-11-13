@@ -71,6 +71,7 @@ var t_mode := ""              # "" (maybe a tap), "line", "pan", "pinch" or "don
 var pinch_prev_dist := 0.0
 var pinch_prev_center := Vector2.ZERO
 var run_toggle := false
+var spectate := false  # watching: the computer commands both sides, everything is in view
 var autotest_hide_outline := false  # (kept false; a switch for comparison screenshots)
 const DOUBLE_TAP_MS := 450
 var tap_pending := false  # a lone tap on the ground that may become a double tap
@@ -124,6 +125,7 @@ var hits := [0, 0]
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	autotest = "--autotest" in args
+	Engine.time_scale = 1.0  # (a watched battle may have been sped up)
 	var seed_value := randi()
 	if Settings.next_seed >= 0:
 		seed_value = Settings.next_seed  # restarting the same battle: the same battlefield
@@ -153,8 +155,11 @@ func _ready() -> void:
 	if "--test-restart" in args:
 		_test_restart.call_deferred()
 	if Settings.next_faction != "":
-		hud._choose.call_deferred(Settings.next_faction)  # restarted: straight back into battle
+		hud._choose.call_deferred(Settings.next_faction, Settings.next_watch)  # restarted: straight back into battle
 		Settings.next_faction = ""
+		Settings.next_watch = false
+	if "--watch" in args and not autotest:
+		hud._choose.call_deferred("legion", true)  # test aid: straight into a watched battle
 	if OS.has_feature("web") and Settings._q().contains("massdemo"):
 		hud._choose.call_deferred("legion")  # test aid in the browser: start, then order everyone about
 		_web_mass.call_deferred()
@@ -469,6 +474,7 @@ func restart(same: bool) -> void:
 	if same:
 		Settings.next_faction = factions[player_team]
 		Settings.next_seed = current_seed
+		Settings.next_watch = spectate
 	get_tree().paused = false
 	get_tree().reload_current_scene()
 
@@ -951,15 +957,21 @@ func _add_ash() -> void:
 
 # ---------------------------------------------------------------- setup
 
-func start_battle(player_faction: String) -> void:
+## Does the computer command this side? (Its own side always; both when watching or testing.)
+func ai_controls(team: int) -> bool:
+	return team != player_team or autotest or spectate
+
+
+func start_battle(player_faction: String, watch := false) -> void:
 	factions = [player_faction, "sworn" if player_faction == "legion" else "legion"]
+	spectate = watch
 	# the player's force as picked (saved for next time); the computer picks its own
 	var saved = Settings.saved("army_" + player_faction, [])
 	if not autotest and saved is Array and not saved.is_empty():
 		armies[0] = saved
 	if not autotest or "--random-armies" in OS.get_cmdline_user_args():
 		armies[1] = GameData.random_army(factions[1], current_seed * 7 + 1)
-		if autotest:
+		if autotest or spectate:
 			armies[0] = GameData.random_army(factions[0], current_seed * 7 + 2)
 	if autotest and "--random-armies" in OS.get_cmdline_user_args():
 		for t in 2:
@@ -967,11 +979,13 @@ func start_battle(player_faction: String) -> void:
 	for t in 2:
 		_spawn_team(t)
 	ais.append(AICommander.new(self, 1))
-	if autotest:
+	if autotest or spectate:
 		ais.append(AICommander.new(self, 0))
 	hud.build_squad_cards()
 	started = true
-	if not autotest or "--test-deploy" in OS.get_cmdline_user_args():
+	if spectate:
+		hud.show_watch()
+	elif not autotest or "--test-deploy" in OS.get_cmdline_user_args():
 		_begin_deploy()
 	Settings.stage("battle started (%s)" % Settings.summary())
 	# start looking at your own force
@@ -984,7 +998,10 @@ func start_battle(player_faction: String) -> void:
 	camera.position = Vector2(c.x / maxi(n, 1) + get_viewport_rect().size.x * 0.25 / camera.zoom.x, c.y / maxi(n, 1))
 	_clamp_camera()
 	var f: Dictionary = GameData.FACTIONS[factions[1]]
-	log_message("Scouts report %s advancing from the east. Take the %s!" % [f.name, map.objective_word()])
+	if spectate:
+		log_message("Watching: %s against %s, for %s." % [GameData.FACTIONS[factions[0]].name, f.name, map.objective_name()])
+	else:
+		log_message("Scouts report %s advancing from the east. Take the %s!" % [f.name, map.objective_word()])
 
 
 var armies := [[], []]  # each side's force as unit ids (see GameData.units); empty: the standard one
@@ -1403,7 +1420,7 @@ func _update_spotting() -> void:
 					seen = true
 					break
 			s.seen_by[team] = seen
-		s.visible = autotest or s.seen_by[player_team]
+		s.visible = autotest or spectate or s.seen_by[player_team]
 
 
 func nearest_seen_enemy(team: int, from: Vector2) -> Soldier:
@@ -1987,7 +2004,7 @@ func effects_visible_at(p: Vector2) -> bool:
 	for s in soldiers:
 		if s.team == player_team and s.is_alive() and s.position.distance_to(p) < SIGHT:
 			return true
-	return autotest
+	return autotest or spectate
 
 
 ## High explosive: hurts and pins every soldier near the impact, friend or foe,
@@ -2192,6 +2209,8 @@ func _end(winner: int, reason: String) -> void:
 	var head := "DRAW"
 	if winner >= 0:
 		head = "VICTORY" if winner == player_team else "DEFEAT"
+		if spectate:
+			head = "%s WIN" % GameData.FACTIONS[factions[winner]].name.to_upper()
 	hud.show_end("%s\n%s\nSurvivors: yours %d of %d, enemy %d of %d" % [head, reason,
 			left[player_team], start_counts[player_team], left[1 - player_team], start_counts[1 - player_team]])
 
@@ -2363,6 +2382,8 @@ func select_squad(sq: Squad, add: bool) -> void:
 
 func _player_squads() -> Array[Squad]:
 	var out: Array[Squad] = []
+	if spectate:
+		return out  # watching: nothing to command
 	for sq in squads:
 		if sq.team == player_team:
 			out.append(sq)
@@ -3076,7 +3097,8 @@ func _deselect_all() -> void:
 
 ## Called by a squad card: select the squad and glide the camera over to it.
 func focus_squad(sq: Squad, add: bool) -> void:
-	select_squad(sq, add)
+	if not spectate:
+		select_squad(sq, add)
 	if sq.alive().is_empty() and sq.carrier() == null and sq.vehicle() == null:
 		return
 	var from := camera.position

@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.07 (2026-11-13)
+- Watch a battle: a new button on the title screen. The computer commands both sides, each with a
+  force it picks itself, with no deployment and everything in view (no fog). A banner at the top has
+  Speed (x1, x2, x4) and Leave (back to the title screen). You can scroll and zoom, pause, use the
+  Cover view and click a squad in the list to look at it; there's nothing to command. The end of the
+  battle says which side won; Restart replays the same watched battle.
+
 ## v1.06 (2026-11-13)
 - Muster screen: swipe the list of units up and down with a finger (or drag it with the mouse; the
   mouse wheel works too) instead of having to catch the thin scroll bar. A tap that doesn't move still

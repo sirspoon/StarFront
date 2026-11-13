@@ -338,6 +338,45 @@ func set_objective(name: String, word: String) -> void:
 		help_label.text = help_label.text.replace("the Ashen Chapel", name).replace("the Prime Factorium", name)
 
 
+## Watching a battle: a banner with the speed and a way out.
+func show_watch() -> void:
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.position.y += 48
+	root.add_child(panel)
+	watch_panel = panel
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 12)
+	panel.add_child(h)
+	var l := Label.new()
+	l.text = "WATCHING  ·  %s vs %s" % [GameData.FACTIONS[main.factions[0]].short, GameData.FACTIONS[main.factions[1]].short]
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(l)
+	var sp := Button.new()
+	sp.text = "Speed x1"
+	sp.focus_mode = Control.FOCUS_NONE
+	sp.custom_minimum_size = Vector2(110, 44 if main.touch_mode else 30)
+	sp.pressed.connect(func():
+		var nxt: float = {1.0: 2.0, 2.0: 4.0}.get(Engine.time_scale, 1.0)
+		Engine.time_scale = nxt
+		sp.text = "Speed x%d" % int(nxt))
+	h.add_child(sp)
+	var lv := Button.new()
+	lv.text = "Leave"
+	lv.focus_mode = Control.FOCUS_NONE
+	lv.custom_minimum_size = Vector2(90, 44 if main.touch_mode else 30)
+	lv.pressed.connect(func():
+		Engine.time_scale = 1.0
+		main.get_tree().reload_current_scene())
+	h.add_child(lv)
+	if touch_buttons.has("Support"):
+		touch_buttons["Support"].visible = false  # nothing to call in
+
+
+var watch_panel: PanelContainer = null
+
+
 ## The deployment banner: what to do, and the Begin battle button.
 var deploy_panel: PanelContainer = null
 
@@ -376,7 +415,7 @@ func set_squads_visible(on: bool) -> void:
 ## True if a screen position is over a panel or button, so a touch there
 ## isn't also taken as an order on the battlefield.
 func is_over_ui(pos: Vector2) -> bool:
-	for c in [top_panel, deploy_panel, squad_panel, unit_card, unit_card.popup if unit_card != null else null, help_panel, touch_bar.get_parent() if touch_bar else null,
+	for c in [top_panel, deploy_panel, watch_panel, squad_panel, unit_card, unit_card.popup if unit_card != null else null, help_panel, touch_bar.get_parent() if touch_bar else null,
 			menu_panel, end_panel]:
 		if c != null and is_instance_valid(c) and c.is_visible_in_tree() and c.get_global_rect().has_point(pos):
 			return true
@@ -501,7 +540,7 @@ func _refresh() -> void:
 					var verb: String = {"Pinned": "is pinned down!", "Routing": "is breaking and running!",
 							"Lost": "has been wiped out."}[st]
 					main.log_message("[color=%s]%s %s[/color]" % [col, sq.name, verb])
-					if mine and sq.faction == "legion" and st != "Lost":
+					if mine and sq.faction == "legion" and st != "Lost" and not main.spectate:
 						main.sfx.voice("legion_pinned" if st == "Pinned" else "legion_rout")  # the men cry out
 			last_status[sq] = st
 		if rows.has(sq):
@@ -808,6 +847,12 @@ func show_menu() -> void:
 		b.focus_mode = Control.FOCUS_NONE
 		b.pressed.connect(func(): show_army(key))
 		v.add_child(b)
+	var wb := Button.new()  # watch the computer fight itself
+	wb.text = "Watch a battle  (the computer commands both sides)"
+	wb.custom_minimum_size = Vector2(620, 40)
+	wb.focus_mode = Control.FOCUS_NONE
+	wb.pressed.connect(func(): _choose(["legion", "sworn"][randi() % 2], true))
+	v.add_child(wb)
 	var ob := Button.new()
 	ob.text = "Options"
 	ob.focus_mode = Control.FOCUS_NONE
@@ -1191,12 +1236,16 @@ func _preview_vehicle(faction: String, sq: Squad, k: String) -> Vehicle:
 	return v
 
 
-func _choose(key: String) -> void:
+var pending_watch := false
+
+
+func _choose(key: String, watch := false) -> void:
 	if _map_ready():
 		menu_panel.queue_free()
-		main.start_battle(key)
+		main.start_battle(key, watch)
 	else:
 		pending_faction = key
+		pending_watch = watch
 		load_text.text = "Starting as %s when the battlefield is ready..." % GameData.FACTIONS[key].name
 
 
@@ -1219,7 +1268,7 @@ func _update_loading() -> void:
 		load_text.visible = false
 	if pending_faction != "":
 		menu_panel.queue_free()
-		main.start_battle(pending_faction)
+		main.start_battle(pending_faction, pending_watch)
 
 
 func show_end(text: String) -> void:

@@ -19,6 +19,7 @@ static var _read := false
 static var _cfg: ConfigFile = null
 ## Carried over when the scene is reloaded to restart a battle.
 static var next_faction := ""
+static var next_watch := false  # restarting a battle that was being watched
 static var next_seed := -1
 
 

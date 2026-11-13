@@ -130,7 +130,7 @@ func _process(dt: float) -> void:
 	if ai_think <= 0.0:
 		ai_think = 3.0
 		for t in 2:
-			if (t != main.player_team or main.autotest) and ready_for(t):
+			if main.ai_controls(t) and ready_for(t):
 				_ai_call(t)
 	queue_redraw()
 	sky.queue_redraw()

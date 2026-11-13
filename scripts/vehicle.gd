@@ -390,7 +390,7 @@ func tick(dt: float, now: float) -> void:
 			receive_hit(w, position + Vector2.from_angle(randf() * TAU) * 100.0, null)
 		for k in 5:
 			_mark_hit(position + Vector2.from_angle(randf() * TAU) * 100.0, false)
-	if launcher and (team != main.player_team or main.autotest):
+	if launcher and main.ai_controls(team):
 		_auto_launch(dt)
 	hull_kick = maxf(0.0, hull_kick - dt * 4.0)
 	_drive(dt)
@@ -513,7 +513,7 @@ func _aim_and_fire(dt: float, now: float) -> void:
 	for sl in slots:
 		sl.flash = maxf(0.0, sl.flash - dt)
 		sl.cooldown -= dt
-		if not sl.modes.is_empty() and (team != main.player_team or main.autotest):
+		if not sl.modes.is_empty() and main.ai_controls(team):
 			_auto_mode(sl, dt)
 		var t = sl.target
 		if t != null and (not is_instance_valid(t) or not t.is_alive()):
@@ -655,7 +655,7 @@ func _draw() -> void:
 		var bw := L * 0.8
 		draw_rect(Rect2(-bw * 0.5, -L * 0.5 - 10, bw, 4), Color(0.1, 0.05, 0.04))
 		draw_rect(Rect2(-bw * 0.5, -L * 0.5 - 10, bw * maxf(hp, 0) / max_hp, 4), Color(0.85, 0.7, 0.35))
-	if passengers.size() > 0 and (team == main.player_team or main.autotest):
+	if passengers.size() > 0 and (team == main.player_team or main.autotest or main.spectate):
 		draw_string(ThemeDB.fallback_font, Vector2(-L * 0.5, L * 0.5 + 16), "%d aboard" % passengers.size(),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.9, 0.85, 0.7))
 	if shaken > 0.0:
