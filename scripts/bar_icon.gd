@@ -51,6 +51,13 @@ func _man(c: Color, at: Vector2, run: bool) -> void:
 		draw_line(at + Vector2(0, -3), at + Vector2(-2.5, 3), c, 2.0)
 
 
+## A stroke with rounded ends (for fingers).
+func _capsule(a: Vector2, b: Vector2, r: float, c: Color) -> void:
+	draw_line(a, b, c, r * 2.0)
+	draw_circle(a, r, c)
+	draw_circle(b, r, c)
+
+
 func _icon(c: Color) -> void:
 	match kind:
 		"Pace":  # crouched / running / lying down
@@ -115,15 +122,17 @@ func _icon(c: Color) -> void:
 			draw_line(Vector2(3, 18), Vector2(21, 18), c, 2.6)
 			draw_line(Vector2(12, 18), Vector2(12, 9), c, 3.2)
 			draw_colored_polygon(PackedVector2Array([Vector2(6.5, 10), Vector2(12, 3), Vector2(17.5, 10)]), c)
-		"Halt":  # a raised hand, palm forward
-			draw_rect(Rect2(7, 10, 11, 10), c)
-			draw_circle(Vector2(12.5, 20), 5.5, c)
-			for k in 4:
-				var x := 7.6 + k * 2.75
-				var top := 3.5 if k == 1 or k == 2 else 5.0
-				draw_rect(Rect2(x, top, 2.2, 10.0 - top + 2.0), c)
-				draw_circle(Vector2(x + 1.1, top), 1.1, c)
-			draw_colored_polygon(PackedVector2Array([Vector2(7, 14), Vector2(3, 10), Vector2(2, 11.5), Vector2(6, 18)]), c)  # thumb
+		"Halt":  # a raised hand, palm forward: four fingers splayed a little, the thumb out to the side
+			for f in [[Vector2(8.0, 12.5), Vector2(7.2, 5.2)], [Vector2(10.9, 12.0), Vector2(10.6, 3.2)],
+					[Vector2(13.8, 12.0), Vector2(14.2, 3.8)], [Vector2(16.6, 12.5), Vector2(17.6, 6.4)]]:
+				_capsule(f[0], f[1], 1.35, c)
+			_capsule(Vector2(8.2, 17.0), Vector2(3.6, 11.2), 1.5, c)  # thumb
+			var palm := PackedVector2Array([Vector2(6.7, 11.5), Vector2(17.9, 11.5), Vector2(18.2, 16.0)])
+			for k in 9:  # the heel of the hand, rounded
+				var a := k * PI / 8.0
+				palm.append(Vector2(12.4, 16.0) + Vector2(cos(a) * 5.4, sin(a) * 5.4))
+			palm.append(Vector2(6.9, 15.0))
+			draw_colored_polygon(palm, c)
 		"Cover":  # the cover view: a grid with some squares filled in
 			for k in 5:
 				draw_line(Vector2(3 + k * 4.5, 3), Vector2(3 + k * 4.5, 21), c, 1.3)

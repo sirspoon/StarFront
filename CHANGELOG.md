@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.75 (2026-11-13)
+- The Halt icon redrawn as a more natural raised hand: rounded fingers of different lengths, spread a
+  little, a fuller palm and the thumb angled out.
+
 ## v0.74 (2026-11-13)
 Command bar: one Pace button, new icons.
 - Pace and Stance are one Pace button that cycles crouched (walking) -> running -> lying down, its icon
