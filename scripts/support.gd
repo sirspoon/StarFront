@@ -125,7 +125,7 @@ func _process(dt: float) -> void:
 			l[0].queue_free()
 			lights.erase(l)
 		else:
-			l[0].energy = 2.2 * heat * main.light_fx.boost
+			l[0].energy = main.light_fx.boosted(2.2 * heat)
 	ai_think -= dt
 	if ai_think <= 0.0:
 		ai_think = 3.0
@@ -181,7 +181,7 @@ func _drop_rods(s: Dictionary) -> void:
 	# they walk down it fast, one after another
 	for i in n:
 		var f := float(i) / maxf(1.0, n - 1)
-		falling.append({"pos": s.a.lerp(s.b, f), "t": ROD_FALL + 0.09 * i, "team": s.team})
+		falling.append({"pos": s.a.lerp(s.b, f), "t": ROD_FALL + 0.09 * i, "team": s.team, "idx": i})
 
 
 func _rod_lands(r: Dictionary) -> void:
@@ -192,7 +192,10 @@ func _rod_lands(r: Dictionary) -> void:
 	if main.effects_visible_at(p):
 		main.effects.explosion(p, 70.0)
 		main.effects.debris(p, 18)
-		main.light_fx.flash(p, Color(1.0, 0.85, 0.6), 4.0, 340.0, 0.9, true)
+		# eight of these land within a second: each is bright, but not all at full blast,
+		# and only every other one throws shadows
+		var idx: int = int(r.get("idx", 0))
+		main.light_fx.flash(p, Color(1.0, 0.8, 0.55), 2.6, 260.0, 0.7, idx % 2 == 0)
 	var mo := {"pos": p, "r": 30.0 + randf() * 8.0, "t": 0.0, "seed": randi()}
 	molten.append(mo)
 	if main.light_fx.enabled_fx and main.light_fx.tex != null and lights.size() < (2 if Settings.is_phone() else 6):

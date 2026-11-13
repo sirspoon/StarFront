@@ -566,7 +566,7 @@ func _aim_and_fire(dt: float, now: float) -> void:
 					main.beam_start(self, sl)
 				else:
 					main.resolve_point_shot(self, bp, sl.weapon, _mount_pos(sl))
-					if sl.turret:
+					if sl.turret and role == "tank":
 						main.big_gun_fx(self, _mount_pos(sl), Vector2.from_angle(turret_angle))
 				sl.cooldown = sl.weapon.cooldown * randf_range(0.9, 1.15)
 			continue
@@ -603,8 +603,8 @@ func _fire(sl: Dictionary, t: Soldier, now: float) -> void:
 		sl.beam_point = null
 		main.beam_start(self, sl)
 		return
-	if sl.turret and sl.weapon.get("light", false):
-		recoil = maxf(recoil, 0.3)  # a pulse: a kick of the turret, not the whole tank
+	if sl.turret and (sl.weapon.get("light", false) or role != "tank"):
+		recoil = maxf(recoil, 0.3)  # a pulse, or a buggy's stubber: a kick, not a tank gun's blast
 	elif sl.turret:
 		recoil = 1.0
 		main.big_gun_fx(self, _mount_pos(sl), Vector2.from_angle(turret_angle))

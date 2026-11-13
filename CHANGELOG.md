@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.89 (2026-11-13)
+Fix: blinding light from the Outrider buggies.
+- The buggies' turret stubber was treated as a tank's main gun: every burst set off the big-gun
+  effect (a huge flash throwing wall shadows, a camera shake, the vehicle rocking). Only tanks' main
+  guns do that now; the buggy's gun gives a small kick.
+- Rapid fire no longer piles up lights: a muzzle flash or bolt light where one was just started keeps
+  that light going instead of adding another (big lights still get their own).
+- The lighting strength option boosts small lights (muzzle flashes, bolts) only partly, and no light
+  gets brighter than a set limit, including fires, the lance's beam and molten ground. The orbital
+  rods' flashes are a little smaller, and a destroyed buggy goes up smaller than a tank.
+
 ## v0.88 (2026-11-13)
 - Orbital bombardment: the 8 rods are spaced exactly evenly from one end of the drawn line to the
   other (draw a short line to concentrate them, a long one to spread them out), and land in order

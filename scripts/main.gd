@@ -841,7 +841,7 @@ func add_fire(p: Vector2) -> void:
 	var light := PointLight2D.new()
 	light.texture = light_tex
 	light.color = Color(1.0, 0.55, 0.25)
-	light.energy = 1.6 * Settings.light_boost()
+	light.energy = minf(1.6 * Settings.light_boost(), 4.0)
 	light.texture_scale = 1.6 * sqrt(Settings.light_boost())
 	light.position = p
 	light.enabled = Settings.on("lights", true)
@@ -850,7 +850,7 @@ func add_fire(p: Vector2) -> void:
 	light.shadow_filter = Light2D.SHADOW_FILTER_PCF5
 	light.shadow_color = Color(0, 0, 0, minf(0.95, 0.7 + (Settings.light_boost() - 1.0) * 0.15))
 	add_child(light)
-	fire_lights.append([light, 1.6 * Settings.light_boost(), randf() * TAU])
+	fire_lights.append([light, minf(1.6 * Settings.light_boost(), 4.0), randf() * TAU])
 
 	var fire := SimpleParticles.new()
 	fire.texture = dot
@@ -1203,6 +1203,12 @@ func _melee_spot():
 
 
 func _take_shot() -> void:
+	if "--log-lights" in OS.get_cmdline_user_args():
+		for a2 in light_fx.active:
+			print("LIGHT e=%.1f r=%.0f at %s col=%s t=%.2f/%.2f" % [a2.light.energy, a2.light.texture_scale * 128.0, a2.light.position.round(), a2.light.color, a2.t, a2.dur])
+		for n in light_fx.get_children():
+			if n is PointLight2D and n.enabled and not light_fx.pool.has(n):
+				print("OWN LIGHT e=%.1f r=%.0f at %s" % [n.energy, n.texture_scale * 128.0, n.position.round()])
 	var path := shot_path
 	shot_path = ""
 	var c := Vector2.ZERO
@@ -1585,7 +1591,7 @@ func _beam_lights(sl: Dictionary, from: Vector2, end: Vector2, show: bool) -> vo
 		l.enabled = show
 		l.position = spots[k][0]
 		l.color = spots[k][1]
-		l.energy = float(spots[k][2]) * 1.3 * boost * flick
+		l.energy = light_fx.boosted(float(spots[k][2]) * 1.3) * flick
 		l.texture_scale = float(spots[k][3]) / 128.0 * sqrt(boost)
 
 
@@ -1702,7 +1708,7 @@ func ignite(c: Vector2i) -> void:
 			var l := PointLight2D.new()
 			l.texture = _light_tex if _light_tex != null else _soft_dot(256)
 			l.color = Color(1.0, 0.55, 0.25)
-			l.energy = 1.1 * Settings.light_boost()
+			l.energy = minf(1.1 * Settings.light_boost(), 3.0)
 			l.texture_scale = 0.8 * sqrt(Settings.light_boost())
 			l.position = p
 			l.enabled = Settings.on("lights", true)
@@ -1763,7 +1769,7 @@ func _update_burning(dt: float) -> void:
 		e.t -= 0.5
 		var p := map.center_of(c)
 		if e.light != null:
-			e.light.energy = (0.9 + randf() * 0.4) * Settings.light_boost()
+			e.light.energy = minf((0.9 + randf() * 0.4) * Settings.light_boost(), 3.0)
 		for s in soldiers:  # men caught in the flames
 			if s.is_alive() and not s.is_vehicle and s.state != Soldier.State.EMBARKED and s.position.distance_to(p) < 12.0:
 				s.add_suppression(10.0, time)
@@ -1977,9 +1983,10 @@ func _blast(at: Vector2, w: Dictionary, shooter: Soldier, show: bool) -> void:
 func on_vehicle_destroyed(v: Vehicle, killer: Soldier) -> void:
 	if autotest:
 		print("  vehicle lost: %s at %ds, killed by %s" % [v.squad.name, int(time), killer.kind if killer != null else "?"])
-	effects.explosion(v.position, 40.0)
-	sfx.play("explosion_big", v.position, 4.0, 0.03)
-	light_fx.flash(v.position, Color(1.0, 0.55, 0.25), 3.2, 240.0, 1.3, true)
+	var size: float = clampf(v.length / 62.0, 0.5, 1.0)  # a buggy goes up smaller than a tank
+	effects.explosion(v.position, 40.0 * size)
+	sfx.play("explosion_big", v.position, 4.0 * size, 0.03)
+	light_fx.flash(v.position, Color(1.0, 0.55, 0.25), 3.2 * size, 240.0 * size, 1.3, true)
 	decals.add_scorch(v.position, 40.0)
 	add_fire(v.position + Vector2(randf_range(-6, 6), randf_range(-6, 6)))
 	for o in soldiers:

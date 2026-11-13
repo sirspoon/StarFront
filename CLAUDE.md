@@ -106,6 +106,7 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `--demo-vdamage` knocks every vehicle down to about a third of its hull a second in (to see the battle damage).
 - `--lightfx=normal|strong|max` (or `?lightfx=`) sets the lighting strength for a test; `--shot-paused` pauses for a
   screenshot (your men's outlines show more strongly).
+- `--log-lights` (with `--shot`) prints every light lit when the screenshot is taken (energy, radius, where).
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for
