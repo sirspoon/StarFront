@@ -277,9 +277,56 @@ def kokoro_say(k, text, man, speed):
     if any(0x400 <= ord(ch) <= 0x4FF for ch in text):
         ph = "ʊrˈɑː!"  # "Ura!" (a Russian cheer), said the Russian way
     else:
-        ph = "".join(SWAP.get(c, c) for c in k.tokenizer.phonemize(text, lang))
-    a, sr = k.create(ph, voice=voice, speed=speed, lang=lang, is_phonemes=True)
-    return np.asarray(a, dtype=np.float64), sr
+        # no commas inside a line (they made him pause mid-phrase: "Get moving, ... you dogs"),
+        # and the small words unstressed so the line runs on ("get MOVing you DOGS")
+        flat = text.replace(",", "")
+        ph = k.tokenizer.phonemize(flat, lang)
+        words = [w.strip("!.?").lower() for w in flat.split()]
+        parts = ph.split(" ")
+        if len(parts) == len(words):
+            parts = [p.replace("ˈ", "").replace("ˌ", "") if w in LIGHT_WORDS else p for p, w in zip(parts, words)]
+            ph = " ".join(parts)
+        ph = "".join(SWAP.get(c, c) for c in ph)
+    a, sr = k.create(ph, voice=voice, speed=speed, lang=lang, is_phonemes=True, clause_pause=0.0, sentence_pause=0.12)
+    return splice(np.asarray(a, dtype=np.float64), sr), sr
+
+
+LIGHT_WORDS = {"you", "off", "them", "it", "we", "the", "are", "one", "a", "to", "us", "all", "they", "can"}
+
+
+def splice(x, sr, gap=0.035, quiet=0.05):
+    """Cut the pauses inside a line down to a short breath, crossfading the joins, so it flows."""
+    win = int(0.01 * sr)
+    n = len(x) // win
+    if n < 3:
+        return x
+    level = np.array([np.sqrt(np.mean(x[i * win:(i + 1) * win] ** 2)) for i in range(n)])
+    loud = level > quiet * level.max()
+    keep = int(gap * sr)
+    fade = int(0.008 * sr)
+    out = []
+    i = 0
+    first = np.argmax(loud)
+    last = n - np.argmax(loud[::-1])
+    seg_start = first * win
+    while i < n:
+        if i > first and i < last and not loud[i]:
+            j = i
+            while j < n and not loud[j]:
+                j += 1
+            if j < last and (j - i) * win > keep:  # a pause in the middle: shorten it
+                out.append(x[seg_start: i * win + keep // 2])
+                seg_start = j * win - keep // 2
+            i = j
+        else:
+            i += 1
+    out.append(x[seg_start: last * win + int(0.06 * sr)])
+    y = out[0]
+    for seg in out[1:]:  # join with a short crossfade (no clicks)
+        f = min(fade, len(y), len(seg))
+        ramp = np.linspace(0, 1, f)
+        y = np.concatenate([y[:-f], y[-f:] * (1 - ramp) + seg[:f] * ramp, seg[f:]])
+    return y
 
 
 def main():

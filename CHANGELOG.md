@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.99 (2026-11-13)
+- Smoother Legion lines: the pauses inside a line are cut down to a short breath and the joins
+  crossfaded, commas no longer make the speaker stop mid-phrase, and the small words ("you", "off",
+  "them", "we"...) are unstressed so a line runs on ("get MOVing you DOGS", "SAFEty off BOYS"),
+  instead of every word getting its own beat. No gap between words is now longer than about a tenth
+  of a second.
+
 ## v0.98 (2026-11-13)
 - More natural Legion voices: the lines are now spoken by Kokoro, an open neural voice that sounds far
   less robotic than the old one, by two different men (one British, one deep) instead of one voice
