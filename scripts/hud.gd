@@ -900,24 +900,36 @@ func show_army(key: String) -> void:
 			r.plus.disabled = n >= int(r.u.max) or cost + int(r.u.cost) > GameData.BUDGET or army.size() >= GameData.MAX_UNITS
 		start.disabled = army.is_empty() or cost > GameData.BUDGET
 	var bh := 40.0 if main.touch_mode else 28.0
+	army_boxes.clear()
 	for u in GameData.units(key):
+		# each unit in a box: tap anywhere on it (but the - and + buttons) to see it in the preview
+		var box := PanelContainer.new()
+		box.add_theme_stylebox_override("panel", _unit_box_style(false))
+		box.mouse_filter = Control.MOUSE_FILTER_STOP
+		list.add_child(box)
+		var uu: Dictionary = u
+		army_boxes[u.id] = box
+		box.gui_input.connect(func(e):
+			if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and not e.pressed:
+				show_unit_preview(key, uu))
+		box.mouse_entered.connect(func(): if box.get_meta("chosen", false) == false: box.add_theme_stylebox_override("panel", _unit_box_style(false, true)))
+		box.mouse_exited.connect(func(): if box.get_meta("chosen", false) == false: box.add_theme_stylebox_override("panel", _unit_box_style(false)))
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
-		list.add_child(row)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(row)
 		var info := VBoxContainer.new()
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.add_theme_constant_override("separation", 0)
+		info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(info)
-		var nm := LinkButton.new()  # tap the name: a picture of the unit and its unit card
+		var nm := Label.new()
 		nm.text = "%s   (%d pts, up to %d)" % [u.name, u.cost, u.max]
-		nm.underline = LinkButton.UNDERLINE_MODE_ON_HOVER
-		nm.focus_mode = Control.FOCUS_NONE
 		nm.add_theme_color_override("font_color", Color(0.92, 0.86, 0.7))
-		nm.add_theme_color_override("font_hover_color", Color(1.0, 0.85, 0.5))
-		var uu: Dictionary = u
-		nm.pressed.connect(func(): show_unit_preview(key, uu))
+		nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		info.add_child(nm)
 		var ab := Label.new()
+		ab.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ab.text = u.about
 		ab.add_theme_font_size_override("font_size", 11)
 		ab.add_theme_color_override("font_color", Color(0.65, 0.62, 0.55))
@@ -929,6 +941,8 @@ func show_army(key: String) -> void:
 		minus.focus_mode = Control.FOCUS_NONE
 		row.add_child(minus)
 		var count := Label.new()
+		count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		count.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		count.custom_minimum_size = Vector2(24, 0)
 		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		row.add_child(count)
@@ -992,12 +1006,31 @@ func show_army(key: String) -> void:
 ## vehicles) drawn as they look in battle, the carrier they ride in, and the unit card. It stays
 ## open on the screen and changes as other names are tapped.
 var preview_box: Container = null
+var army_boxes := {}  # unit id -> its box on the Muster screen
+
+
+func _unit_box_style(chosen: bool, hover := false) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.24, 0.19, 0.12) if chosen else (Color(0.17, 0.14, 0.1) if hover else Color(0.12, 0.1, 0.08))
+	sb.border_color = Color(0.9, 0.72, 0.38) if chosen else BRASS.darkened(0.35)
+	sb.set_border_width_all(2 if chosen else 1)
+	sb.set_corner_radius_all(4)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 6
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	return sb
 var preview_card: UnitCard = null
 
 
 func show_unit_preview(faction: String, u: Dictionary) -> void:
 	if preview_box == null or not is_instance_valid(preview_box):
 		return
+	for id in army_boxes:  # light up the box of the unit shown
+		var bx: PanelContainer = army_boxes[id]
+		if is_instance_valid(bx):
+			bx.set_meta("chosen", id == u.id)
+			bx.add_theme_stylebox_override("panel", _unit_box_style(id == u.id))
 	for c in preview_box.get_children():
 		preview_box.remove_child(c)
 		c.queue_free()
@@ -1044,7 +1077,7 @@ func show_unit_preview(faction: String, u: Dictionary) -> void:
 	var cols := bodies.size() if bodies.size() <= 4 or bodies[0].is_vehicle else ceili(bodies.size() / 2.0)
 	var cell := Vector2.ZERO
 	for b in bodies:
-		cell.x = maxf(cell.x, (b.length + 16.0) if b.is_vehicle else b.radius * 2.0 + 18.0)
+		cell.x = maxf(cell.x, (b.length + 16.0) if b.is_vehicle else b.radius * 2.0 + (40.0 if b.heavy or b.mortar else 18.0))
 		cell.y = maxf(cell.y, (b.width + 12.0) if b.is_vehicle else b.radius * 2.0 + 14.0)
 	var rows := ceili(bodies.size() / float(cols))
 	var block := Vector2(cols * cell.x, rows * cell.y)

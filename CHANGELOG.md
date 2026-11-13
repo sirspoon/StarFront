@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.95 (2026-11-13)
+- Muster screen: each unit is in its own box; tap or click anywhere on the box (apart from its - and +)
+  to show it in the preview. The box being shown is highlighted, and boxes light up under the mouse.
+  Men with heavy guns or mortars get more room in the preview picture.
+
 ## v0.94 (2026-11-13)
 - Fix: support strikes, mortars and grenades no longer carry on during deployment (the computer
   could call its orbital bombardment on you while you were still setting up). Their timers start
