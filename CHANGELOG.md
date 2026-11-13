@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.91 (2026-11-13)
+- Muster screen: tap or click a unit's name to see it up close: its men (or vehicles) drawn as they
+  look in battle, the carrier they ride in on a row of its own, and the unit card, whose tags and
+  icons show their details as in battle.
+
 ## v0.90 (2026-11-13)
 Pick your force.
 - After choosing a side, the Muster screen lists every unit with its points cost, a short description

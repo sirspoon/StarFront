@@ -109,7 +109,7 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `--log-lights` (with `--shot`) prints every light lit when the screenshot is taken (energy, radius, where).
 - Forces: points and limits are `GameData.COSTS` (budget `BUDGET`); `--random-armies` (with `--autotest`) gives both
   sides a random force and prints them (ARMY lines); otherwise test battles use the standard forces. `--shot-army`
-  (with `--shot=file.png`, no `--autotest`) saves the Muster screen.
+  (with `--shot=file.png`, no `--autotest`) saves the Muster screen; add `--shot-unit=N` to open the Nth unit's preview (`--side=sworn` for the Sworn).
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

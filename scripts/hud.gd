@@ -864,8 +864,14 @@ func show_army(key: String) -> void:
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.add_theme_constant_override("separation", 0)
 		row.add_child(info)
-		var nm := Label.new()
+		var nm := LinkButton.new()  # tap the name: a picture of the unit and its unit card
 		nm.text = "%s   (%d pts, up to %d)" % [u.name, u.cost, u.max]
+		nm.underline = LinkButton.UNDERLINE_MODE_ON_HOVER
+		nm.focus_mode = Control.FOCUS_NONE
+		nm.add_theme_color_override("font_color", Color(0.92, 0.86, 0.7))
+		nm.add_theme_color_override("font_hover_color", Color(1.0, 0.85, 0.5))
+		var uu: Dictionary = u
+		nm.pressed.connect(func(): show_unit_preview(key, uu))
 		info.add_child(nm)
 		var ab := Label.new()
 		ab.text = u.about
@@ -930,7 +936,118 @@ func show_army(key: String) -> void:
 	v.add_child(start)
 	refresh.call()
 	if "--shot-army" in OS.get_cmdline_user_args():
+		for a in OS.get_cmdline_user_args():
+			if a.begins_with("--shot-unit="):  # test aid: open one unit's preview for the shot
+				show_unit_preview.call_deferred(key, GameData.units(key)[int(a.get_slice("=", 1))])
 		_shot_whats_new.call_deferred()
+
+
+## A unit from the Muster screen, up close: the men (and any vehicles) drawn as they look in
+## battle, and the unit card. Built from real soldiers, outside the battle.
+var preview_panel: PanelContainer = null
+
+
+func show_unit_preview(faction: String, u: Dictionary) -> void:
+	if preview_panel != null and is_instance_valid(preview_panel):
+		preview_panel.queue_free()
+	var def: Dictionary = u.def
+	var sq := Squad.new()
+	sq.team = 1  # (not the player's: no outlines in the picture)
+	sq.faction = faction
+	sq.name = u.name
+	var bodies: Array = []
+	if def.has("vehicle") or def.has("vehicles"):
+		for k in (def.vehicles if def.has("vehicles") else [def.vehicle]):
+			var v := Vehicle.new()
+			v.setup_vehicle(main, sq, 1, k)
+			if v.engine_sound != null:
+				v.engine_sound.queue_free()
+				v.engine_sound = null
+			sq.members.append(v)
+			bodies.append(v)
+	else:
+		for k in def.members:
+			var s := Soldier.new()
+			s.setup(main, sq, 1, k)
+			sq.members.append(s)
+			bodies.append(s)
+	sq.start_size = sq.members.size()
+	var carrier: Vehicle = null
+	if def.has("carrier"):
+		var csq := Squad.new()
+		csq.faction = faction
+		csq.team = 1
+		carrier = Vehicle.new()
+		carrier.setup_vehicle(main, csq, 1, def.carrier)
+		if carrier.engine_sound != null:
+			carrier.engine_sound.queue_free()
+			carrier.engine_sound = null
+	preview_panel = _centre_panel()
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	preview_panel.add_child(v)
+	var t := Label.new()
+	t.text = u.name
+	t.add_theme_font_size_override("font_size", 20)
+	t.add_theme_color_override("font_color", Color(0.9, 0.76, 0.45))
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(t)
+	# the picture: the men in a row, facing right, on a dark ground (the carrier beside them)
+	var pic := Panel.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.17, 0.16, 0.14)
+	sb.border_color = BRASS.darkened(0.3)
+	sb.set_border_width_all(1)
+	pic.add_theme_stylebox_override("panel", sb)
+	pic.clip_contents = true
+	var pw := 360.0 if main.touch_mode else 420.0
+	pic.custom_minimum_size = Vector2(pw, 120 if main.touch_mode else 140)
+	v.add_child(pic)
+	var holder := Node2D.new()
+	pic.add_child(holder)
+	var x := 0.0
+	var tall := 0.0
+	var all: Array = bodies.duplicate()
+	for b in all:
+		var w: float = b.length if b.is_vehicle else b.radius * 2.0 + 14.0
+		var hgt: float = b.width if b.is_vehicle else b.radius * 2.0 + 8.0
+		b.position = Vector2(x + w * 0.5 + (6.0 if b.is_vehicle else 0.0), 0)
+		b.facing = 0.0
+		if b.is_vehicle:
+			b.turret_angle = 0.0
+		x += w + (16.0 if b.is_vehicle else 4.0)
+		tall = maxf(tall, hgt)
+		holder.add_child(b)
+	var scale := minf(3.0, minf((pw - 30.0) / maxf(x, 1.0), (pic.custom_minimum_size.y - 24.0) / maxf(tall, 1.0)))
+	holder.scale = Vector2(scale, scale)
+	holder.position = Vector2((pw - x * scale) * 0.5, pic.custom_minimum_size.y * 0.5)
+	if carrier != null:
+		# the carrier they ride in, on a row of its own below
+		var pic2 := pic.duplicate()
+		for ch in pic2.get_children():
+			ch.free()
+		pic2.custom_minimum_size.y = 90.0
+		v.add_child(pic2)
+		var h2 := Node2D.new()
+		pic2.add_child(h2)
+		carrier.facing = 0.0
+		h2.add_child(carrier)
+		h2.scale = Vector2(1.6, 1.6)
+		h2.position = Vector2(pw * 0.5, 42.0)
+	# the unit card
+	var card := UnitCard.new(main.touch_mode)
+	v.add_child(card)
+	card.show_squad(sq, 0)
+	var close := Button.new()
+	close.text = "Close"
+	close.focus_mode = Control.FOCUS_NONE
+	close.custom_minimum_size = Vector2(0, 40 if main.touch_mode else 30)
+	close.pressed.connect(func():
+		if card.popup != null:
+			card.popup.queue_free()
+		preview_panel.queue_free()
+		preview_panel = null)
+	v.add_child(close)
 
 
 func _choose(key: String) -> void:
