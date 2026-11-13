@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.83 (2026-11-13)
+New units: the Legion's Mortar Team and the Sworn's Outrider Squadron.
+- Mortar Team (Legion): three mortars, each with a gunner and a loader (one is the sergeant). They
+  set up on open ground (not under a roof) and lob rounds over walls, so need no sight of the target:
+  - New Target button (reticle, F): then tap a spot for a fire mission; a red reticle marks it. Halt or
+    a move order ends it. Without one they shell the nearest enemies your side can see.
+  - Range 950 (110 minimum). The three tubes fire within about half a second of each other, so the
+    rounds land together as a barrage, every 9 seconds or so. They're inaccurate (more at long range)
+    but each salvo on the same mission lands a little tighter as they range in.
+  - Gun (V) switches HE / smoke. Smoke fires one salvo (three screens), then they go back to HE and
+    the mission ends.
+- Outrider Squadron (Sworn): the first squad of vehicles, three fast, lightly armoured buggies (armour
+  5 / 4 / 4, 6 hull) with a stubber on a turret that swings round quickly. They move as a wedge;
+  the squad list and unit card count all three. Drawn with four wheels, an open cab, a roll cage, a
+  pennant and the gunner at his gun; a damaged one can lose a wheel.
+- Light vehicles count for less of their side's strength (2, against 4 for tanks and carriers).
+- Test battles (12): Legion 8, Sworn 4 (too close to call); the Outriders made about 6 kills a
+  battle and the mortars about 2.5.
+
 ## v0.82 (2026-11-13)
 Smoother as the battle goes on, and when the lumen lance fires.
 - Ground marks (blood, burns, scorches, track ruts) were one big drawing, redrawn whole whenever a

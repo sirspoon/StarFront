@@ -5,6 +5,7 @@ extends RefCounted
 ## When a whole version is reached (1.0, 2.0 ...), start a new heading for it.
 
 const TEXT := """PROTOTYPE (before 1.0)
+- Legion Mortar Team (indirect fire barrages, HE or smoke, Target button) and Sworn Outrider Squadron (three fast gun buggies)
 - Foundry District battles are fought for the Prime Factorium: a big L-shaped works with an engine room and a machine hall
 - Faint outlines on your own troops (stronger when paused); a lighting strength option for brighter flashes and deeper shadows
 - Tidier command bar with icons: only the orders for what's selected, showing what each is set to; solid facing arrows

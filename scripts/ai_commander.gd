@@ -22,7 +22,7 @@ func tick(dt: float) -> void:
 		return
 	timer = randf_range(2.0, 3.0)
 	for sq in main.squads:
-		if sq.team == team:
+		if sq.team == team and not sq.no_ai:
 			_think(sq)
 
 
@@ -40,6 +40,8 @@ func _think_vehicle(v: Vehicle) -> void:
 		return
 	var c := v.position
 	var goal := _goal(v.squad)
+	var idx: int = v.squad.members.find(v)
+	goal += Vector2(0, (idx - 1) * 70.0) if v.squad.members.size() > 1 else Vector2.ZERO  # a squadron spreads out
 	var enemy: Soldier = main.nearest_seen_enemy(team, c)
 	var d: float = INF if enemy == null else c.distance_to(enemy.position)
 	if v.passengers.size() > 0:
@@ -64,7 +66,8 @@ func _think_vehicle(v: Vehicle) -> void:
 func _think(sq: Squad) -> void:
 	var v = sq.vehicle()
 	if v != null:
-		_think_vehicle(v)
+		for o in sq.vehicles():
+			_think_vehicle(o)
 		return
 	var ready := sq.effective()
 	if ready.is_empty():
@@ -74,6 +77,9 @@ func _think(sq: Squad) -> void:
 		return  # busy throwing
 	if ready.any(func(m): return m.charger):
 		_think_assault(sq, ready, c)
+		return
+	if sq.has_mortars():
+		_think_mortar(sq, ready, c)
 		return
 	if ready.any(func(m): return m.heavy):
 		if _think_heavy(sq, ready, c):
@@ -111,6 +117,27 @@ func _think(sq: Squad) -> void:
 	if c.distance_to(goal) < 50.0:
 		return
 	sq.order_move(main.map, c.move_toward(goal, 260.0), enemy == null and c.distance_to(goal) > 450.0)
+
+
+## Mortar teams stay back: once enemies are within reach they stop and fire (the barrage
+## picks its own targets, see Mortars); otherwise they move up behind the line, keeping
+## well clear of the enemy.
+func _think_mortar(sq: Squad, ready: Array, c: Vector2) -> void:
+	if ready.any(func(m): return m.moving):
+		return
+	var enemy: Soldier = main.nearest_seen_enemy(team, c)
+	var reach: float = GameData.WEAPONS.mortar.range
+	if enemy != null:
+		var d := c.distance_to(enemy.position)
+		sq.facing = (enemy.position - c).normalized()
+		if d < 330.0:
+			sq.order_move(main.map, c + (c - enemy.position).normalized() * 160.0, true)  # too close: fall back
+			return
+		if d < reach * 0.8:
+			return
+	var goal := _goal(sq)
+	if c.distance_to(goal) > reach * 0.6:
+		sq.order_move(main.map, c.move_toward(goal, 200.0), false)
 
 
 ## Assault troops close in on the nearest enemy foot soldiers, from cover to cover while

@@ -69,6 +69,16 @@ func _draw() -> void:
 	for sq in main.squads:
 		if sq.team == main.player_team and (sq.selected or main.paused):
 			_draw_route(sq)
+		if sq.team == main.player_team and sq.fire_mission != null:
+			# the mortars' fire mission: a red reticle on the spot, and a faint line to it when selected
+			var fm: Vector2 = sq.fire_mission
+			var z: float = 1.0 / main.camera.zoom.x
+			var fcol := Color(1.0, 0.4, 0.3, 0.9)
+			draw_arc(fm, 14.0 * z, 0, TAU, 24, fcol, 2.0 * z)
+			for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+				draw_line(fm + d * 7.0 * z, fm + d * 20.0 * z, fcol, 2.0 * z)
+			if sq.selected and not sq.alive().is_empty():
+				draw_dashed_line(sq.center(), fm, Color(1.0, 0.4, 0.3, 0.35), 1.5 * z, 10.0 * z)
 	for sq in main.squads:
 		if not sq.selected or sq.vehicle() != null:
 			continue

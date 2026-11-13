@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.82"
+const VERSION := "0.83"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -31,6 +31,13 @@ const WEAPONS := {
 	"lumen_pulse": {"name": "Lumen lance (pulse)", "range": 560.0, "cooldown": 2.4, "burst": 4, "gap": 0.22,
 		"acc": 0.3, "ap": 0.6, "dmg": 2, "pen": 5, "vdmg": 1, "supp": 16.0, "tracer": Color(1.0, 0.5, 0.22), "width": 3.4,
 		"light": true, "mode": "Pulse"},
+	# indirect fire: lobbed over walls at a spot (no sight needed), inaccurate; see Mortars
+	"mortar": {"name": "Mortar", "range": 950.0, "min_range": 110.0, "cooldown": 9.0, "burst": 1, "gap": 0.0,
+		"acc": 0.3, "ap": 0.35, "dmg": 2, "pen": 4, "vdmg": 2, "blast": 30.0, "wall": 45.0, "supp": 45.0,
+		"indirect": true, "tracer": Color(0.9, 0.8, 0.6), "width": 2.0},
+	# the Outriders' turret gun: a rapid-firing mass-reactive stubber
+	"mass_stubber": {"name": "Mass stubber", "range": 420.0, "cooldown": 2.2, "burst": 6, "gap": 0.08,
+		"acc": 0.2, "ap": 0.35, "dmg": 2, "pen": 3, "vdmg": 1, "supp": 11.0, "tracer": Color(0.6, 0.85, 1.0), "width": 2.0},
 	"siege_cannon": {"name": "Siege cannon", "range": 620.0, "cooldown": 5.0, "burst": 1, "gap": 0.0,
 		"acc": 0.5, "ap": 0.6, "dmg": 3, "pen": 9, "vdmg": 6, "blast": 42.0, "wall": 80.0, "supp": 40.0,
 		"tracer": Color(1.0, 0.9, 0.6), "width": 3.5},
@@ -114,6 +121,12 @@ const SOLDIERS := {
 		"radius": 7.0, "weapon": "heavy_lumen", "heavy": true, "grenades": {}},
 	"hw_loader": {"name": "Loader", "hp": 1, "armor": 0.1, "speed": 42.0, "morale": 70.0, "nerve": 1.0,
 		"radius": 7.0, "weapon": "lumen_rifle", "loader": true, "grenades": {"he": 1}},
+	"mortar_gunner": {"name": "Mortar Gunner", "hp": 1, "armor": 0.1, "speed": 38.0, "morale": 70.0, "nerve": 1.0,
+		"radius": 7.0, "weapon": "mortar", "mortar": true, "grenades": {}},
+	"mortar_loader": {"name": "Mortar Loader", "hp": 1, "armor": 0.1, "speed": 42.0, "morale": 70.0, "nerve": 1.0,
+		"radius": 7.0, "weapon": "lumen_rifle", "mortar_loader": true, "grenades": {"he": 1}},
+	"mortar_sgt": {"name": "Mortar Sergeant", "hp": 1, "armor": 0.2, "speed": 42.0, "morale": 80.0, "nerve": 0.9,
+		"radius": 7.0, "weapon": "lumen_rifle", "leader": true, "mortar_loader": true, "grenades": {"he": 1, "smoke": 2}},
 	"brother": {"name": "Sworn Brother", "hp": 3, "armor": 0.5, "speed": 38.0, "morale": 95.0, "nerve": 0.5,
 		"radius": 10.0, "weapon": "mass_carbine", "grenades": {"he": 1, "ap": 1}},
 	"cannoneer": {"name": "Sworn Cannoneer", "hp": 3, "armor": 0.5, "speed": 34.0, "morale": 95.0, "nerve": 0.5,
@@ -148,6 +161,11 @@ const VEHICLES := {
 	"pilgrim": {"name": "Pilgrim Carrier", "role": "carrier", "hp": 9, "armour": [6, 5, 4], "speed": 50.0, "launcher": true,
 		"turn": 1.5, "length": 52.0, "width": 32.0, "capacity": 6,
 		"weapons": [{"weapon": "rotor_cannon", "mount": Vector2(8, 0)}]},
+	# a fast, lightly armoured recon buggy: four wheels, a roll cage, a turret stubber; they come
+	# as a squad of three (an Outrider Squadron)
+	"outrider": {"name": "Outrider", "role": "buggy", "hp": 6, "armour": [5, 4, 4], "speed": 82.0, "strength": 2,
+		"turn": 2.6, "length": 34.0, "width": 22.0, "capacity": 0,
+		"weapons": [{"weapon": "mass_stubber", "turret": true}]},
 	"verdict": {"name": "Verdict Tank", "role": "tank", "hp": 14, "armour": [9, 8, 6], "speed": 32.0,
 		"turn": 0.9, "length": 64.0, "width": 40.0, "capacity": 0,
 		"weapons": [{"weapon": "fusion_cannon", "alt": "fusion_cannon_he", "turret": true}, {"weapon": "rotor_cannon", "mount": Vector2(18, -13)}]},
@@ -170,6 +188,7 @@ const FACTIONS := {
 			{"name": "Heavy Gun Team", "members": ["hw_gunner", "hw_loader"]},
 			{"name": "Stubber Team", "members": ["sergeant", "gunner", "gunner"]},
 			{"name": "Lance Team", "members": ["sergeant", "lancer", "lancer"]},
+			{"name": "Mortar Team", "members": ["mortar_gunner", "mortar_sgt", "mortar_gunner", "mortar_loader", "mortar_gunner", "mortar_loader"]},
 			{"vehicle": "vigil"},
 		],
 	},
@@ -186,6 +205,7 @@ const FACTIONS := {
 			{"name": "Pyre Warden", "members": ["pyre_warden"]},
 			{"name": "Bastion Brother", "members": ["bastion"]},
 			{"name": "Breacher Talon", "members": ["champion", "brother", "breacher", "breacher"]},
+			{"name": "Outrider Squadron", "vehicles": ["outrider", "outrider", "outrider"]},
 			{"vehicle": "verdict"},
 		],
 	},

@@ -20,6 +20,12 @@ var fire_log: Array = []     # recent incoming fire: [time, direction]
 var queue: Array = []   # orders still to come: {kind: "move"/"line", a, b, face, run}
 var current = null      # the order being carried out now (for drawing the route), or null
 var grenade_order = null  # a throw the squad has been told to make (see Grenades), or null
+# mortars (see Mortars)
+var fire_mission = null   # the spot the player told the mortars to shell (Vector2), or null
+var mortar_kind := "he"   # the round loaded: "he" or "smoke" (smoke: one salvo, then back to HE)
+var barrage_t := 0.0      # seconds until the next salvo
+var ranging := 0          # salvos fired at the current mission: each lands a little tighter
+var no_ai := false        # test aid: the computer leaves this squad alone
 
 ## Squad coherency, as in Epik: every soldier must be within this distance of
 ## another, forming one connected group. Stragglers make their way back.
@@ -33,8 +39,19 @@ func leader() -> Soldier:
 	return null
 
 
+## The squad's vehicle (for a squad of several, the first one still running).
 func vehicle():
-	return members[0] if members.size() > 0 and members[0].is_vehicle else null
+	if members.is_empty() or not members[0].is_vehicle:
+		return null
+	for m in members:
+		if m.is_alive():
+			return m
+	return members[0]
+
+
+## All the squad's vehicles (one for a tank or carrier, three for an Outrider squadron).
+func vehicles() -> Array:
+	return members.filter(func(m): return m.is_vehicle)
 
 
 ## The carrier this squad is riding in, if every surviving man is aboard.
@@ -91,7 +108,12 @@ func leader_bonus(s: Soldier) -> float:
 func avg_morale() -> float:
 	var v = vehicle()
 	if v != null:
-		return float(maxi(v.hp, 0)) / v.max_hp
+		var hp := 0
+		var mx := 0
+		for o in vehicles():
+			hp += maxi(o.hp, 0)
+			mx += o.max_hp
+		return float(hp) / maxi(mx, 1)
 	var al := alive()
 	if al.is_empty():
 		return 0.0
@@ -104,13 +126,14 @@ func avg_morale() -> float:
 func status() -> String:
 	var v = vehicle()
 	if v != null:
-		if not v.is_alive():
+		var vs := vehicles().filter(func(o): return o.is_alive())
+		if vs.is_empty():
 			return "Destroyed"
-		if v.shaken > 0.0:
+		if vs.any(func(o): return o.shaken > 0.0):
 			return "Shaken"
-		if v.moving:
+		if vs.any(func(o): return o.moving):
 			return "Moving"
-		return "Firing" if v.is_firing() else "Ready"
+		return "Firing" if vs.any(func(o): return o.is_firing()) else "Ready"
 	var al := alive()
 	if al.is_empty():
 		return "Aboard" if carrier() != null else "Lost"
@@ -224,7 +247,7 @@ func set_final_facing(dir: Vector2) -> void:
 func busy() -> bool:
 	var v = vehicle()
 	if v != null:
-		return v.is_alive() and v.path_i < v.path.size()
+		return vehicles().any(func(o): return o.is_alive() and o.path_i < o.path.size())
 	for m in members:
 		if m.is_alive() and m.state != Soldier.State.ROUTING and m.path_i < m.path.size():
 			return true
@@ -327,9 +350,20 @@ func order_move(map: BattleMap, pos: Vector2, run: bool, from_queue := false, ke
 		current = null
 	running = run
 	fire_point = null
+	fire_mission = null  # mortars on the move can't fire
 	var v = vehicle()
 	if v != null:
-		v.go_to(pos, run)
+		var vs := vehicles().filter(func(o): return o.is_alive())
+		if vs.size() == 1:
+			v.go_to(pos, run)
+			return
+		# a squadron: a wedge, the lead at the spot and the others back to either side
+		var c := center()
+		var dir := (pos - c).normalized() if pos.distance_to(c) > 1.0 else Vector2.from_angle(v.facing)
+		for i in vs.size():
+			var row := (i + 1) / 2
+			var sgn := 1.0 if i % 2 == 1 else -1.0
+			vs[i].go_to(pos - dir * 45.0 * row + dir.orthogonal() * 50.0 * row * sgn, run)
 		return
 	for m in members:
 		m.board_vehicle = null
@@ -343,7 +377,7 @@ func order_move(map: BattleMap, pos: Vector2, run: bool, from_queue := false, ke
 		for m in ms:
 			m.go_to(clamp_coherent(m, pos + Vector2(randf_range(-6, 6), randf_range(-6, 6))), run)
 		return
-	var slots := pick_slots(map, pos, ms.size(), facing)
+	var slots := pick_slots(map, pos, ms.size(), facing, has_mortars())
 	_assign(ms, slots, run)
 
 
@@ -403,6 +437,8 @@ func _assign(ms: Array, slots: Array, run: bool) -> void:
 ## (A sniper's long-range rifle will rank high on reach alone.)
 static func gun_value(m: Soldier) -> float:
 	var w: Dictionary = GameData.WEAPONS[m.data.weapon]
+	if m.mortar:
+		return 0.0  # a mortar wants open ground, not a window
 	var v := float(w.range) / 150.0
 	if m.data.get("heavy", false):
 		v += 3.0
@@ -584,9 +620,8 @@ func set_assault(on: bool) -> void:
 	for m in members:
 		if m.is_alive() and m.state != Soldier.State.ROUTING:
 			m.running = on
-	var v = vehicle()
-	if v != null:
-		v.running = on
+	for o in vehicles():
+		o.running = on
 	for o in queue:
 		o.run = on
 	if current != null:
@@ -599,8 +634,13 @@ func set_prone(on: bool) -> void:
 		set_assault(false)
 
 
+func has_mortars() -> bool:
+	return members.any(func(m): return m.mortar)
+
+
 func halt() -> void:
 	grenade_order = null
+	fire_mission = null
 	queue.clear()
 	current = null
 	focus = null
@@ -620,7 +660,7 @@ func order_board(v) -> void:
 
 ## Spots around pos for n soldiers, preferring cover (from dir, if given) and
 ## keeping them spread out.
-func pick_slots(map: BattleMap, pos: Vector2, n: int, dir := Vector2.ZERO) -> Array[Vector2]:
+func pick_slots(map: BattleMap, pos: Vector2, n: int, dir := Vector2.ZERO, open_sky := false) -> Array[Vector2]:
 	var c0 := map.nearest_walkable(map.cell_of(pos))
 	var cands: Array = []
 	for dx in range(-4, 5):
@@ -629,7 +669,10 @@ func pick_slots(map: BattleMap, pos: Vector2, n: int, dir := Vector2.ZERO) -> Ar
 			var d := Vector2(dx, dy).length()
 			if d > 4.5 or not map.walkable(c) or map.get_t(c) == BattleMap.T.LOW:
 				continue
-			cands.append([map.cell_cover_dir(c, dir) * 4.0 - d * 0.6 + randf() * 0.3, c])
+			var score := map.cell_cover_dir(c, dir) * 4.0 - d * 0.6 + randf() * 0.3
+			if open_sky and map.roof_at(c) > 0.0:
+				score -= 20.0  # mortars need open sky over them: not under a roof
+			cands.append([score, c])
 	cands.sort_custom(func(a, b): return a[0] > b[0])
 	var chosen: Array[Vector2i] = []
 	for cand in cands:

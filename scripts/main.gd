@@ -15,6 +15,8 @@ var map_view: MapView
 var roofs: Roofs
 var effects: Effects
 var grenades: Grenades
+var mortars: Mortars
+var target_mode := false  # the Target button: the next tap gives the mortars a fire mission
 var grenade_mode := false
 var cover_mode := false   # the Cover view (C): colours the ground by the cover it gives
 var cover_view: CoverView  # the next click / tap picks where to throw grenades
@@ -168,6 +170,8 @@ func _ready() -> void:
 			_test_follow()
 		if "--test-voice" in args:
 			_test_voice()
+		if "--test-mortar" in args:
+			_test_mortar()
 		if "--test-pace" in args:
 			_test_pace()
 		if "--test-grenades" in args:
@@ -257,6 +261,46 @@ func _test_carrier() -> void:
 ## seconds and report any soldier who didn't go, and why.
 ## Test aid: a squad told to lay smoke out of its reach moves up and throws two grenades;
 ## the screen then blocks sight through it.
+## Test aid: the player's mortar team: a fire mission (HE) at a spot ahead, then smoke.
+func _test_mortar() -> void:
+	var sq: Squad = null
+	for q in _player_squads():
+		if q.has_mortars():
+			sq = q
+	if sq == null:
+		print("mortar test: no mortar team")
+		return
+	sq.no_ai = true
+	var open_spot := sq.center() + Vector2(40 if player_team == 0 else -40, 0)
+	sq.order_move(map, open_spot, false)  # stop and set up (in the open) near where they are
+	await get_tree().create_timer(12.0).timeout
+	var c := sq.center()
+	var spot := c + Vector2(520 if player_team == 0 else -520, 0)
+	var set_up := sq.members.filter(func(m): return m.mortar and m.mortar_set >= 1.0).size()
+	print("mortar test: %d tubes set up; HE mission at %s: %s" % [set_up, spot.round(), mortars.order(sq, spot)])
+	var times: Array = []
+	var lands: Array = []
+	for i in 30:
+		await get_tree().create_timer(0.5).timeout
+		for g in grenades.flying:
+			if g.kind == "mortar" and not g.has("seen"):
+				g.seen = true
+				times.append(snappedf(time, 0.1))
+				lands.append(g.to.distance_to(spot))
+		if times.size() >= 6:
+			break
+	print("  rounds fired at %s; landed %s px from the aim" % [times, lands.map(func(d): return int(d))])
+	sq.mortar_kind = "smoke"
+	print("  smoke mission: %s" % mortars.order(sq, spot + Vector2(0, 80)))
+	var screens0 := grenades.screens.size()
+	for i in 30:
+		await get_tree().create_timer(0.5).timeout
+		if grenades.screens.size() >= screens0 + 3:
+			break
+	await get_tree().create_timer(2.0).timeout
+	print("  smoke screens made: %d; now loaded with %s; mission %s" % [grenades.screens.size() - screens0, sq.mortar_kind, "ended" if sq.fire_mission == null else "still on"])
+
+
 ## Test aid: three squads at different paces; selecting each should show its own pace.
 func _test_pace() -> void:
 	await get_tree().create_timer(2.0).timeout
@@ -678,6 +722,9 @@ func _build_world(seed_value: int) -> void:
 	grenades = Grenades.new()
 	add_child(grenades)
 	grenades.setup(self)
+	mortars = Mortars.new()
+	add_child(mortars)
+	mortars.setup(self)
 	overlay = OverlayScript.new()
 	overlay.main = self
 	overlay.z_index = 10
@@ -862,6 +909,9 @@ func _spawn_team(team: int) -> void:
 		if def.has("vehicle"):
 			_spawn_vehicle(team, def.vehicle, cy, counts)
 			continue
+		if def.has("vehicles"):
+			_spawn_vehicle_squad(team, def, cy, counts)
+			continue
 		var sq := Squad.new()
 		sq.team = team
 		sq.faction = factions[team]
@@ -884,6 +934,30 @@ func _spawn_team(team: int) -> void:
 			var v := _spawn_vehicle(team, def.carrier, cy, counts)
 			for s in sq.members:
 				v.take_aboard(s)
+
+
+## A squad of vehicles (the Outriders): one squad, several vehicles, side by side.
+func _spawn_vehicle_squad(team: int, def: Dictionary, cy: int, counts: Dictionary) -> void:
+	var sq := Squad.new()
+	sq.team = team
+	sq.faction = factions[team]
+	counts[def.name] = counts.get(def.name, 0) + 1
+	sq.name = "%s %s" % [def.name, GameData.NUMERALS[counts[def.name] - 1]]
+	var cx := 11 if team == 0 else BattleMap.W - 12
+	var kinds: Array = def.vehicles
+	for i in kinds.size():
+		var v := Vehicle.new()
+		v.setup_vehicle(self, sq, team, kinds[i])
+		var c := Vector2i(cx + (i % 2) * (2 if team == 0 else -2), cy + (i - (kinds.size() - 1) / 2) * 3)
+		v.position = map.center_of(map.nearest_vehicle_cell(c))
+		v.facing = 0.0 if team == 0 else PI
+		v.turret_angle = v.facing
+		units_layer.add_child(v)
+		soldiers.append(v)
+		sq.members.append(v)
+		start_counts[team] += v.strength
+	sq.start_size = kinds.size()
+	squads.append(sq)
 
 
 func _spawn_vehicle(team: int, kind_id: String, cy: int, counts: Dictionary) -> Vehicle:
@@ -2017,6 +2091,9 @@ func _end(winner: int, reason: String) -> void:
 ## Switch the main gun setting of the selected tanks (beam / pulse, AP / HE).
 func switch_guns() -> void:
 	for sq in _player_squads():
+		if sq.selected and sq.has_mortars():
+			sq.mortar_kind = "smoke" if sq.mortar_kind == "he" else "he"
+			log_message("[color=#e8c070]%s: mortars loaded with %s[/color]" % [sq.name, "smoke" if sq.mortar_kind == "smoke" else "HE"])
 		var v = sq.vehicle()
 		if sq.selected and v != null and v.is_alive() and v.gun_mode() != "":
 			var m: String = v.switch_gun()
@@ -2125,7 +2202,9 @@ func _unhandled_input(e: InputEvent) -> void:
 			MOUSE_BUTTON_LEFT:
 				if not started or over:
 					return
-				if mb.pressed and grenade_mode:
+				if mb.pressed and target_mode:
+					_order_target(wp)
+				elif mb.pressed and grenade_mode:
 					_order_grenade(wp)
 				elif mb.pressed and face_mode:
 					_order_face(wp)
@@ -2187,6 +2266,9 @@ func _unhandled_input(e: InputEvent) -> void:
 		elif k == KEY_T:
 			grenade_mode = not grenade_mode
 			hud.sync_touch("Grenade", grenade_mode)
+		elif k == KEY_F:
+			target_mode = not target_mode
+			hud.sync_touch("Target", target_mode)
 		elif k >= KEY_1 and k <= KEY_9:
 			var mine := _player_squads()
 			var i := k - KEY_1
@@ -2278,6 +2360,18 @@ func _plan(kind: String, a: Vector2, b: Vector2, final: bool, face_override := V
 
 
 ## The selected squads answer an order (only the Sworn have voices so far).
+## A fire mission for the selected mortar teams at a picked spot.
+func _order_target(wp: Vector2) -> void:
+	target_mode = false
+	hud.sync_touch("Target", false)
+	for sq in _player_squads():
+		if sq.selected and sq.has_mortars():
+			var msg := mortars.order(sq, wp)
+			if msg != "":
+				log_message("[color=#e8c070]%s[/color]" % msg)
+	effects.marker(wp, Color(1.0, 0.45, 0.3))
+
+
 ## Grenades at a picked spot: each selected squad throws what suits it (see Grenades).
 func _order_grenade(wp: Vector2) -> void:
 	grenade_mode = false
@@ -2630,6 +2724,9 @@ func _pinch_begin() -> void:
 func _tap(wp: Vector2, screen := Vector2.ZERO) -> void:
 	if not started or over:
 		return
+	if target_mode:
+		_order_target(wp)
+		return
 	if grenade_mode:
 		_order_grenade(wp)
 		return
@@ -2776,6 +2873,8 @@ func touch_button(key: String, on: bool) -> void:
 			face_mode = on
 		"Grenade":
 			grenade_mode = on
+		"Target":
+			target_mode = on
 		"Cover":
 			cover_mode = on
 			hud.show_cover_key(on)

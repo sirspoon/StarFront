@@ -174,7 +174,7 @@ func _build_touch_bar() -> void:
 	panel.add_child(touch_bar)
 	# orders for what's selected (only those that apply are shown), then a gap, then the
 	# buttons that are always there
-	for spec in [["Pace", false], ["Gun", false], ["Grenade", true], ["Unload", false], ["Face", true], ["Halt", false],
+	for spec in [["Pace", false], ["Gun", false], ["Target", true], ["Grenade", true], ["Unload", false], ["Face", true], ["Halt", false],
 			["|", false], ["Cover", true], ["Squads", true], ["Pause", true], ["Menu", false]]:
 		if spec[0] == "|":
 			var gap := VSeparator.new()
@@ -212,10 +212,11 @@ var bar_panel: PanelContainer
 var bar_icons := {}
 var last_sel_sig := ""
 var bar_gap: Control
-const HINTS := {"Pace": "R/G", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "Menu": "Esc"}
+const HINTS := {"Pace": "R/G", "Target": "F", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "Menu": "Esc"}
 const TIPS := {"Pace": "Pace (tap to change): crouched and walking; running (faster, charge into close combat, but fire less and easier to hit); or lying down (much harder to hit, crawl when moving)",
 		"Gun": "Switch the gun setting: a tank's main gun (beam / pulse, AP / HE), or the round a carrier's launchers fire (HE / smoke)",
 		"Grenade": "Then tap a spot: infantry throw frags at men, tank-breakers at armour, smoke on open ground; carriers fire a salvo of the loaded round",
+		"Target": "Then tap a spot: the mortars shell it (no sight needed). Halt or a move order ends the mission",
 		"Unload": "Passengers get out", "Face": "Then drag: which way the squad faces", "Halt": "Stop and forget orders",
 		"Cover": "Show where the cover is", "Squads": "Show the squad list", "Pause": "Pause (orders still work)", "Menu": "Restart, options, controls"}
 
@@ -241,6 +242,7 @@ func _context_buttons() -> void:
 	if touch_buttons.is_empty():
 		return
 	var inf := false
+	var mortars := false
 	var any := false
 	var grenades := false
 	var unload := false
@@ -267,6 +269,10 @@ func _context_buttons() -> void:
 			for k in ["he", "ap", "smoke"]:
 				if sq.grenade_count(k) > 0:
 					grenades = true
+			if sq.has_mortars():
+				mortars = true
+				if mode == "":
+					mode = "HE" if sq.mortar_kind == "he" else "Smoke"
 	var sel_sig := ""
 	for sq in main.squads:
 		if sq.selected:
@@ -274,7 +280,7 @@ func _context_buttons() -> void:
 	if sel_sig != last_sel_sig:
 		last_sel_sig = sel_sig
 		main.sync_pace_to_selection()
-	var show := {"Pace": inf, "Gun": mode != "", "Grenade": grenades, "Unload": unload,
+	var show := {"Pace": inf, "Gun": mode != "", "Target": mortars, "Grenade": grenades, "Unload": unload,
 			"Face": any, "Halt": any}
 	var changed := false
 	for k in show:
@@ -282,7 +288,7 @@ func _context_buttons() -> void:
 		if b.visible != show[k]:
 			b.visible = show[k]
 			changed = true
-			if not show[k] and b.toggle_mode and b.button_pressed and k in ["Grenade", "Face"]:
+			if not show[k] and b.toggle_mode and b.button_pressed and k in ["Grenade", "Face", "Target"]:
 				b.button_pressed = false  # (switches the mode off too)
 		bar_icons[k].set_variant(mode if k == "Gun" else (main.pace_state() if k == "Pace" else ("on" if b.button_pressed else "")))
 	bar_icons["Pause"].set_variant("paused" if main.paused else "")
@@ -458,7 +464,12 @@ func _refresh() -> void:
 			r.bar.value = sq.avg_morale()
 			var v = sq.vehicle()
 			if v != null:
-				r.label.text = "Hull %d/%d  %s" % [maxi(v.hp, 0), v.max_hp, st]
+				var hp := 0
+				var mx := 0
+				for o in sq.vehicles():
+					hp += maxi(o.hp, 0)
+					mx += o.max_hp
+				r.label.text = "Hull %d/%d  %s" % [hp, mx, st]
 				if v.gun_mode() != "":
 					r.label.text += "  " + v.gun_mode()
 				if v.passengers.size() > 0:

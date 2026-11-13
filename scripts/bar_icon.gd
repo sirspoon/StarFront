@@ -99,6 +99,11 @@ func _icon(c: Color) -> void:
 					draw_colored_polygon(pts, c)
 				_:
 					draw_line(Vector2(2, 12), Vector2(22, 12), c, 3.0)
+		"Target":  # a target reticle: ring, cross hairs, a dot at the centre
+			draw_arc(Vector2(12, 12), 7.5, 0, TAU, 24, c, 2.0)
+			for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+				draw_line(Vector2(12, 12) + d * 4.0, Vector2(12, 12) + d * 11.0, c, 2.0)
+			draw_circle(Vector2(12, 12), 1.6, c)
 		"Grenade":  # a "pineapple": a segmented oval body, the fuse top, its spoon and ring
 			var body := PackedVector2Array()
 			for k in 20:

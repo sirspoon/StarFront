@@ -74,6 +74,8 @@ const SETUP_TIME := 2.5       # seconds to set a heavy gun up
 const ARC := 1.3              # once set up it covers this far either side (radians) without moving it
 var heavy := false            # carries a heavy gun (the loader takes it over if the gunner falls)
 var setup_t := 0.0            # 0..1: how far the gun is set up
+var mortar := false           # crews a mortar (fired by the squad, see Mortars)
+var mortar_set := 0.0         # 0..1: how far the mortar is set up (base plate down, laid)
 var deploy_dir := 0.0         # the way it was set up facing
 const MAG := 5                # long bursts in a load of ammunition
 const RELOAD := 3.0           # seconds for the loader to change it...
@@ -96,6 +98,7 @@ func setup(m: Node, sq: Squad, t: int, kind_id: String) -> void:
 	charger = data.get("charger", false)
 	grenades = data.get("grenades", {}).duplicate()
 	heavy = data.get("heavy", false)
+	mortar = data.get("mortar", false)
 	hp = data.hp
 	max_hp = hp
 	armor = data.armor
@@ -204,6 +207,13 @@ func tick(dt: float, now: float) -> void:
 		charging = null
 	if heavy:
 		_update_setup(dt)
+	if mortar:
+		# the base plate goes down and the tube is laid once he stops (quicker with a loader by him)
+		if moving or state == State.ROUTING or in_melee:
+			mortar_set = 0.0
+		else:
+			var helper := squad.members.any(func(o): return o != self and o.is_alive() and o.data.get("mortar_loader", false) and o.position.distance_to(position) < 40.0)
+			mortar_set = minf(1.0, mortar_set + dt / (3.0 if helper else 4.5))
 	_update_posture(dt)
 	if bleeding > 0.0:
 		bleeding -= dt
@@ -226,7 +236,7 @@ func refresh_look() -> void:
 	# turning shows in 5-degree steps and the stride at about 7 frames a second: plenty at this
 	# size, and far fewer redraws when a whole army is on the move
 	var k := hash([int(facing * 12.0), posture, int(lean * 4.0), squad.selected, squad.sub.has(self), state, hp,
-			flash > 0.0, int(swing * 4.0), int(walk * 0.6) if moving else -1, int(setup_t * 4.0), in_melee,
+			flash > 0.0, int(swing * 4.0), int(walk * 0.6) if moving else -1, int(setup_t * 4.0) + int(mortar_set * 4.0) * 7, in_melee,
 			charging != null, squad.prone, reload_t > 0.0, main.camera.zoom.x < LOD_ZOOM, main.paused and team == main.player_team])
 	if k != _look or main.always_draw:
 		_look = k
@@ -399,6 +409,8 @@ func _follow_path(dt: float, fleeing: bool) -> void:
 
 
 func _fight(dt: float, now: float) -> void:
+	if mortar:
+		return  # the mortar is fired by the squad as a battery (see Mortars)
 	cooldown -= dt
 	if burst_left > 0:
 		burst_timer -= dt
@@ -746,7 +758,9 @@ func _draw_body() -> void:
 		_draw_sworn()
 	else:
 		_draw_conscript()
-	if flash > 0.0:
+	if mortar:
+		_draw_mortar(r)
+	if flash > 0.0 and not mortar:
 		var m := Vector2(radius + 10.0, 3.0)
 		var pts := PackedVector2Array()
 		for i in 8:
@@ -828,6 +842,8 @@ func _draw_conscript() -> void:
 	# the weapon
 	if heavy:
 		_draw_heavy_gun(Color(0.42, 0.44, 0.36), Color(1.0, 0.55, 0.25), 5.5, r + 19.0)
+	elif mortar:
+		pass  # (the mortar is drawn on its own, see _draw_mortar)
 	elif raider:
 		_gun(Rect2(r * 0.1, r * 0.3, r + 3.0, 2.6), gunmetal)  # ripper gun, short and stubby
 		draw_circle(Vector2(r * 0.65, r * 0.3 + 3.4), 2.0, Color(0.15, 0.13, 0.1))  # drum
@@ -1060,6 +1076,31 @@ func _draw_sworn() -> void:
 		draw_line(hc - Vector2(hr * 0.2, 0.3), hc - Vector2(hr * 1.5, 0.3), Color(0.95, 0.35, 0.25), 0.5)
 	else:
 		draw_line(hc - Vector2(hr * 0.8, 0), hc + Vector2(hr * 0.3, 0), trim.darkened(0.3), 1.0)  # a ridge
+
+
+## The mortar: set up, a base plate on the ground in front of him with the tube on its bipod,
+## pointing up and out towards the target (a flash and smoke at the muzzle as it fires);
+## on the move, the tube carried over his shoulder.
+func _draw_mortar(r: float) -> void:
+	var metal := Color(0.22, 0.23, 0.21)
+	if mortar_set >= 0.5:
+		var plate := Vector2(r + 5.0, 0.0)
+		draw_circle(plate + Vector2(1.5, 2), 4.6, Color(0, 0, 0, 0.3))
+		draw_circle(plate, 4.2, Color(0.3, 0.3, 0.28))
+		draw_arc(plate, 4.2, 0, TAU, 12, Color(0.1, 0.1, 0.09), 0.8)
+		var muzzle := plate + Vector2(9.0, 0.0)
+		draw_line(plate + Vector2(5.0, -3.5), plate + Vector2(5.0, 3.5), metal, 1.2)  # the bipod
+		draw_line(plate, muzzle, Color(0, 0, 0, 0.35), 5.0)
+		draw_line(plate, muzzle, metal, 3.6)
+		draw_line(plate + Vector2(1, -1), muzzle + Vector2(0, -1), metal.lightened(0.25), 0.8)
+		draw_circle(muzzle, 2.2, metal.lightened(0.1))
+		draw_circle(muzzle, 1.1, Color(0.04, 0.04, 0.04))
+		if flash > 0.0:
+			draw_circle(muzzle, 5.0, Color(1.0, 0.85, 0.5, 0.9))
+			draw_circle(muzzle + Vector2(4, 0), 6.0, Color(0.7, 0.68, 0.64, 0.6))
+	else:
+		draw_line(Vector2(-r * 0.7, -r * 0.55), Vector2(r * 0.8, -r * 0.95), Color(0, 0, 0, 0.3), 4.4)
+		draw_line(Vector2(-r * 0.7, -r * 0.6), Vector2(r * 0.8, -r * 1.0), metal, 3.4)
 
 
 ## A heavy gun: a long, thick barrel; standing on a tripod once it's set up (legs splay

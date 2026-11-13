@@ -63,7 +63,7 @@ func setup_vehicle(m: Node, sq: Squad, t: int, kind_id: String) -> void:
 	capacity = vdata.capacity
 	radius = width * 0.55
 	is_vehicle = true
-	strength = 4
+	strength = int(vdata.get("strength", 4))  # (a light buggy counts for less than a tank)
 	morale = 100.0
 	max_morale = 100.0
 	nerve = 0.0
@@ -78,7 +78,7 @@ func setup_vehicle(m: Node, sq: Squad, t: int, kind_id: String) -> void:
 	engine_sound = m.sfx.make_engine()
 	if engine_sound != null:
 		add_child(engine_sound)
-		engine_sound.pitch_scale = 0.75 if role == "tank" else 0.9
+		engine_sound.pitch_scale = 0.75 if role == "tank" else (1.25 if role == "buggy" else 0.9)
 		engine_sound.autoplay = true  # starts when the vehicle is placed on the map
 
 
@@ -371,7 +371,7 @@ func tick(dt: float, now: float) -> void:
 	shaken = maxf(0.0, shaken - dt)
 	if engine_sound != null:
 		# revs up and gets louder when moving; the tank is deeper than the carrier
-		var base := 0.85 if role == "tank" else 1.0
+		var base := 0.85 if role == "tank" else (1.35 if role == "buggy" else 1.0)
 		engine_sound.pitch_scale = move_toward(engine_sound.pitch_scale, base * (1.15 if moving else 0.8), dt * 0.4)
 		engine_sound.volume_db = move_toward(engine_sound.volume_db, -8.0 if moving else -16.0, dt * 10.0)
 		rev_cooldown -= dt
@@ -501,6 +501,8 @@ func _run_over(spd: float) -> void:
 
 func _mount_pos(sl: Dictionary) -> Vector2:
 	if sl.turret:
+		if role == "buggy":
+			return position + Vector2.from_angle(facing) * -2.0 + Vector2.from_angle(turret_angle) * 13.0
 		return position + Vector2.from_angle(turret_angle) * (width * 0.35 + 26.0)
 	var m: Vector2 = sl.mount
 	return position + m.rotated(facing) + Vector2.from_angle(sl.angle) * 10.0
@@ -587,7 +589,8 @@ func _aim_and_fire(dt: float, now: float) -> void:
 		sl.burst_timer = 0.0
 		sl.cooldown = sl.weapon.cooldown * randf_range(0.9, 1.15)
 	var tdiff := wrapf(turret_goal - turret_angle, -PI, PI)
-	turret_angle += clampf(tdiff, -1.3 * dt, 1.3 * dt)
+	var tr := 3.2 if role == "buggy" else 1.3  # a buggy's pintle gun swings round fast
+	turret_angle += clampf(tdiff, -tr * dt, tr * dt)
 
 
 func _fire(sl: Dictionary, t: Soldier, now: float) -> void:
@@ -630,17 +633,23 @@ func _draw() -> void:
 		draw_rect(Rect2(-L * 0.5 - 5, -Wd * 0.5 - 5, L + 10, Wd + 10), Color(0.45, 1.0, 0.45, 0.85), false, 1.5)
 	elif team == main.player_team:
 		draw_rect(Rect2(-L * 0.5 - 4, -Wd * 0.5 - 4, L + 8, Wd + 8), Color(1.0, 0.97, 0.88, 0.5 if main.paused else 0.2), false, 1.6 if main.paused else 1.2)
-	_draw_tracks(L, Wd)
-	if faction == "sworn":
-		_draw_sworn_hull(L, Wd)
+	if role == "buggy":
+		_draw_buggy(L, Wd)
+		_draw_damage(L, Wd)
 	else:
-		_draw_legion_hull(L, Wd)
-	_draw_damage(L, Wd)
+		_draw_tracks(L, Wd)
+		if faction == "sworn":
+			_draw_sworn_hull(L, Wd)
+		else:
+			_draw_legion_hull(L, Wd)
+		_draw_damage(L, Wd)
 	for sl in slots:
 		if not sl.turret:
 			_draw_mount(sl)
 	if role == "tank":
 		_draw_turret(Wd)
+	elif role == "buggy":
+		_draw_buggy_gun()
 	draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
 	if squad.selected or hp < max_hp:
 		var bw := L * 0.8
@@ -816,7 +825,7 @@ func _draw_sworn_hull(L: float, Wd: float) -> void:
 func _draw_damage(L: float, Wd: float) -> void:
 	var tw := _tw(Wd)
 	var t: float = main.time
-	if plate_off != 0.0:
+	if plate_off != 0.0 and role != "buggy":
 		var y: float = plate_off * (Wd * 0.5 - tw * 0.5)
 		var bare := Rect2(-L * 0.12, y - tw * 0.55, L * 0.3, tw * 1.1)
 		draw_rect(bare, Color(0.11, 0.1, 0.09))  # the bare hull side under it
@@ -828,7 +837,12 @@ func _draw_damage(L: float, Wd: float) -> void:
 				hp0 + Vector2(-1, plate_off * tw * 0.8)])
 		draw_colored_polygon(hang, colors.coat.darkened(0.35))
 		draw_polyline(hang + PackedVector2Array([hp0]), DARK, 0.8)
-	if track_off != 0.0:
+	if track_off != 0.0 and role == "buggy":
+		# a wheel blown off: the bare hub on its axle
+		var wy: float = track_off * Wd * 0.5
+		draw_rect(Rect2(-L * 0.42, wy - 3.0, 9.0, 6.0), Color(0.15, 0.14, 0.13))
+		draw_circle(Vector2(-L * 0.42 + 4.5, wy), 1.8, Color(0.4, 0.38, 0.35))
+	elif track_off != 0.0:
 		var yc: float = track_off * (Wd * 0.5 - tw * 0.5)
 		# the broken run: a gap, then links trailing out behind
 		draw_rect(Rect2(-L * 0.5, yc - tw * 0.5, L * 0.28, tw), Color(0.16, 0.14, 0.12))
@@ -860,6 +874,73 @@ func _draw_damage(L: float, Wd: float) -> void:
 			var f := 0.6 + 0.4 * sin(t * 13.0 + k * 1.7)
 			draw_circle(p, 3.2 * f + 1.0, Color(1.0, 0.45, 0.1, 0.75))
 			draw_circle(p, 1.6 * f + 0.5, Color(1.0, 0.85, 0.4, 0.9))
+
+
+## The Sworn's Outrider: a low wedge of a hull on four big knobbly wheels, an open cab with
+## the driver behind a slit visor, a roll cage over the back, oath-scroll pennant, and the
+## gunner standing at the pintle stubber (drawn by _draw_buggy_gun).
+func _draw_buggy(L: float, Wd: float) -> void:
+	var coat: Color = colors.coat
+	var trim: Color = colors.trim
+	var spin := fposmod(track_phase * 0.6, 4.0)
+	for sx in [-1.0, 1.0]:  # wheels, sticking out past the body, treads turning
+		for sy in [-1.0, 1.0]:
+			if track_off == sy and sx < 0.0:
+				continue  # that one's gone
+			var wc := Vector2(sx * L * 0.3, sy * (Wd * 0.5 - 1.0))
+			var wr := Rect2(wc - Vector2(5.5, 3.2), Vector2(11, 6.4))
+			draw_rect(wr, Color(0.09, 0.085, 0.08))
+			var x := wr.position.x + spin * 0.5
+			while x < wr.end.x:
+				draw_line(Vector2(x, wr.position.y + 0.6), Vector2(x, wr.end.y - 0.6), Color(0.2, 0.19, 0.17), 1.0)
+				x += 2.0
+			draw_circle(wc, 1.4, Color(0.42, 0.4, 0.36))  # hub
+	# the body: a low wedge, nose forward
+	var body := PackedVector2Array([Vector2(L * 0.5, -Wd * 0.22), Vector2(L * 0.5, Wd * 0.22), Vector2(L * 0.18, Wd * 0.36),
+			Vector2(-L * 0.45, Wd * 0.36), Vector2(-L * 0.5, Wd * 0.25), Vector2(-L * 0.5, -Wd * 0.25), Vector2(-L * 0.45, -Wd * 0.36),
+			Vector2(L * 0.18, -Wd * 0.36)])
+	draw_colored_polygon(body, coat.darkened(0.1))
+	var lit := PackedVector2Array([Vector2(L * 0.5, -Wd * 0.22), Vector2(L * 0.18, -Wd * 0.36), Vector2(-L * 0.45, -Wd * 0.36), Vector2(-L * 0.3, -Wd * 0.18), Vector2(L * 0.3, -Wd * 0.12)])
+	draw_colored_polygon(lit, coat.lightened(0.12))  # the side catching the light
+	var edge := body.duplicate()
+	edge.append(body[0])
+	draw_polyline(edge, DARK, 1.0)
+	# bull bar and headlamps on the nose
+	draw_line(Vector2(L * 0.52, -Wd * 0.25), Vector2(L * 0.52, Wd * 0.25), STEEL.lightened(0.15), 1.6)
+	for sy in [-1.0, 1.0]:
+		draw_circle(Vector2(L * 0.46, sy * Wd * 0.17), 1.5, Color(0.95, 0.85, 0.55))
+	# the open cab: the driver's seat and slit visor
+	draw_rect(Rect2(L * 0.02, -Wd * 0.2, L * 0.2, Wd * 0.4), Color(0.12, 0.08, 0.07))
+	draw_circle(Vector2(L * 0.09, 0), Wd * 0.13, coat.darkened(0.3))  # the driver's helm
+	draw_line(Vector2(L * 0.14, -Wd * 0.05), Vector2(L * 0.14, Wd * 0.05), Color(1.0, 0.3, 0.12), 1.0)
+	# the roll cage over the back
+	var cage := Rect2(-L * 0.42, -Wd * 0.3, L * 0.38, Wd * 0.6)
+	draw_rect(cage, STEEL.darkened(0.2), false, 1.4)
+	draw_line(cage.position, cage.end, STEEL.darkened(0.3), 1.0)
+	draw_line(Vector2(cage.position.x, cage.end.y), Vector2(cage.end.x, cage.position.y), STEEL.darkened(0.3), 1.0)
+	# gilt trim and an oath-scroll pennant streaming from the cage
+	draw_line(Vector2(-L * 0.45, Wd * 0.36), Vector2(L * 0.18, Wd * 0.36), trim.darkened(0.2), 1.0)
+	var pole := Vector2(-L * 0.42, -Wd * 0.3)
+	var flutter := sin(main.time * 9.0 + get_instance_id()) * 1.5
+	draw_colored_polygon(PackedVector2Array([pole, pole + Vector2(-9, -2 + flutter), pole + Vector2(-7, 2 + flutter)]), Color(0.86, 0.8, 0.62))
+
+
+## The Outrider's gunner at his pintle-mounted stubber, swinging round with the gun.
+func _draw_buggy_gun() -> void:
+	var a := turret_angle - facing
+	var mount := Vector2(-length * 0.08, 0)
+	draw_set_transform(Vector2.ZERO, facing, Vector2.ONE)
+	var dir := Vector2.from_angle(a)
+	draw_circle(mount, 5.0, Color(0.1, 0.09, 0.08))  # the ring
+	draw_circle(mount - dir * 2.0, 3.6, colors.coat.darkened(0.25))  # the gunner's shoulders
+	draw_circle(mount - dir * 2.0, 2.2, colors.armour)  # his helm
+	var muzzle := mount + dir * 13.0
+	draw_line(mount + dir * 2.0, muzzle, Color(0, 0, 0, 0.4), 3.6)
+	draw_line(mount + dir * 2.0, muzzle, STEEL.lightened(0.1), 2.4)
+	draw_rect(Rect2(mount + dir * 3.0 - Vector2(2, 2), Vector2(4, 4)), Color(0.3, 0.25, 0.15))  # the ammo box
+	draw_line(mount + dir.orthogonal() * 3.0 + dir * 3.0, mount - dir.orthogonal() * 3.0 + dir * 3.0, STEEL.darkened(0.2), 1.6)  # gun shield
+	if slots[0].flash > 0.0:
+		draw_circle(muzzle + dir * 2.0, 3.0, Color(0.7, 0.9, 1.0, 0.9))
 
 
 func _draw_sunburst(c: Vector2, r: float, col: Color) -> void:

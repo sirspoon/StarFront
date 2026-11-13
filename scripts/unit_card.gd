@@ -25,6 +25,7 @@ const SPECIALS := {
 	"flame": ["Flamer", "Flamer: a jet of fire round cover; sets the scenery alight"],
 	"breach": ["Breacher", "Breaks walls: can shell or blast a way through buildings"],
 	"carrier": ["Carrier", "Carrier: men board it (right click it) and unload (U)"],
+	"indirect": ["Indirect fire", "Mortars: lob rounds over walls, no sight needed (but not from under a roof). Target (F) then tap: a fire mission; otherwise they shell enemies your side can see. Inaccurate, tighter with each salvo on a mission. Gun (V): HE or smoke (one salvo, then back to HE)"],
 	"modes": ["2 settings", "Main gun has two settings: V switches them"],
 	"launcher": ["Launchers", "Grenade launchers: Grenade (T) then tap a spot to fire six of the loaded round there (it turns to face the spot); Gun (V) switches HE / smoke. Three salvos of each"],
 }
@@ -61,7 +62,7 @@ func show_squad(sq: Squad, others: int) -> void:
 	var v = sq.vehicle()
 	var s := "%d|%d|%d|%d|%s|%s|%s" % [sq.get_instance_id(), sq.alive().size(), _aboard(sq), others,
 			sq.grenade_count("he") * 100 + sq.grenade_count("ap") * 10 + sq.grenade_count("smoke"),
-			v.gun_mode() if v != null else "", (str(v.passengers.size()) + str(v.launch_ammo) + str(v.plate_off) + str(v.track_off)) if v != null else ""]
+			v.gun_mode() if v != null else "", (str(sq.alive().size()) + str(v.passengers.size()) + str(v.launch_ammo) + str(v.plate_off) + str(v.track_off)) if v != null else ""]
 	if s != sig or squad != sq:
 		sig = s
 		squad = sq
@@ -252,6 +253,11 @@ func _build(sq: Squad, others: int) -> void:
 			top.add_child(_icon("men", 0, "Men aboard / room for"))
 			men_lbl = _label("", 13)
 			top.add_child(men_lbl)
+		elif sq.vehicles().size() > 1:
+			top.add_child(_spacer(8))
+			top.add_child(_icon("men", 0, "Vehicles still running / in the squadron"))
+			men_lbl = _label("", 13)
+			top.add_child(men_lbl)
 	box.add_child(top)
 	# health and morale
 	health = _bar("status")
@@ -368,9 +374,17 @@ func _update(sq: Squad) -> void:
 		health.set_values(float(hp) / maxf(1.0, max_hp), 1.0, "%d/%d" % [hp, max_hp])
 		morale.set_values(sq.avg_morale(), 1.0, "")
 	else:
-		health.set_values(float(maxi(v.hp, 0)) / v.max_hp, 1.0, "%d/%d" % [maxi(v.hp, 0), v.max_hp])
+		var hp := 0
+		var mx := 0
+		for o in sq.vehicles():
+			hp += maxi(o.hp, 0)
+			mx += o.max_hp
+		health.set_values(float(hp) / maxi(mx, 1), 1.0, "%d/%d" % [hp, mx])
 		if men_lbl != null:
-			men_lbl.text = "%d/%d" % [v.passengers.size(), v.capacity]
+			if v.capacity > 0:
+				men_lbl.text = "%d/%d" % [v.passengers.size(), v.capacity]
+			else:
+				men_lbl.text = "%d/%d" % [sq.vehicles().filter(func(o): return o.is_alive()).size(), sq.vehicles().size()]
 	var now := unit_power(_weapons_now(sq) + _grenades(sq, true), [])
 	var full := unit_power(_weapons_full(sq) + _grenades(sq, false), [])
 	for i in TARGETS.size():
@@ -393,11 +407,12 @@ func _gun_list(sq: Squad) -> Array:
 	var v = sq.vehicle()
 	var out: Array = []  # [weapon, count, name]
 	if v != null:
+		var n: int = maxi(1, sq.vehicles().filter(func(o): return o.is_alive()).size())
 		for sl in v.slots:
 			var nm: String = sl.weapon.name
 			if not sl.modes.is_empty():
 				nm = "%s: %s" % [String(sl.modes[0].name).split(" (")[0], sl.weapon.get("mode", "")]
-			out.append([sl.weapon, 1, nm])
+			out.append([sl.weapon, n, nm])
 		return out
 	var idx := {}
 	for m in sq.members:
@@ -449,9 +464,11 @@ func _specials(sq: Squad) -> Array:
 		for k in ["leader", "charger", "heavy", "loader", "bastion", "steadfast"]:
 			if d.get(k, false) and not k in out:
 				out.append(k)
+		if w.get("indirect", false) and not "indirect" in out:
+			out.append("indirect")
 		if w.get("flame", false) and not "flame" in out:
 			out.append("flame")
-		if float(w.get("blast", 0.0)) > 0.0 and float(w.get("wall", 0.0)) >= 40.0 and not "breach" in out:
+		if float(w.get("blast", 0.0)) > 0.0 and float(w.get("wall", 0.0)) >= 40.0 and not "breach" in out and not w.get("indirect", false):
 			out.append("breach")
 	return out
 
@@ -469,14 +486,21 @@ func _pace_name(l: int) -> String:
 func _weapons_now(sq: Squad) -> Array:
 	var v = sq.vehicle()
 	if v != null:
-		return v.slots.map(func(sl): return sl.weapon) if v.is_alive() else []
+		var out: Array = []
+		for o in sq.vehicles():
+			if o.is_alive():
+				out.append_array(o.slots.map(func(sl): return sl.weapon))
+		return out
 	return sq.alive().map(func(m): return GameData.WEAPONS[m.data.weapon])
 
 
 func _weapons_full(sq: Squad) -> Array:
 	var v = sq.vehicle()
 	if v != null:
-		return v.slots.map(func(sl): return sl.weapon)
+		var out: Array = []
+		for o in sq.vehicles():
+			out.append_array(o.slots.map(func(sl): return sl.weapon))
+		return out
 	return sq.members.map(func(m): return GameData.WEAPONS[m.data.weapon])
 
 
@@ -545,7 +569,11 @@ static func _make_refs() -> void:
 		for spec in GameData.FACTIONS[f].squads:
 			var guns: Array = []
 			var blades: Array = []
-			if spec.has("vehicle"):
+			if spec.has("vehicles"):
+				for vk in spec.vehicles:
+					for wd in GameData.VEHICLES[vk].weapons:
+						guns.append(GameData.WEAPONS[wd.weapon])
+			elif spec.has("vehicle"):
 				for wd in GameData.VEHICLES[spec.vehicle].weapons:
 					guns.append(GameData.WEAPONS[wd.weapon])
 					if wd.has("alt"):

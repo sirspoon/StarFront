@@ -215,6 +215,11 @@ func launch(v: Vehicle, kind: String, at = null) -> void:
 		main.sfx.play("lance", v.position, -2.0, 0.1)
 
 
+## A round lobbed from far off (a mortar): high and slow, landing at `to`.
+func lob(shooter: Soldier, to: Vector2, kind: String, dur: float) -> void:
+	flying.append({"from": shooter.position, "to": to, "t": 0.0, "dur": dur, "kind": kind, "thrower": shooter, "high": true})
+
+
 func _burst(g: Dictionary) -> void:
 	var at: Vector2 = g.to
 	var thrower: Soldier = g.thrower if is_instance_valid(g.thrower) else null
@@ -222,6 +227,9 @@ func _burst(g: Dictionary) -> void:
 	match g.kind:
 		"he":
 			main._blast(at, G.he, thrower, show)
+		"mortar":
+			main._blast(at, GameData.WEAPONS.mortar, thrower, show)
+			main.shake(at, 3.0)
 		"ap":
 			main._blast(at, G.ap, thrower, show)
 			for v in main.soldiers:
@@ -275,8 +283,8 @@ func _draw() -> void:
 			continue  # not out of the tube yet
 		var k: float = g.t / g.dur
 		var p: Vector2 = g.from.lerp(g.to, k)
-		var h: float = sin(k * PI) * g.from.distance_to(g.to) * 0.25  # the arc of the throw
+		var h: float = sin(k * PI) * g.from.distance_to(g.to) * (0.4 if g.get("high", false) else 0.25)  # the arc of the throw
 		draw_circle(p + Vector2(2, 2), 2.0, Color(0, 0, 0, 0.35))
-		var col: Color = {"he": Color(0.25, 0.27, 0.2), "ap": Color(0.3, 0.25, 0.15), "smoke": Color(0.5, 0.5, 0.48)}[g.kind]
+		var col: Color = {"he": Color(0.25, 0.27, 0.2), "ap": Color(0.3, 0.25, 0.15), "smoke": Color(0.5, 0.5, 0.48), "mortar": Color(0.2, 0.21, 0.18)}[g.kind]
 		draw_circle(p - Vector2(0, h), 2.4, col)
 		draw_arc(p - Vector2(0, h), 2.4, 0, TAU, 8, Color(0, 0, 0, 0.6), 0.8)

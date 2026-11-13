@@ -115,6 +115,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `--test-touch` gives orders the way a phone does (tap, double-tap, hold-drag, hold) with nobody fighting;
   `--no-enemy` with `--test-follow` does the same for direct orders; `--test-reach` counts unreachable
   destination spots. All print anyone who did not move.
+- `--test-mortar` (with `--autotest`, headless is fine) sets the player's mortar team up, gives it an HE fire mission
+  (prints when each round left and how far from the aim it landed), then a smoke one (screens made, back to HE).
 - `--test-pace` (under xvfb) gives three squads different paces and prints what the Pace button shows as each is selected.
 - `--test-carrier` checks one tap on a carrier selects it and a double tap boards the selected infantry.
 - `--test-orders` (with `--autotest`, headless is fine) runs a line order and a planned route and
