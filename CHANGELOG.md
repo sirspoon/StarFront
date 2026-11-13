@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.88 (2026-11-13)
+- Orbital bombardment: the 8 rods are spaced exactly evenly from one end of the drawn line to the
+  other (draw a short line to concentrate them, a long one to spread them out), and land in order
+  along it, fast, about a tenth of a second apart. Each comes straight down, a white-hot streak
+  shortening onto the spot in a quarter of a second. A tap without a line drops them all together.
+
 ## v0.87 (2026-11-13)
 Support from above.
 - New Support button (Q), always on the bar: its icon shows the calls left and a ring filling up

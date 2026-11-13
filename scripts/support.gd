@@ -17,6 +17,7 @@ const KINDS := {
 		"rods": 8, "rod": {"blast": 46.0, "dmg": 4, "ap": 0.95, "pen": 10, "vdmg": 8, "wall": 220.0, "supp": 70.0}},
 }
 const GUNSHIP_SPEED := 340.0
+const ROD_FALL := 0.25  # seconds a rod is seen streaking straight down before it hits
 
 var main: Node
 var kind := ["gunship", "orbital"]  # per team
@@ -83,8 +84,8 @@ func call_strike(team: int, a: Vector2, b: Vector2) -> String:
 	var k: Dictionary = info(team)
 	if a.distance_to(b) > k.max_len:
 		b = a + (b - a).normalized() * k.max_len
-	if a.distance_to(b) < 40.0:
-		b = a + Vector2(80.0 if team == 0 else -80.0, 0)  # (a tap: a short line facing the enemy)
+	if a.distance_to(b) < 12.0:
+		b = a + Vector2(24.0, 0)  # (a tap: all the rods close together on the spot)
 	left[team] -= 1
 	wait[team] = k.cooldown
 	strikes.append({"team": team, "kind": kind[team], "a": a, "b": b, "t": 0.0})
@@ -176,10 +177,11 @@ func _fly(dt: float) -> void:
 func _drop_rods(s: Dictionary) -> void:
 	var k: Dictionary = KINDS.orbital
 	var n: int = k.rods
+	# evenly spaced from one end of the line to the other (a short line packs them close), and
+	# they walk down it fast, one after another
 	for i in n:
-		var f := (i + 0.5) / n
-		var p: Vector2 = s.a.lerp(s.b, f) + Vector2(randf_range(-10, 10), randf_range(-10, 10))
-		falling.append({"pos": p, "t": 0.15 * i + randf() * 0.1, "team": s.team, "fall": 0.6})
+		var f := float(i) / maxf(1.0, n - 1)
+		falling.append({"pos": s.a.lerp(s.b, f), "t": ROD_FALL + 0.09 * i, "team": s.team})
 
 
 func _rod_lands(r: Dictionary) -> void:
@@ -296,13 +298,14 @@ func draw_sky(ci: CanvasItem) -> void:
 		ci.draw_string(ThemeDB.fallback_font, mid + Vector2(-10, -14) * z, "%d" % ceili(left_t), HORIZONTAL_ALIGNMENT_CENTER, -1, int(16 * z), col)
 	# rods streaking down: a white-hot line out of the sky onto the spot
 	for r in falling:
-		var f := clampf(1.0 - r.t / 0.6, 0.0, 1.0)
+		var f := clampf(1.0 - r.t / ROD_FALL, 0.0, 1.0)
 		if f <= 0.0:
 			continue
-		var top: Vector2 = r.pos + Vector2(70, -700) * (1.0 - f)
-		ci.draw_line(top, r.pos + (top - r.pos) * 0.05, Color(1.0, 0.95, 0.85, 0.9), 4.0 * z)
-		ci.draw_line(top, r.pos + (top - r.pos) * 0.05, Color(1.0, 0.6, 0.25, 0.4), 12.0 * z)
-		ci.draw_circle(r.pos, (6.0 + 20.0 * f) * z, Color(1.0, 0.9, 0.6, 0.25 * f))
+		# straight down out of the sky: the white-hot streak shortens onto the spot as it comes in
+		var top: Vector2 = r.pos - Vector2(0, 520.0 * (1.0 - f) + 18.0)
+		ci.draw_line(top, r.pos, Color(1.0, 0.6, 0.25, 0.35), 14.0 * z)
+		ci.draw_line(top, r.pos, Color(1.0, 0.97, 0.88, 0.95), 4.0 * z)
+		ci.draw_circle(r.pos, (5.0 + 22.0 * f) * z, Color(1.0, 0.9, 0.6, 0.3 * f))
 	# gunships: their shadow on the ground, and the aircraft itself
 	for p in planes:
 		var pos: Vector2 = p.from + p.dir * p.s
