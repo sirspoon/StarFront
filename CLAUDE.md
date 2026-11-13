@@ -113,6 +113,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - Forces: points and limits are `GameData.COSTS` (budget `BUDGET`); `--random-armies` (with `--autotest`) gives both
   sides a random force and prints them (ARMY lines); otherwise test battles use the standard forces. `--shot-army`
   (with `--shot=file.png`, no `--autotest`) saves the Muster screen; add `--shot-unit=N` to open the Nth unit's preview (`--side=sworn` for the Sworn).
+  `--test-army-swipe` (under xvfb, no `--autotest`; add `--touch` for the phone layout) swipes the list with real input
+  events and taps a unit, and prints whether the list scrolled and the preview changed only on the tap.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

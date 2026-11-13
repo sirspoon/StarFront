@@ -782,7 +782,7 @@ func show_menu() -> void:
 	if "--shot-whatsnew" in OS.get_cmdline_user_args() or "--shot-menu" in OS.get_cmdline_user_args() \
 			or "--shot-options" in OS.get_cmdline_user_args():
 		_shot_whats_new.call_deferred()
-	if "--shot-army" in OS.get_cmdline_user_args():
+	if "--shot-army" in OS.get_cmdline_user_args() or "--test-army-swipe" in OS.get_cmdline_user_args():
 		show_army.call_deferred("sworn" if "--side=sworn" in OS.get_cmdline_user_args() else "legion")
 	var info := Label.new()
 	info.text = "Graphics: " + Settings.summary()
@@ -911,9 +911,7 @@ func show_army(key: String) -> void:
 		list.add_child(box)
 		var uu: Dictionary = u
 		army_boxes[u.id] = box
-		box.gui_input.connect(func(e):
-			if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and not e.pressed:
-				show_unit_preview(key, uu))
+		box.gui_input.connect(func(e): _unit_box_input(e, scroll, key, uu))
 		box.mouse_entered.connect(func(): if box.get_meta("chosen", false) == false: box.add_theme_stylebox_override("panel", _unit_box_style(false, true)))
 		box.mouse_exited.connect(func(): if box.get_meta("chosen", false) == false: box.add_theme_stylebox_override("panel", _unit_box_style(false)))
 		var row := HBoxContainer.new()
@@ -1000,6 +998,8 @@ func show_army(key: String) -> void:
 		if a.begins_with("--shot-unit="):  # test aid: preview this unit for the shot
 			first = int(a.get_slice("=", 1))
 	show_unit_preview(key, GameData.units(key)[first])
+	if "--test-army-swipe" in OS.get_cmdline_user_args():
+		_test_army_swipe.call_deferred(scroll)
 	if "--shot-army" in OS.get_cmdline_user_args():
 		_shot_whats_new.call_deferred()
 
@@ -1009,6 +1009,74 @@ func show_army(key: String) -> void:
 ## open on the screen and changes as other names are tapped.
 var preview_box: Container = null
 var army_boxes := {}  # unit id -> its box on the Muster screen
+
+
+## Test aid: swipe up on a unit box, then tap one, with real (emulated) mouse events.
+func _test_army_swipe(scroll: ScrollContainer) -> void:
+	await get_tree().create_timer(1.0).timeout
+	var box: Control = army_boxes.values()[2]
+	var to_screen := func(c: Control) -> Vector2: return c.get_viewport().get_screen_transform() * c.get_global_transform_with_canvas() * (c.size * 0.5)
+	var p0: Vector2 = to_screen.call(box)
+	var shown: String = preview_card.title.text
+	var ev := func(e: InputEvent): Input.parse_input_event(e)
+	var b := InputEventMouseButton.new()
+	b.button_index = MOUSE_BUTTON_LEFT
+	b.pressed = true
+	b.position = p0
+	b.global_position = p0
+	ev.call(b)
+	for k in 12:
+		await get_tree().process_frame
+		var m := InputEventMouseMotion.new()
+		m.position = p0 - Vector2(0, 10 * (k + 1))
+		m.global_position = m.position
+		m.relative = Vector2(0, -10)
+		m.button_mask = MOUSE_BUTTON_MASK_LEFT
+		ev.call(m)
+	var r := b.duplicate()
+	r.pressed = false
+	r.position = p0 - Vector2(0, 120)
+	r.global_position = r.position
+	ev.call(r)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	print("ARMY SWIPE: list scrolled to %d (was 0); preview still %s: %s" % [scroll.scroll_vertical, shown, preview_card.title.text == shown])
+	var box2: Control = army_boxes.values()[4]
+	var p1: Vector2 = to_screen.call(box2)
+	b.position = p1
+	b.global_position = p1
+	ev.call(b)
+	await get_tree().process_frame
+	r.position = p1
+	r.global_position = p1
+	ev.call(r)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	print("ARMY TAP: preview now %s" % preview_card.title.text)
+	get_tree().quit()
+
+
+## A unit box on the Muster screen: a swipe on it scrolls the list (a finger or a dragged
+## mouse); a tap that didn't move shows the unit in the preview.
+var _list_drag := 0.0
+var _list_pressed := false
+
+
+func _unit_box_input(e: InputEvent, scroll: ScrollContainer, key: String, u: Dictionary) -> void:
+	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
+		if e.pressed:
+			_list_pressed = true
+			_list_drag = 0.0
+		else:
+			if _list_pressed and _list_drag < 10.0:
+				show_unit_preview(key, u)
+			_list_pressed = false
+	elif e is InputEventMouseMotion and _list_pressed and (e.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		_list_drag += absf(e.relative.y)
+		if _list_drag >= 10.0:
+			scroll.scroll_vertical -= int(round(e.relative.y))
+	elif e is InputEventMouseButton and e.pressed and e.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		scroll.scroll_vertical += 40 * (1 if e.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1)
 
 
 func _unit_box_style(chosen: bool, hover := false) -> StyleBoxFlat:

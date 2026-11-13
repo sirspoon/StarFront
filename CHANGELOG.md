@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.06 (2026-11-13)
+- Muster screen: swipe the list of units up and down with a finger (or drag it with the mouse; the
+  mouse wheel works too) instead of having to catch the thin scroll bar. A tap that doesn't move still
+  shows the unit in the preview; a swipe doesn't.
+
 ## v1.05 (2026-11-13)
 - Legion vehicle crews answer orders: "Acknowledged.", "Manoeuvring.", "Advancing." when told to
   drive somewhere, "Target acquired.", "Locked on.", "Engaging." when told to attack. Calm and
