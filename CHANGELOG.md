@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.03 (2026-11-13)
+- "They're everywhere!" is said once now (no second "Everywhere!").
+- More Legion death sounds: as well as the six screams and groans, the two men now die screaming,
+  crying "Nooo! No!", "Mama!", "Help me!", "My legs!", or a fading "Mother...", their voices strained
+  and breaking, then hitting the ground with their kit (18 in all).
+- Wounded men can also cry "I'm hit!" or "Argh, my arm!" (12 wounded sounds in all).
+
 ## v1.02 (2026-11-13)
 - "They're everywhere! ... Everywhere!": a longer pause (about a third of a second) before the
   second "Everywhere!".

@@ -10,7 +10,7 @@ const VARIANTS := {
 	"collapse": 2, "lance": 2, "engine_rev": 2,
 	"smg": 2, "pistol": 2, "melee_blade": 3, "melee_blunt": 3, "melee_power": 3, "smoke": 2, "heavy_laser": 2, "heavy_mass": 2, "flamer": 2, "hail": 2, "beam": 2,
 	"sworn_move": 6, "sworn_attack": 6, "sworn_death": 6,
-	"legion_move": 8, "legion_attack": 10, "legion_pinned": 6, "legion_rout": 6, "legion_hurt": 8, "legion_death": 6,
+	"legion_move": 8, "legion_attack": 10, "legion_pinned": 6, "legion_rout": 6, "legion_hurt": 12, "legion_death": 18,
 }
 const VOLUME := {  # dB, to balance them against each other
 	"explosion_big": 2.0, "explosion_small": -2.0, "cannon": 1.0, "fusion": 0.0, "fusion_small": -4.0,

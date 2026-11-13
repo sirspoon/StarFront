@@ -38,7 +38,7 @@ VOICES = os.environ.get("PIPER_VOICES", "/tmp/claude-0/voices")
 LINES = {
     "legion_move": [("Onwards, comrades!", "shout"), ("Get moving!", "shout"), ("We move together.", "calm"), ("Advance!", "shout")],
     "legion_attack": [("Let them have it!", "shout"), ("Fire!", "shout"), ("Safety off, boys!", "shout"), ("Not one step backwards!", "shout"), ("Ура!", "shout")],
-    "legion_pinned": [("We are pinned down!", "fear"), ("Heads down! Heads down!", "fear"), ("They're everywhere! | Everywhere!", "panic")],
+    "legion_pinned": [("We are pinned down!", "fear"), ("Heads down! Heads down!", "fear"), ("They're everywhere!", "panic")],
     "legion_rout": [("Fall back! Fall back!", "fear"), ("Get back! Get back!", "fear"), ("We cannot hold!", "fear")],
 }
 # English sounds a Russian speaker swaps for his own (the accent)
@@ -260,7 +260,11 @@ def death(i, rng):
     x = vocal(f0, va, vb, rng, breath)
     x *= env(len(x), 0.03, 0.62)
     x = norm(x)
-    # the body falling: a soft thump, the clatter of his rifle and kit
+    return with_fall(x, rng)
+
+
+def with_fall(x, rng, at_frac=0.85):
+    """The body falling just after: a soft thump, the clatter of his rifle and kit."""
     tn = int(0.6 * SR)
     tt = np.arange(tn) / SR
     fall = np.sin(2 * np.pi * (75 - 30 * tt / 0.6) * tt) * np.exp(-tt / 0.07) * 0.6
@@ -271,9 +275,44 @@ def death(i, rng):
         fall[c: c + cl] += bp(rng.standard_normal(cl), 1500, 4500)[: tn - c] * np.exp(-np.arange(cl) / (cl / 6))[: tn - c] * rng.uniform(0.1, 0.25)
     out = np.zeros(len(x) + tn)
     out[: len(x)] = x
-    at = int(len(x) * 0.85)
+    at = int(len(x) * at_frac)
     out[at: at + tn] += fall[: len(out) - at]
     return out
+
+
+# Spoken death cries and wounded cries: (words, or "/" and phonemes to say exactly; style)
+DEATH_SPOKEN = [
+    ("/ˈɑːɑːɑːɑːɑː!", "scream"),      # a long scream
+    ("/nˈoːoːoː! nˈoː!", "scream"),    # "Nooo! No!"
+    ("Mama!", "dying"),
+    ("Help me!", "dying"),
+    ("My legs!", "scream"),
+    ("Mother...", "fading"),
+]
+HURT_SPOKEN = [("I'm hit!", "hurt"), ("Argh, my arm!", "hurt")]
+
+
+def spoken_pain(k, spec, man, rng):
+    text, style = spec
+    voice, lang = MEN[man]
+    if text.startswith("/"):
+        ph = text[1:]
+    else:
+        ph = "".join(SWAP.get(c, c) for c in k.tokenizer.phonemize(text.replace(",", ""), lang))
+    speed = {"scream": 0.8, "dying": 1.0, "fading": 0.75, "hurt": 1.2}[style]
+    a, sr = k.create(ph, voice=voice, speed=speed, lang=lang, is_phonemes=True, clause_pause=0.0, sentence_pause=0.1)
+    x = np.asarray(a, dtype=np.float64)
+    up = {"scream": 1.14, "dying": 1.06, "fading": 0.97, "hurt": 1.08}[style]  # strained higher (or sinking)
+    x = norm(resample(x, sr, up))
+    t = np.arange(len(x)) / SR
+    shake = {"scream": 0.3, "dying": 0.22, "fading": 0.15, "hurt": 0.15}[style]
+    x *= 1 + shake * np.sin(2 * np.pi * rng.uniform(6, 9) * t)  # the voice shaking, breaking
+    if style == "fading":
+        x *= np.linspace(1.0, 0.25, len(x)) ** 1.5  # the strength going out of him
+    x = np.tanh(x * 1.8) / np.tanh(1.8)
+    if style == "hurt":
+        return x
+    return with_fall(x, rng, 0.9 if style != "fading" else 0.95)
 
 
 # Kokoro (kokoro-onnx): far more natural than Piper. Two men: George (British) and Onyx (deep).
@@ -368,6 +407,20 @@ def main():
         rng = np.random.default_rng(zlib.crc32(("death%d" % i).encode()))
         save("legion_death_%d" % i, mask_and_radio(death(i, rng), rng, breath=False, drive=1.5))
         print("made death", i)
+    i = 6
+    for spec in DEATH_SPOKEN:  # spoken / screamed by both men: 6 + 12 death sounds
+        for man in range(2):
+            rng = np.random.default_rng(zlib.crc32(("%s%d" % (spec[0], man)).encode()))
+            save("legion_death_%d" % i, mask_and_radio(spoken_pain(k, spec, man, rng), rng, breath=False, drive=1.4, light=True))
+            print("made death", i, spec[0])
+            i += 1
+    i = 8
+    for spec in HURT_SPOKEN:  # and 8 + 4 wounded cries
+        for man in range(2):
+            rng = np.random.default_rng(zlib.crc32(("%s%d" % (spec[0], man)).encode()))
+            save("legion_hurt_%d" % i, mask_and_radio(spoken_pain(k, spec, man, rng), rng, breath=False, drive=1.4, light=True))
+            print("made hurt", i, spec[0])
+            i += 1
 
 
 if __name__ == "__main__":
