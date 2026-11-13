@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.98 (2026-11-13)
+- More natural Legion voices: the lines are now spoken by Kokoro, an open neural voice that sounds far
+  less robotic than the old one, by two different men (one British, one deep) instead of one voice
+  pitched down. The processing is lighter too (no pitch shifting, a gentler mask and radio), and
+  the lines are clearer: a speech recogniser now catches nearly every word. Same Russian accent
+  (v for w, z / s for th, kh for h, a rolled r) and the same lines.
+
 ## v0.97 (2026-11-13)
 - New Legion lines. Moving: "Onwards, comrades!", "Get moving, you dogs!", "We move together.",
   "Advance!". Attacking: "Let them have it!", "Fire!", "Safety off, boys!", "Not one step backwards!"

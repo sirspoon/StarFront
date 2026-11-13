@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Makes the Legion's voices into sounds/legion_*.wav.
 
-Spoken lines: English with a Russian accent. The English is turned into phonemes (eSpeak)
-and the sounds a Russian speaker would swap for his own are swapped (w -> v, th -> s / z,
-h -> kh, a rolled r, short vowels opened), then the British "alan" Piper voice says them,
-one take as it is and one deeper, for two different men. (Having a Russian Piper voice say the
-English was more Russian but hard to follow.) The battle cry "Urrah!" is real Russian, said by
-the Russian voice ru_RU dmitri.
+Spoken lines: English with a Russian accent, said by Kokoro (kokoro-onnx, an open neural voice
+far more natural than Piper, which sounded robotic): the English is turned into phonemes and the
+sounds a Russian speaker would swap for his own are swapped (w -> v, th -> s / z, h -> kh, a rolled
+r, the short i and u), then two men say each line: George (British) and Onyx (deep). The battle
+cry "Urrah!" is given as Russian phonemes.
 
 Then each line is given emotion and the Legion's kit: shouted lines are faster, higher and
 driven harder; frightened ones shake; all come through the conscript's rebreather mask
@@ -18,9 +17,9 @@ and breath, shaped by vowel formant resonators) yelps, grunts or screams with a 
 jumps and breaks, through the mask, and a death ends with the body and its kit hitting the
 ground.
 
-Needs: pip install piper-tts numpy scipy, and in PIPER_VOICES (default /tmp/claude-0/voices)
-en_GB-alan-medium.onnx(.json), ru_RU-dmitri-medium.onnx(.json), ru_RU-ruslan-medium.onnx(.json)
-from https://huggingface.co/rhasspy/piper-voices
+Needs: pip install kokoro-onnx numpy scipy (and piper-tts, imported but no longer used for
+speech), and in PIPER_VOICES/kokoro (default /tmp/claude-0/voices/kokoro) kokoro-v1.0.onnx and
+voices-v1.0.bin from https://github.com/thewh1teagle/kokoro-onnx/releases (model-files-v1.0).
 """
 import os
 import wave
@@ -105,13 +104,14 @@ def say(en, ru_voice, text, speed):
     return np.concatenate(out), voice.config.sample_rate
 
 
-def mask_and_radio(x, rng, breath=True, drive=1.8):
-    """Through the rebreather mask and a field radio, with the squelch and a breath after."""
-    x = x + 0.35 * resonator(x, rng.uniform(950, 1150), 160)  # the mask's nasal, boxed-in ring
-    x = lp(x, 3300, 3)
-    x = bp(x, 260, 3500)
+def mask_and_radio(x, rng, breath=True, drive=1.8, light=False):
+    """Through the rebreather mask and a field radio, with the squelch and a breath after
+    (light: a gentler mask and a wider radio, for speech)."""
+    x = x + (0.18 if light else 0.35) * resonator(x, rng.uniform(950, 1150), 160)  # the mask's nasal, boxed-in ring
+    x = lp(x, 4200 if light else 3300, 3)
+    x = bp(x, 200 if light else 260, 4500 if light else 3500)
     x = np.tanh(norm(x) * drive) / np.tanh(drive)  # a cheap radio pushed hard
-    x += rng.standard_normal(len(x)) * 0.012  # the hiss of the set
+    x += rng.standard_normal(len(x)) * (0.006 if light else 0.012)  # the hiss of the set
     pad = int(0.05 * SR)
     tail = int(0.38 * SR) if breath else int(0.05 * SR)
     out = np.zeros(pad + len(x) + tail)
@@ -130,18 +130,17 @@ def mask_and_radio(x, rng, breath=True, drive=1.8):
     return norm(out)
 
 
-def moods(x, sr, mood, rng, man=1.0):
-    sr = sr * man  # (each take a different man: one a little deeper)
+def moods(x, sr, mood, rng):
+    """Kept light: pitch shifting and hard clipping are what made the first voices robotic.
+    Shouts and fear come mostly from how Kokoro says them (faster, the punctuation)."""
+    x = resample(x, sr, 1.0)
     if mood == "shout":
-        x = resample(x, sr, 1.07)  # up a little: a raised voice
-        x = np.tanh(norm(x) * 2.6)
-        return x, 2.4
+        return np.tanh(norm(x) * 1.5) / np.tanh(1.5), 1.5
     if mood == "fear":
-        x = resample(x, sr, 1.1)
         t = np.arange(len(x)) / SR
-        x = x * (1 + 0.25 * np.sin(2 * np.pi * rng.uniform(6, 8) * t))  # a shaking voice
-        return np.tanh(norm(x) * 2.2), 2.2
-    return resample(x, sr, 1.0), 1.6
+        x = x * (1 + 0.1 * np.sin(2 * np.pi * rng.uniform(6, 8) * t))  # a slight shake
+        return x, 1.3
+    return x, 1.2
 
 
 # ---------------------------------------------------------------- pain
@@ -268,18 +267,33 @@ def death(i, rng):
     return out
 
 
+# Kokoro (kokoro-onnx): far more natural than Piper. Two men: George (British) and Onyx (deep).
+KOKORO = os.path.join(VOICES, "kokoro")
+MEN = [("bm_george", "en-gb"), ("am_onyx", "en-us")]
+
+
+def kokoro_say(k, text, man, speed):
+    voice, lang = MEN[man]
+    if any(0x400 <= ord(ch) <= 0x4FF for ch in text):
+        ph = "ʊrˈɑː!"  # "Ura!" (a Russian cheer), said the Russian way
+    else:
+        ph = "".join(SWAP.get(c, c) for c in k.tokenizer.phonemize(text, lang))
+    a, sr = k.create(ph, voice=voice, speed=speed, lang=lang, is_phonemes=True)
+    return np.asarray(a, dtype=np.float64), sr
+
+
 def main():
-    en = PiperVoice.load(os.path.join(VOICES, "en_GB-alan-medium.onnx"))
-    ru = [PiperVoice.load(os.path.join(VOICES, "ru_RU-%s-medium.onnx" % k)) for k in ("dmitri", "ruslan")]
+    from kokoro_onnx import Kokoro
+    k = Kokoro(os.path.join(KOKORO, "kokoro-v1.0.onnx"), os.path.join(KOKORO, "voices-v1.0.bin"))
     for kind, lines in LINES.items():
         i = 0
         for text, mood in lines:
             for take in range(2):  # two men saying each line
                 rng = np.random.default_rng(zlib.crc32(("%s%d" % (text, take)).encode()))
-                speed = {"calm": 1.0, "shout": 0.88, "fear": 0.82}[mood] * [1.0, 1.06][take]
-                x, sr = say(en, ru[take], text, speed)
-                x, drive = moods(x, sr, mood, rng, [1.0, 0.9][take])
-                save("%s_%d" % (kind, i), mask_and_radio(x, rng, breath=mood != "shout", drive=drive))
+                speed = {"calm": 1.0, "shout": 1.12, "fear": 1.18}[mood]
+                x, sr = kokoro_say(k, text, take, speed)
+                x, drive = moods(x, sr, mood, rng)
+                save("%s_%d" % (kind, i), mask_and_radio(x, rng, breath=mood != "shout", drive=drive, light=True))
                 print("made", kind, i, text, mood)
                 i += 1
     for i in range(8):
