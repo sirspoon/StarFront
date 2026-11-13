@@ -5,6 +5,7 @@ extends RefCounted
 ## When a whole version is reached (1.0, 2.0 ...), start a new heading for it.
 
 const TEXT := """PROTOTYPE (before 1.0)
+- Legion vehicle crews answer orders over the intercom
 - Legion voices: Russian-accented replies, battle cries, cries when pinned or breaking, and yelps and screams of pain
 - Deployment: place your squads in your end of the map before the battle begins
 - Pick your force: every unit has a points cost; spend 1300 points before the battle. The enemy picks its own

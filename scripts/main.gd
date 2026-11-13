@@ -683,6 +683,12 @@ func _test_voice() -> void:
 	enemy.visible = true
 	_order(enemy.position, false)
 	print("VOICE after target order: %s %s" % [sfx.radio.playing, sfx.radio.stream.resource_path if sfx.radio.stream else "-"])
+	await get_tree().create_timer(2.5).timeout
+	var tank: Squad = _player_squads().filter(func(q): return q.vehicle() != null and q.vehicle().capacity == 0)[0]
+	select_squad(tank, false)
+	_plan("move", tank.center() + Vector2(150, 0), tank.center() + Vector2(150, 0), true)
+	print("VOICE after vehicle move order: %s %s" % [sfx.radio.playing, sfx.radio.stream.resource_path if sfx.radio.stream else "-"])
+	get_tree().quit()
 
 
 ## Test aid: shell the chapel's west wall so screenshots show every damage stage.
@@ -2606,6 +2612,9 @@ func _acknowledge(kind: String) -> void:
 		if _player_squads().any(func(q): return q.selected and q.faction == f and q.vehicle() == null and (not q.alive().is_empty() or q.carrier() != null)):
 			sfx.voice(f + "_" + kind)
 			return
+	# only vehicles selected: their crews answer (the Legion's so far)
+	if _player_squads().any(func(q): return q.selected and q.faction == "legion" and q.vehicle() != null and q.vehicle().is_alive()):
+		sfx.voice("legion_v" + kind)
 
 
 func _has_selection() -> bool:

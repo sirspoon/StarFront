@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.05 (2026-11-13)
+- Legion vehicle crews answer orders: "Acknowledged.", "Manoeuvring.", "Advancing." when told to
+  drive somewhere, "Target acquired.", "Locked on.", "Engaging." when told to attack. Calm and
+  clipped, over a crackling intercom with the engine rumbling under them. They answer when only
+  vehicles are selected (with infantry selected too, the infantry answer).
+
 ## v1.04 (2026-11-13)
 - Legion death and wounded cries more panicked: quicker, higher and strained, the voice shaking
   harder, with a ragged gasp (or panting) for breath before each.

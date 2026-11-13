@@ -64,7 +64,7 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   --test-voice` (with `--autotest`, under xvfb) checks a move and a target order each get a reply.
 - Legion voices: `python3 tools/make_legion_voices.py` (needs `pip install kokoro-onnx piper-tts numpy scipy` and the Kokoro model
   files, see the top of the script) makes `sounds/legion_*.wav`; the same
-  `--test-voice` checks them on the Legion side. Pain sounds are synthesised (a glottal-pulse voice through formants).
+  `--test-voice` checks them on the Legion side (and that a tank's crew answers a move order). Pain sounds are synthesised (a glottal-pulse voice through formants).
 - `--shot-melee` waits (after `--shot-time`) for a close fight and centres the screenshot on it;
   `--debug-assault` prints where the assault squads are and what they're doing every 10 s. Test
   results also print close-combat blows, melee kills and each assault squad's kills.

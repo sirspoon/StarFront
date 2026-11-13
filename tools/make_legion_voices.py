@@ -40,6 +40,9 @@ LINES = {
     "legion_attack": [("Let them have it!", "shout"), ("Fire!", "shout"), ("Safety off, boys!", "shout"), ("Not one step backwards!", "shout"), ("Ура!", "shout")],
     "legion_pinned": [("We are pinned down!", "fear"), ("Heads down! Heads down!", "fear"), ("They're everywhere!", "panic")],
     "legion_rout": [("Fall back! Fall back!", "fear"), ("Get back! Get back!", "fear"), ("We cannot hold!", "fear")],
+    # vehicle crews: calm and clipped, over the vehicle's radio with the engine under it
+    "legion_vmove": [("Acknowledged.", "crew"), ("Manoeuvring.", "crew"), ("Advancing.", "crew")],
+    "legion_vattack": [("Target acquired.", "crew"), ("Locked on.", "crew"), ("Engaging.", "crew")],
 }
 # English sounds a Russian speaker swaps for his own (the accent)
 SWAP = {"w": "v", "θ": "s", "ð": "z", "ɪ": "i", "ʊ": "u", "ɹ": "r", "h": "x", "ŋ": "n",
@@ -126,6 +129,29 @@ def mask_and_radio(x, rng, breath=True, drive=1.8, light=False):
         at = pad + len(x) + int(0.04 * SR)
         out[at:at + n] += b[: len(out) - at]
     f = int(0.02 * SR)
+    out[-f:] *= np.linspace(1, 0, f)
+    return norm(out)
+
+
+def crew_radio(x, rng):
+    """A vehicle crewman on the intercom: a narrow, crackling radio (no mask: he's in the hull),
+    the engine rumbling and the tracks clattering under him."""
+    x = bp(norm(x), 350, 3000, 3)
+    x = np.tanh(x / (np.max(np.abs(x)) + 1e-9) * 2.0) / np.tanh(2.0)
+    pad = int(0.08 * SR)
+    out = np.zeros(len(x) + pad * 2)
+    out[pad:pad + len(x)] = x
+    t = np.arange(len(out)) / SR
+    eng = np.sin(2 * np.pi * 38 * t) + 0.5 * np.sin(2 * np.pi * 76 * t + 1.0) + 0.3 * np.sin(2 * np.pi * 114 * t)
+    eng *= 1 + 0.3 * np.sin(2 * np.pi * 7 * t)  # the engine's beat
+    eng = lp(eng + lp(rng.standard_normal(len(t)), 300) * 0.8, 400) * 0.12
+    clatter = bp(rng.standard_normal(len(t)), 1500, 4000) * (np.sin(2 * np.pi * 11 * t) > 0.85) * 0.03
+    out += eng + clatter + rng.standard_normal(len(t)) * 0.008
+    for at in (int(pad * 0.4), pad + len(x) + int(pad * 0.3)):  # squelch: the intercom keyed and released
+        cl = int(0.012 * SR)
+        out[at:at + cl] += bp(rng.standard_normal(cl), 1500, 6000) * np.exp(-np.arange(cl) / (cl / 5)) * 0.35
+    f = int(0.02 * SR)
+    out[:f] *= np.linspace(0, 1, f)
     out[-f:] *= np.linspace(1, 0, f)
     return norm(out)
 
@@ -400,10 +426,13 @@ def main():
         for text, mood in lines:
             for take in range(2):  # two men saying each line
                 rng = np.random.default_rng(zlib.crc32(("%s%d" % (text, take)).encode()))
-                speed = {"calm": 1.0, "shout": 1.12, "fear": 1.18, "panic": 1.28}[mood]
+                speed = {"calm": 1.0, "shout": 1.12, "fear": 1.18, "panic": 1.28, "crew": 1.08}[mood]
                 x, sr = kokoro_say(k, text, take, speed)
-                x, drive = moods(x, sr, mood, rng)
-                save("%s_%d" % (kind, i), mask_and_radio(x, rng, breath=mood != "shout", drive=drive, light=True))
+                if mood == "crew":
+                    save("%s_%d" % (kind, i), crew_radio(resample(x, sr, 1.0), rng))
+                else:
+                    x, drive = moods(x, sr, mood, rng)
+                    save("%s_%d" % (kind, i), mask_and_radio(x, rng, breath=mood != "shout", drive=drive, light=True))
                 print("made", kind, i, text, mood)
                 i += 1
     for i in range(8):

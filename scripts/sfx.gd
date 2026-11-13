@@ -10,7 +10,7 @@ const VARIANTS := {
 	"collapse": 2, "lance": 2, "engine_rev": 2,
 	"smg": 2, "pistol": 2, "melee_blade": 3, "melee_blunt": 3, "melee_power": 3, "smoke": 2, "heavy_laser": 2, "heavy_mass": 2, "flamer": 2, "hail": 2, "beam": 2,
 	"sworn_move": 6, "sworn_attack": 6, "sworn_death": 6,
-	"legion_move": 8, "legion_attack": 10, "legion_pinned": 6, "legion_rout": 6, "legion_hurt": 12, "legion_death": 18,
+	"legion_move": 8, "legion_attack": 10, "legion_pinned": 6, "legion_rout": 6, "legion_hurt": 12, "legion_death": 18, "legion_vmove": 6, "legion_vattack": 6,
 }
 const VOLUME := {  # dB, to balance them against each other
 	"explosion_big": 2.0, "explosion_small": -2.0, "cannon": 1.0, "fusion": 0.0, "fusion_small": -4.0,
@@ -18,7 +18,7 @@ const VOLUME := {  # dB, to balance them against each other
 	"collapse": -1.0, "lance": -5.0, "engine_rev": -6.0,
 	"smg": -7.0, "pistol": -5.0, "melee_blade": -6.0, "melee_blunt": -5.0, "melee_power": -5.0, "smoke": -8.0, "heavy_laser": -6.0, "heavy_mass": -3.0, "flamer": -3.0, "hail": -4.0, "beam": -2.0,
 	"sworn_move": -2.0, "sworn_attack": -1.0, "sworn_death": -3.0,
-	"legion_move": -3.0, "legion_attack": -2.0, "legion_pinned": -2.0, "legion_rout": -2.0, "legion_hurt": -6.0, "legion_death": -4.0,
+	"legion_move": -3.0, "legion_attack": -2.0, "legion_pinned": -2.0, "legion_rout": -2.0, "legion_hurt": -6.0, "legion_death": -4.0, "legion_vmove": -3.0, "legion_vattack": -3.0,
 }
 ## Which sound each weapon makes (once per burst).
 const WEAPON_SOUND := {
