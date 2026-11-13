@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.00 (2026-11-13)
+- Legion line "Get moving, you dogs!" is now "Get moving, dogs!", which flows better.
+
 ## v0.99 (2026-11-13)
 - Smoother Legion lines: the pauses inside a line are cut down to a short breath and the joins
   crossfaded, commas no longer make the speaker stop mid-phrase, and the small words ("you", "off",

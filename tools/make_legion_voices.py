@@ -36,7 +36,7 @@ VOICES = os.environ.get("PIPER_VOICES", "/tmp/claude-0/voices")
 
 # kind: [(text, mood)]   mood: calm / shout / fear. Text in Cyrillic is said as Russian.
 LINES = {
-    "legion_move": [("Onwards, comrades!", "shout"), ("Get moving, you dogs!", "shout"), ("We move together.", "calm"), ("Advance!", "shout")],
+    "legion_move": [("Onwards, comrades!", "shout"), ("Get moving, dogs!", "shout"), ("We move together.", "calm"), ("Advance!", "shout")],
     "legion_attack": [("Let them have it!", "shout"), ("Fire!", "shout"), ("Safety off, boys!", "shout"), ("Not one step backwards!", "shout"), ("Ура!", "shout")],
     "legion_pinned": [("We are pinned down!", "fear"), ("Heads down! Heads down!", "fear"), ("They are everywhere!", "fear")],
     "legion_rout": [("Fall back! Fall back!", "fear"), ("Get back! Get back!", "fear"), ("We cannot hold!", "fear")],
