@@ -114,11 +114,26 @@ func _draw_links(sq: Squad) -> void:
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1.0, 0.45, 0.35, 0.8))
 
 
+## A facing arrow: a solid white arrow with a dark edge, the same size on screen at any zoom
+## (col's alpha sets how strongly it shows).
 func _arrow(a: Vector2, b: Vector2, col: Color) -> void:
-	draw_line(a, b, col, 2.0)
+	var z: float = clampf(1.0 / main.camera.zoom.x, 0.2, 3.0)
 	var d := (b - a).normalized()
-	draw_line(b, b - d.rotated(0.5) * 9.0, col, 2.0)
-	draw_line(b, b - d.rotated(-0.5) * 9.0, col, 2.0)
+	if d == Vector2.ZERO:
+		return
+	var n := d.orthogonal()
+	var hw := 5.0 * z      # half the shaft's width
+	var hl := 20.0 * z     # the head's length
+	var hh := 13.0 * z     # half the head's width
+	var tip := b
+	var base := b - d * hl
+	if base.distance_to(a) < hl * 0.3:
+		base = a + d * hl * 0.3
+	var pts := PackedVector2Array([a + n * hw, base + n * hw, base + n * hh, tip, base - n * hh, base - n * hw, a - n * hw])
+	var edge := pts.duplicate()
+	edge.append(pts[0])
+	draw_colored_polygon(pts, Color(1.0, 1.0, 1.0, col.a))
+	draw_polyline(edge, Color(0.0, 0.0, 0.0, col.a * 0.6), 1.5 * z, true)
 
 
 ## While right-dragging: where each selected soldier will stand, and which way they'll face.

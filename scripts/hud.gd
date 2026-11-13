@@ -179,12 +179,19 @@ func _build_touch_bar() -> void:
 			bar_gap = gap
 			continue
 		var b := Button.new()
-		b.text = _button_text(spec[0], false)
+		b.text = ""
 		b.toggle_mode = spec[1]
 		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(64, 44) if main.touch_mode else Vector2(0, 30)
+		b.custom_minimum_size = Vector2(56, 44) if main.touch_mode else Vector2(44, 38)
+		var ic := BarIcon.new()
+		ic.kind = spec[0]
+		ic.key = "" if main.touch_mode else HINTS.get(spec[0], "")
+		ic.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(ic)
+		bar_icons[spec[0]] = ic
 		b.add_theme_font_size_override("font_size", 16 if main.touch_mode else 13)
-		b.tooltip_text = TIPS.get(spec[0], "")
+		b.tooltip_text = TIPS.get(spec[0], "") + ("" if main.touch_mode or not HINTS.has(spec[0]) else "  [%s]" % HINTS[spec[0]])
 		touch_bar.add_child(b)
 		touch_buttons[spec[0]] = b
 		var key: String = spec[0]
@@ -198,6 +205,7 @@ func _build_touch_bar() -> void:
 
 
 var bar_panel: PanelContainer
+var bar_icons := {}
 var bar_gap: Control
 const HINTS := {"Assault": "R", "Down": "G", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "Menu": "Esc"}
 const TIPS := {"Assault": "Pace: walking, or running (faster, and they charge into close combat, but fire less and are easier to hit)",
@@ -264,7 +272,8 @@ func _context_buttons() -> void:
 			changed = true
 			if not show[k] and b.toggle_mode and b.button_pressed and k in ["Grenade", "Face"]:
 				b.button_pressed = false  # (switches the mode off too)
-		b.text = _button_text(k, b.button_pressed, mode)
+		bar_icons[k].set_variant(mode if k == "Gun" else ("on" if b.button_pressed else ""))
+	bar_icons["Pause"].set_variant("paused" if main.paused else "")
 	bar_gap.visible = any
 	if changed:
 		bar_panel.reset_size()

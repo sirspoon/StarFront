@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.73 (2026-11-13)
+Icons on the command bar; solid facing arrows.
+- The bar's buttons are white icons instead of words: a walking / running man for pace, a standing /
+  prone man for stance, a solid beam / dashed bolts (or a pointed round / a burst for AP / HE) for the
+  tank's gun, a grenade, an arrow out of a box for unload, an arrow out from a line for face, a raised
+  palm for halt, a shield for the cover view, three figures for the squad list, pause bars (a play
+  triangle while paused) and three lines for the menu. On a PC each shows its key in the corner, and
+  hovering gives its name.
+- Facing arrows (a squad's facing, setting a facing, line orders) are solid white arrows with a dark
+  edge, the same size on screen at any zoom, instead of thin blue lines.
+
 ## v0.72 (2026-11-13)
 Tidier command bar.
 - Only the orders that apply to the selected squads are shown: Pace and Stance for infantry, Gun for
