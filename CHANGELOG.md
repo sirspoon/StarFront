@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.04 (2026-11-13)
+- Legion death and wounded cries more panicked: quicker, higher and strained, the voice shaking
+  harder, with a ragged gasp (or panting) for breath before each.
+- "Argh, my arm!" (which came out "agg") is now "Aaah! My arm!".
+
 ## v1.03 (2026-11-13)
 - "They're everywhere!" is said once now (no second "Everywhere!").
 - More Legion death sounds: as well as the six screams and groans, the two men now die screaming,

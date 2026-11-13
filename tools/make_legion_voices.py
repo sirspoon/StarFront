@@ -289,7 +289,7 @@ DEATH_SPOKEN = [
     ("My legs!", "scream"),
     ("Mother...", "fading"),
 ]
-HURT_SPOKEN = [("I'm hit!", "hurt"), ("Argh, my arm!", "hurt")]
+HURT_SPOKEN = [("I'm hit!", "hurt"), ("/ˈɑːɑː! maj ˈɑːm!", "hurt")]  # "Aaah! My arm!" ("Argh" came out "agg")
 
 
 def spoken_pain(k, spec, man, rng):
@@ -299,14 +299,21 @@ def spoken_pain(k, spec, man, rng):
         ph = text[1:]
     else:
         ph = "".join(SWAP.get(c, c) for c in k.tokenizer.phonemize(text.replace(",", ""), lang))
-    speed = {"scream": 0.8, "dying": 1.0, "fading": 0.75, "hurt": 1.2}[style]
+    speed = {"scream": 0.9, "dying": 1.18, "fading": 0.85, "hurt": 1.32}[style]  # panicked: quick
     a, sr = k.create(ph, voice=voice, speed=speed, lang=lang, is_phonemes=True, clause_pause=0.0, sentence_pause=0.1)
     x = np.asarray(a, dtype=np.float64)
-    up = {"scream": 1.14, "dying": 1.06, "fading": 0.97, "hurt": 1.08}[style]  # strained higher (or sinking)
+    up = {"scream": 1.18, "dying": 1.12, "fading": 1.02, "hurt": 1.14}[style]  # strained higher
     x = norm(resample(x, sr, up))
     t = np.arange(len(x)) / SR
-    shake = {"scream": 0.3, "dying": 0.22, "fading": 0.15, "hurt": 0.15}[style]
-    x *= 1 + shake * np.sin(2 * np.pi * rng.uniform(6, 9) * t)  # the voice shaking, breaking
+    shake = {"scream": 0.38, "dying": 0.32, "fading": 0.22, "hurt": 0.28}[style]
+    x *= 1 + shake * np.sin(2 * np.pi * rng.uniform(7, 10) * t)  # the voice shaking, breaking
+    # a ragged gasp (or two, panting) for breath before he cries out
+    gasps = []
+    for g in range(1 if style == "scream" else 2):
+        gn = int(rng.uniform(0.12, 0.2) * SR)
+        gasps.append(bp(rng.standard_normal(gn), 700, 3200) * np.sin(np.linspace(0, np.pi, gn)) ** 1.5 * 0.4)
+        gasps.append(np.zeros(int(0.04 * SR)))
+    x = np.concatenate(gasps + [x])
     if style == "fading":
         x *= np.linspace(1.0, 0.25, len(x)) ** 1.5  # the strength going out of him
     x = np.tanh(x * 1.8) / np.tanh(1.8)
