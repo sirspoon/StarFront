@@ -25,7 +25,7 @@ const SPECIALS := {
 	"flame": ["Flamer", "Flamer: a jet of fire round cover; sets the scenery alight"],
 	"breach": ["Breacher", "Breaks walls: can shell or blast a way through buildings"],
 	"carrier": ["Carrier", "Carrier: men board it (right click it) and unload (U)"],
-	"indirect": ["Indirect fire", "Mortars: lob rounds over walls, no sight needed (but not from under a roof). Target (F) then tap: a fire mission; otherwise they shell enemies your side can see. Inaccurate, tighter with each salvo on a mission. Gun (V): HE or smoke (5 smoke rounds a battle, one per tube). It takes about 10 s to set up and 10 s to pack up before moving. Smoke ends the current mission and waits for a new target, fires one salvo there, then goes back to HE"],
+	"indirect": ["Indirect fire", "Mortars: lob rounds over walls, no sight needed (but not from under a roof). Target (F) then tap: a fire mission; otherwise they shell enemies your side can see. Inaccurate, tighter with each salvo on a mission. Gun (V): HE or smoke (5 smoke salvos a battle). It takes about 10 s to set up and 10 s to pack up before moving. Smoke ends the current mission and waits for a new target, fires one salvo there, then goes back to HE"],
 	"modes": ["2 settings", "Main gun has two settings: V switches them"],
 	"launcher": ["Launchers", "Grenade launchers: Grenade (T) then tap a spot to fire six of the loaded round there (it turns to face the spot); Gun (V) switches HE / smoke. Three salvos of each"],
 }
@@ -314,7 +314,7 @@ func _build(sq: Squad, others: int) -> void:
 		cc.add_child(pips)
 		if sq.has_mortars():
 			cc.add_child(_spacer(6))
-			cc.add_child(_icon("smoke", 0, "Mortar smoke rounds left for the battle (%d): one per tube in a salvo" % sq.smoke_left))
+			cc.add_child(_icon("smoke", 0, "Mortar smoke salvos left for the battle (%d): every tube fires in each" % sq.smoke_left))
 			cc.add_child(_label("%d" % sq.smoke_left, 13, Color(0.8, 0.8, 0.78)))
 		for k in [["he", "frag", "Frag grenades: a burst against men"], ["ap", "ap", "Tank-breaker charges: against armour and walls"],
 				["smoke", "smoke", "Smoke grenades: a screen that blocks sight"]]:

@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.86 (2026-11-13)
+- Mortars: the smoke limit is 5 full salvos a battle (every tube fires in each), not 5 rounds shared
+  between the tubes. The unit card counts salvos left.
+
 ## v0.85 (2026-11-13)
 Mortars: slower to set up and pack up; limited smoke.
 - Setting up takes about 10 seconds with a loader beside the gunner (15 alone). Told to move, the crew

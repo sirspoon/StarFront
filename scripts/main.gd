@@ -293,7 +293,8 @@ func _test_mortar() -> void:
 		if times.size() >= 6:
 			break
 	print("  rounds fired at %s; landed %s px from the aim" % [times, lands.map(func(d): return int(d))])
-	for k in 3:  # smoke three times: 3 rounds, then 2, then none left
+	sq.smoke_left = 2  # (test: two salvos left, so the third is refused)
+	for k in 3:  # smoke three times: two salvos, then none left
 		switch_guns_for(sq)
 		var screens0 := grenades.screens.size()
 		print("  smoke %d: loaded %s, %s" % [k + 1, sq.mortar_kind, mortars.order(sq, spot + Vector2(0, 60 * k))])
@@ -2121,7 +2122,7 @@ func switch_guns() -> void:
 	for sq in _player_squads():
 		if sq.selected and sq.has_mortars():
 			if sq.mortar_kind == "he" and sq.smoke_left <= 0:
-				log_message("[color=#e8c070]%s: no smoke rounds left[/color]" % sq.name)
+				log_message("[color=#e8c070]%s: no smoke salvos left[/color]" % sq.name)
 				continue
 			sq.mortar_kind = "smoke" if sq.mortar_kind == "he" else "he"
 			if sq.mortar_kind == "smoke" and sq.fire_mission != null:

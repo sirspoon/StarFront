@@ -117,7 +117,7 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   destination spots. All print anyone who did not move.
 - `--test-mortar` (with `--autotest`, headless is fine) sets the player's mortar team up, gives it an HE fire mission
   (prints how long setting up took, when each round left and how far from the aim it landed), then smoke three times
-  (3 rounds, 2, then none left), then a move (how long packing up took).
+  (with two salvos left: two full salvos, then refused), then a move (how long packing up took).
 - `--test-pace` (under xvfb) gives three squads different paces and prints what the Pace button shows as each is selected.
 - `--test-carrier` checks one tap on a carrier selects it and a double tap boards the selected infantry.
 - `--test-orders` (with `--autotest`, headless is fine) runs a line order and a planned route and
