@@ -85,7 +85,7 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   kills by kind of killer (`/melee` for close combat), for seeing what drives casualties.
 - `--shot-cover` turns on the Cover view for a screenshot; `--shot-pick` (with `--shot-squad=N`) selects
   that squad, to see its sight area, weapon range rings and unit card
-  (`--shot-tag` also shows the first weapon's details on the card).
+  (`--shot-tag` also shows the first weapon's details on the card; `--shot-pace=run|down` presses Pace once / twice).
 - `--shot-peek` waits for a man leaning right out round cover and firing, and centres on him. Test results
   print `peeks=[legion, sworn]`: how often men leaned out to shoot.
 - `--shot-noroofs` hides the roofs for a screenshot, to see the buildings' furnishings.

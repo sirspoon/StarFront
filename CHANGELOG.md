@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.74 (2026-11-13)
+Command bar: one Pace button, new icons.
+- Pace and Stance are one Pace button that cycles crouched (walking) -> running -> lying down, its icon
+  showing which: a crouched man with his rifle, a running man, or a man flat on the ground. On a PC,
+  R and G still switch running and lying down directly.
+- New icons: a pineapple grenade (segmented body, spoon and ring), the cover view as a grid with some
+  squares filled in, and unload as the back of a carrier from above with its doors swung open and three
+  men fanning out.
+
 ## v0.73 (2026-11-13)
 Icons on the command bar; solid facing arrows.
 - The bar's buttons are white icons instead of words: a walking / running man for pace, a standing /

@@ -1076,6 +1076,11 @@ func _take_shot() -> void:
 			camera.position = q.center()
 			if "--shot-pick" in OS.get_cmdline_user_args():
 				q.selected = true
+				if "--shot-pace=run" in OS.get_cmdline_user_args():
+					cycle_pace()
+				elif "--shot-pace=down" in OS.get_cmdline_user_args():
+					cycle_pace()
+					cycle_pace()
 				hud._refresh()  # show the unit card in the shot
 	if "--shot-melee" in OS.get_cmdline_user_args():
 		camera.position = _melee_spot()
@@ -1939,6 +1944,32 @@ func switch_guns() -> void:
 		hud._gun_buttons()
 
 
+## The selected infantry's pace: "down" if any are lying down, "run" if running, else "walk".
+func pace_state() -> String:
+	var sel := _player_squads().filter(func(q): return q.selected and q.vehicle() == null)
+	if sel.any(func(q): return q.prone):
+		return "down"
+	if run_toggle or sel.any(func(q): return q.running):
+		return "run"
+	return "walk"
+
+
+## The Pace button: crouched and walking -> running -> lying down -> crouched again.
+func cycle_pace() -> void:
+	match pace_state():
+		"walk":
+			touch_button("Down", false)
+			touch_button("Assault", true)
+		"run":
+			touch_button("Assault", false)
+			touch_button("Down", true)
+		_:
+			touch_button("Down", false)
+			touch_button("Assault", false)
+	if hud != null:
+		hud._context_buttons()
+
+
 func log_message(text: String) -> void:
 	if autotest:
 		return
@@ -2645,6 +2676,8 @@ func touch_button(key: String, on: bool) -> void:
 			if on:
 				run_toggle = false
 				hud.sync_touch("Assault", false)
+		"Pace":
+			cycle_pace()
 		"Face":
 			face_mode = on
 		"Grenade":

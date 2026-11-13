@@ -170,7 +170,7 @@ func _build_touch_bar() -> void:
 	panel.add_child(touch_bar)
 	# orders for what's selected (only those that apply are shown), then a gap, then the
 	# buttons that are always there
-	for spec in [["Assault", true], ["Down", true], ["Gun", false], ["Grenade", true], ["Unload", false], ["Face", true], ["Halt", false],
+	for spec in [["Pace", false], ["Gun", false], ["Grenade", true], ["Unload", false], ["Face", true], ["Halt", false],
 			["|", false], ["Cover", true], ["Squads", true], ["Pause", true], ["Menu", false]]:
 		if spec[0] == "|":
 			var gap := VSeparator.new()
@@ -207,9 +207,8 @@ func _build_touch_bar() -> void:
 var bar_panel: PanelContainer
 var bar_icons := {}
 var bar_gap: Control
-const HINTS := {"Assault": "R", "Down": "G", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "Menu": "Esc"}
-const TIPS := {"Assault": "Pace: walking, or running (faster, and they charge into close combat, but fire less and are easier to hit)",
-		"Down": "Stance: standing, or down flat (much harder to hit; they crawl when they move)",
+const HINTS := {"Pace": "R/G", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "Menu": "Esc"}
+const TIPS := {"Pace": "Pace (tap to change): crouched and walking; running (faster, charge into close combat, but fire less and easier to hit); or lying down (much harder to hit, crawl when moving)",
 		"Gun": "Switch the selected tank's main gun setting", "Grenade": "Then tap a spot: frags at men, tank-breakers at armour, smoke on open ground; carriers fire a launcher salvo",
 		"Unload": "Passengers get out", "Face": "Then drag: which way the squad faces", "Halt": "Stop and forget orders",
 		"Cover": "Show where the cover is", "Squads": "Show the squad list", "Pause": "Pause (orders still work)", "Menu": "Restart, options, controls"}
@@ -262,7 +261,7 @@ func _context_buttons() -> void:
 			for k in ["he", "ap", "smoke"]:
 				if sq.grenade_count(k) > 0:
 					grenades = true
-	var show := {"Assault": inf, "Down": inf, "Gun": mode != "", "Grenade": grenades, "Unload": unload,
+	var show := {"Pace": inf, "Gun": mode != "", "Grenade": grenades, "Unload": unload,
 			"Face": any, "Halt": any}
 	var changed := false
 	for k in show:
@@ -272,7 +271,7 @@ func _context_buttons() -> void:
 			changed = true
 			if not show[k] and b.toggle_mode and b.button_pressed and k in ["Grenade", "Face"]:
 				b.button_pressed = false  # (switches the mode off too)
-		bar_icons[k].set_variant(mode if k == "Gun" else ("on" if b.button_pressed else ""))
+		bar_icons[k].set_variant(mode if k == "Gun" else (main.pace_state() if k == "Pace" else ("on" if b.button_pressed else "")))
 	bar_icons["Pause"].set_variant("paused" if main.paused else "")
 	bar_gap.visible = any
 	if changed:

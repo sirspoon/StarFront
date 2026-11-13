@@ -53,25 +53,24 @@ func _man(c: Color, at: Vector2, run: bool) -> void:
 
 func _icon(c: Color) -> void:
 	match kind:
-		"Assault":  # pace: walking or running
-			_man(c, Vector2(12, 12), variant == "on")
-			if variant == "on":
-				for k in 3:
-					draw_line(Vector2(1, 8 + k * 4), Vector2(5 - k, 8 + k * 4), c, 1.4)  # speed lines
-		"Down":  # stance: standing, or flat on the ground
-			if variant == "on":
-				draw_circle(Vector2(4.5, 15), 2.6, c)
-				draw_line(Vector2(7, 16), Vector2(20, 17), c, 2.8)
-				draw_line(Vector2(9, 17), Vector2(6, 19.5), c, 1.8)
-				draw_line(Vector2(1, 20.5), Vector2(23, 20.5), c, 1.4)
-			else:
-				draw_circle(Vector2(12, 4), 2.6, c)
-				draw_line(Vector2(12, 7), Vector2(12, 14), c, 2.8)
-				draw_line(Vector2(12, 14), Vector2(10, 20), c, 2.2)
-				draw_line(Vector2(12, 14), Vector2(14, 20), c, 2.2)
-				draw_line(Vector2(12, 9), Vector2(8.5, 13), c, 2.0)
-				draw_line(Vector2(12, 9), Vector2(15.5, 13), c, 2.0)
-				draw_line(Vector2(1, 20.5), Vector2(23, 20.5), c, 1.4)
+		"Pace":  # crouched / running / lying down
+			match variant:
+				"run":
+					_man(c, Vector2(12, 12), true)
+					for k in 3:
+						draw_line(Vector2(1, 8 + k * 4), Vector2(5 - k, 8 + k * 4), c, 1.4)  # speed lines
+				"down":
+					draw_circle(Vector2(4.5, 15), 2.6, c)
+					draw_line(Vector2(7, 16), Vector2(20, 17), c, 2.8)
+					draw_line(Vector2(9, 17), Vector2(6, 19.5), c, 1.8)
+					draw_line(Vector2(1, 20.5), Vector2(23, 20.5), c, 1.4)
+				_:  # crouched, rifle ready
+					draw_circle(Vector2(11, 7), 2.6, c)
+					draw_line(Vector2(10.5, 10), Vector2(9, 15), c, 2.8)  # bent back
+					draw_polyline(PackedVector2Array([Vector2(9, 15), Vector2(14, 15), Vector2(14, 20)]), c, 2.2)  # front leg
+					draw_polyline(PackedVector2Array([Vector2(9, 15), Vector2(7, 20), Vector2(4, 20)]), c, 2.2)  # knee down
+					draw_line(Vector2(10, 11), Vector2(19, 9.5), c, 2.0)  # rifle
+					draw_line(Vector2(1, 20.5), Vector2(23, 20.5), c, 1.4)
 		"Gun":
 			match variant:
 				"Beam":  # a full, thick beam
@@ -90,17 +89,28 @@ func _icon(c: Color) -> void:
 					draw_colored_polygon(pts, c)
 				_:
 					draw_line(Vector2(2, 12), Vector2(22, 12), c, 3.0)
-		"Grenade":
-			draw_circle(Vector2(11, 15), 7.0, c)
-			draw_rect(Rect2(8.5, 4.5, 5, 4), c)
-			draw_polyline(PackedVector2Array([Vector2(13.5, 6), Vector2(18, 4), Vector2(20, 8)]), c, 1.6)  # the lever
+		"Grenade":  # a "pineapple": a segmented oval body, the fuse top, its spoon and ring
+			var body := PackedVector2Array()
+			for k in 20:
+				var a := k * TAU / 20.0
+				body.append(Vector2(11, 15) + Vector2(cos(a) * 6.2, sin(a) * 7.6))
+			draw_colored_polygon(body, c)
+			draw_rect(Rect2(8.5, 5, 5, 3.5), c)  # the fuse housing
+			draw_polyline(PackedVector2Array([Vector2(13.5, 6), Vector2(17, 7), Vector2(17.5, 14)]), c, 1.8)  # the spoon down the side
+			draw_arc(Vector2(7, 5), 2.6, 0, TAU, 12, c, 1.3)  # the ring
 			if c == W:
-				for k in 2:  # the casing's grooves
-					draw_line(Vector2(5.5, 13 + k * 4), Vector2(16.5, 13 + k * 4), EDGE, 1.0)
-		"Unload":  # out of a box, arrow leaving
-			draw_rect(Rect2(2, 6, 11, 13), c, false, 2.0)
-			draw_line(Vector2(8, 12.5), Vector2(19, 12.5), c, 2.6)
-			draw_colored_polygon(PackedVector2Array([Vector2(17, 8), Vector2(23, 12.5), Vector2(17, 17)]), c)
+				for k in 3:  # the grooves that make the segments
+					draw_line(Vector2(5.2, 10.5 + k * 3.2), Vector2(16.8, 10.5 + k * 3.2), EDGE, 0.9)
+				for x in [8.5, 13.5]:
+					draw_line(Vector2(x, 8.5), Vector2(x, 21.5), EDGE, 0.9)
+		"Unload":  # the back of a carrier from above: doors swung open, three men fanning out
+			draw_line(Vector2(4, 2), Vector2(20, 2), c, 2.2)  # the hull's rear edge
+			draw_line(Vector2(4, 2), Vector2(4, 6), c, 2.2)
+			draw_line(Vector2(20, 2), Vector2(20, 6), c, 2.2)
+			draw_line(Vector2(7, 6), Vector2(3, 12), c, 2.4)   # left door, open
+			draw_line(Vector2(17, 6), Vector2(21, 12), c, 2.4)  # right door, open
+			for p in [Vector2(6.5, 18), Vector2(12, 20.5), Vector2(17.5, 18)]:
+				draw_circle(p, 2.3, c)
 		"Face":  # an arrow out from a line, as the squad will face
 			draw_line(Vector2(3, 18), Vector2(21, 18), c, 2.6)
 			draw_line(Vector2(12, 18), Vector2(12, 9), c, 3.2)
@@ -114,10 +124,12 @@ func _icon(c: Color) -> void:
 				draw_rect(Rect2(x, top, 2.2, 10.0 - top + 2.0), c)
 				draw_circle(Vector2(x + 1.1, top), 1.1, c)
 			draw_colored_polygon(PackedVector2Array([Vector2(7, 14), Vector2(3, 10), Vector2(2, 11.5), Vector2(6, 18)]), c)  # thumb
-		"Cover":  # a shield
-			draw_colored_polygon(PackedVector2Array([Vector2(4, 4), Vector2(20, 4), Vector2(20, 12), Vector2(12, 21), Vector2(4, 12)]), c)
-			if c == W:
-				draw_colored_polygon(PackedVector2Array([Vector2(7, 7), Vector2(17, 7), Vector2(17, 11.5), Vector2(12, 17), Vector2(7, 11.5)]), EDGE)
+		"Cover":  # the cover view: a grid with some squares filled in
+			for k in 5:
+				draw_line(Vector2(3 + k * 4.5, 3), Vector2(3 + k * 4.5, 21), c, 1.3)
+				draw_line(Vector2(3, 3 + k * 4.5), Vector2(21, 3 + k * 4.5), c, 1.3)
+			for cell in [Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 2), Vector2i(3, 1), Vector2i(1, 3), Vector2i(3, 3)]:
+				draw_rect(Rect2(3 + cell.x * 4.5, 3 + cell.y * 4.5, 4.5, 4.5), c)
 		"Squads":  # three heads: the squad list
 			for k in 3:
 				var x := 5.0 + k * 7.0
