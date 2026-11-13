@@ -10,6 +10,8 @@ const EDGE := Color(0.0, 0.0, 0.0, 0.55)
 var kind := ""
 var variant := ""  # e.g. "on", "Beam", "Pulse", "AP", "HE", "paused"
 var key := ""      # the keyboard shortcut, shown small on a PC
+var badge := ""    # a count in the top corner (Support: calls left)
+var progress := -1.0  # 0..1: a recharge ring round the icon (-1: none)
 
 
 func set_variant(v: String) -> void:
@@ -29,6 +31,14 @@ func _draw() -> void:
 		draw_set_transform(o + off, 0.0, Vector2(s / 24.0, s / 24.0))
 		_icon(EDGE if layer == 0 else W)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if progress >= 0.0 and progress < 1.0:
+		var rc := size * 0.5
+		var rad := minf(size.x, size.y) * 0.46
+		draw_arc(rc, rad, 0, TAU, 32, Color(0, 0, 0, 0.5), 2.5)
+		draw_arc(rc, rad, -PI / 2, -PI / 2 + TAU * progress, 32, Color(0.95, 0.75, 0.35, 0.9), 2.5)
+	if badge != "":
+		var bf := get_theme_default_font()
+		draw_string(bf, Vector2(3, 11), badge, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1.0, 0.85, 0.5))
 	if key != "":
 		var f := get_theme_default_font()
 		draw_string(f, Vector2(size.x - 2 - f.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x, size.y - 1), key,
@@ -99,6 +109,19 @@ func _icon(c: Color) -> void:
 					draw_colored_polygon(pts, c)
 				_:
 					draw_line(Vector2(2, 12), Vector2(22, 12), c, 3.0)
+		"Support":
+			if variant == "orbital":  # a rod falling out of the sky onto a burst
+				draw_line(Vector2(17, 2), Vector2(10, 15), c, 2.6)
+				draw_line(Vector2(19, 1), Vector2(13, 10), c, 1.0)
+				var pts := PackedVector2Array()
+				for k in 12:
+					pts.append(Vector2(9, 18) + Vector2.from_angle(k * TAU / 12.0) * (5.5 if k % 2 == 0 else 2.5))
+				draw_colored_polygon(pts, c)
+			else:  # a gunship from above
+				draw_colored_polygon(PackedVector2Array([Vector2(12, 2), Vector2(14.5, 6), Vector2(14.5, 18), Vector2(12, 21), Vector2(9.5, 18), Vector2(9.5, 6)]), c)
+				draw_colored_polygon(PackedVector2Array([Vector2(9.5, 9), Vector2(2, 13), Vector2(2, 15), Vector2(9.5, 13)]), c)
+				draw_colored_polygon(PackedVector2Array([Vector2(14.5, 9), Vector2(22, 13), Vector2(22, 15), Vector2(14.5, 13)]), c)
+				draw_rect(Rect2(8, 19, 8, 2), c)
 		"Target":  # a target reticle: ring, cross hairs, a dot at the centre
 			draw_arc(Vector2(12, 12), 7.5, 0, TAU, 24, c, 2.0)
 			for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:

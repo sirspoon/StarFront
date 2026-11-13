@@ -17,6 +17,10 @@ var effects: Effects
 var grenades: Grenades
 var mortars: Mortars
 var target_mode := false  # the Target button: the next tap gives the mortars a fire mission
+var support: Support
+var support_mode := false  # the Support button: the next drag draws the strike's line
+var support_drag := false  # drawing it now (from support_a to the pointer)
+var support_a := Vector2.ZERO
 var grenade_mode := false
 var cover_mode := false   # the Cover view (C): colours the ground by the cover it gives
 var cover_view: CoverView  # the next click / tap picks where to throw grenades
@@ -170,6 +174,8 @@ func _ready() -> void:
 			_test_follow()
 		if "--test-voice" in args:
 			_test_voice()
+		if "--test-support" in args:
+			_test_support()
 		if "--test-mortar" in args:
 			_test_mortar()
 		if "--test-pace" in args:
@@ -261,6 +267,20 @@ func _test_carrier() -> void:
 ## seconds and report any soldier who didn't go, and why.
 ## Test aid: a squad told to lay smoke out of its reach moves up and throws two grenades;
 ## the screen then blocks sight through it.
+## Test aid: call the player's support on a line through the enemy's nearest knot of men
+## at once (its timer skipped), and report; with --shot, the screenshot catches it.
+func _test_support() -> void:
+	await get_tree().create_timer(30.0).timeout
+	support.wait[player_team] = 0.0
+	var e: Soldier = nearest_seen_enemy(player_team, map.objective_rect.get_center())
+	var c: Vector2 = e.position if e != null else map.objective_rect.get_center()
+	print("support test: %s" % support.call_strike(player_team, c - Vector2(0, 150), c + Vector2(0, 150)))
+	support_test_at = c
+
+
+var support_test_at = null
+
+
 ## Test aid: the player's mortar team: a fire mission (HE) at a spot ahead, then smoke.
 func _test_mortar() -> void:
 	var sq: Squad = null
@@ -739,6 +759,9 @@ func _build_world(seed_value: int) -> void:
 	mortars = Mortars.new()
 	add_child(mortars)
 	mortars.setup(self)
+	support = Support.new()
+	add_child(support)
+	support.setup(self)
 	overlay = OverlayScript.new()
 	overlay.main = self
 	overlay.z_index = 10
@@ -1218,6 +1241,8 @@ func _take_shot() -> void:
 		camera.position = _melee_spot()
 	if demo_burn_at != null:
 		camera.position = demo_burn_at
+	if support_test_at != null:
+		camera.position = support_test_at
 	if "--shot-beam" in OS.get_cmdline_user_args() and not effects.beams.is_empty():
 		camera.position = (effects.beams[0].from + effects.beams[0].to) * 0.5
 	if "--shot-heavy" in OS.get_cmdline_user_args():
@@ -2093,6 +2118,8 @@ func _end(winner: int, reason: String) -> void:
 				factions[winner] if winner >= 0 else "draw", int(time), shots, hits,
 				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, flank_shots, int(100 * crossfire_time[0] / maxf(field_time[0], 1)), int(100 * crossfire_time[1] / maxf(field_time[1], 1)), blows, melee_kills, assault_kills[0], assault_kills[1], grenades_thrown, heavy_kills, int(100 * heavy_set_time[0] / maxf(heavy_time[0], 1)), int(100 * heavy_set_time[1] / maxf(heavy_time[1], 1)), friendly_kills, bastion_kills, peeks, reason])
 		print("KILLS " + JSON.stringify(kill_sources))
+		print("SUPPORT calls used [%d, %d], kills [%d, %d] (counts own men too)" % [support.info(0).uses - support.left[0],
+				support.info(1).uses - support.left[1], support.kills[0], support.kills[1]])
 		get_tree().quit()
 		return
 	var head := "DRAW"
@@ -2239,7 +2266,13 @@ func _unhandled_input(e: InputEvent) -> void:
 			MOUSE_BUTTON_LEFT:
 				if not started or over:
 					return
-				if mb.pressed and target_mode:
+				if mb.pressed and support_mode:
+					support_drag = true
+					support_a = wp
+					pointer_world = wp
+				elif not mb.pressed and support_drag:
+					_order_support(support_a, wp)
+				elif mb.pressed and target_mode:
 					_order_target(wp)
 				elif mb.pressed and grenade_mode:
 					_order_grenade(wp)
@@ -2306,6 +2339,9 @@ func _unhandled_input(e: InputEvent) -> void:
 		elif k == KEY_F:
 			target_mode = not target_mode
 			hud.sync_touch("Target", target_mode)
+		elif k == KEY_Q and started and not over:
+			touch_button("Support", not support_mode)
+			hud.sync_touch("Support", support_mode)
 		elif k >= KEY_1 and k <= KEY_9:
 			var mine := _player_squads()
 			var i := k - KEY_1
@@ -2397,6 +2433,16 @@ func _plan(kind: String, a: Vector2, b: Vector2, final: bool, face_override := V
 
 
 ## The selected squads answer an order (only the Sworn have voices so far).
+## Call the side's support strike along a-b (the line drawn after pressing Support).
+func _order_support(a: Vector2, b: Vector2) -> void:
+	support_drag = false
+	support_mode = false
+	hud.sync_touch("Support", false)
+	var msg := support.call_strike(player_team, a, b)
+	if msg != "":
+		log_message("[color=#ffd070]%s[/color]" % msg)
+
+
 ## A fire mission for the selected mortar teams at a picked spot.
 func _order_target(wp: Vector2) -> void:
 	target_mode = false
@@ -2662,6 +2708,12 @@ func _touch_input(e: InputEvent) -> void:
 				t_start = st.position
 				t_mode = ""
 				t_press_ms = Time.get_ticks_msec()
+				if support_mode and started and not over:
+					t_mode = "support"
+					support_drag = true
+					support_a = _screen_to_world(st.position)
+					pointer_world = support_a
+					return
 				# a second touch right after a tap close by: double tap, or tap-drag
 				var recent := st.position.distance_to(tap_screen) < 50.0 \
 						and (t_press_ms - tap_time < DOUBLE_TAP_MS or Engine.get_process_frames() - tap_frame <= 10)
@@ -2681,6 +2733,10 @@ func _touch_input(e: InputEvent) -> void:
 			touches.erase(st.index)
 			if single:
 				var wp := _screen_to_world(st.position)
+				if t_mode == "support":
+					t_mode = ""
+					_order_support(support_a, wp)
+					return
 				if t_mode == "line":
 					rdragging = false
 					_plan("line", rdrag_start, wp, true)
@@ -2726,6 +2782,9 @@ func _touch_input(e: InputEvent) -> void:
 			pinch_prev_center = centre
 			pinch_prev_dist = dist
 			_clamp_camera()
+			return
+		if t_mode == "support":
+			pointer_world = _screen_to_world(sd.position)
 			return
 		if t_mode == "" and sd.position.distance_to(t_start) > 18.0:
 			t_mode = "pan"
@@ -2912,6 +2971,11 @@ func touch_button(key: String, on: bool) -> void:
 			grenade_mode = on
 		"Target":
 			target_mode = on
+		"Support":
+			support_mode = on and support.ready_for(player_team)
+			if on and not support_mode:
+				hud.sync_touch("Support", false)
+				log_message("[color=#e8c070]%s not ready yet.[/color]" % support.info(player_team).name)
 		"Cover":
 			cover_mode = on
 			hud.show_cover_key(on)

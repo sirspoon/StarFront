@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.87 (2026-11-13)
+Support from above.
+- New Support button (Q), always on the bar: its icon shows the calls left and a ring filling up
+  until the next is ready. Press it, then draw a line on the map (mouse or finger). The strike hits
+  everyone on the line, friend or foe; strikes on the way are marked in red, with a countdown, for both sides.
+- Legion, Kestrel gunship (5 a battle, 60 s apart, first ready at 40 s): 4 seconds after the call it
+  flies straight along the line (its shadow sweeping the ground below), raking it with cannon fire
+  and 8 rockets.
+- Sworn, Oathfall bombardment (3 a battle, 90 s apart, first ready at 60 s): 10 seconds after the
+  call, 8 tungsten rods streak down out of orbit along the line, each a huge blast (it brings down
+  walls, wrecks vehicles from above) that leaves the ground molten: white-hot, then orange, then a
+  dull red crust, cooling over the next minute to scorched earth.
+- The computer calls its side's strike on a knot of four or more of your men it can see, clear of
+  its own. In 12 test battles (6 to 6) a gunship run killed about 0.6 men and a bombardment about
+  1.9, and both pin a lot more.
+
 ## v0.86 (2026-11-13)
 - Mortars: the smoke limit is 5 full salvos a battle (every tube fires in each), not 5 rounds shared
   between the tubes. The unit card counts salvos left.

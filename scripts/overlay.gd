@@ -85,6 +85,17 @@ func _draw() -> void:
 		_draw_links(sq)
 		if sq.facing != Vector2.ZERO and not sq.alive().is_empty():
 			_arrow(sq.center(), sq.center() + sq.facing * 46.0, Color(0.6, 0.8, 1.0, 0.75))
+	if main.support_drag:
+		# the strike's line as it's drawn, clipped to the longest allowed
+		var sa: Vector2 = main.support_a
+		var sb: Vector2 = main.pointer_world
+		var mx: float = main.support.info(main.player_team).max_len
+		if sa.distance_to(sb) > mx:
+			sb = sa + (sb - sa).normalized() * mx
+		var zz: float = 1.0 / main.camera.zoom.x
+		draw_line(sa, sb, Color(1.0, 0.35, 0.2, 0.85), 4.0 * zz)
+		draw_arc(sa, 9.0 * zz, 0, TAU, 18, Color(1.0, 0.35, 0.2, 0.9), 2.0 * zz)
+		draw_arc(sb, 9.0 * zz, 0, TAU, 18, Color(1.0, 0.35, 0.2, 0.9), 2.0 * zz)
 	if main.t_mode == "face":
 		var fa: Vector2 = main.face_anchor
 		var fb: Vector2 = main.pointer_world

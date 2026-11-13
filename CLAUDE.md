@@ -115,6 +115,9 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `--test-touch` gives orders the way a phone does (tap, double-tap, hold-drag, hold) with nobody fighting;
   `--no-enemy` with `--test-follow` does the same for direct orders; `--test-reach` counts unreachable
   destination spots. All print anyone who did not move.
+- `--test-support` (with `--autotest`) calls the player's support at 30 s on the enemy's nearest men and centres any
+  screenshot there (gunship at ~36 s, Sworn rods land at ~40 s). Test results end with a SUPPORT line: calls used and men
+  killed by each side's strikes.
 - `--test-mortar` (with `--autotest`, headless is fine) sets the player's mortar team up, gives it an HE fire mission
   (prints how long setting up took, when each round left and how far from the aim it landed), then smoke three times
   (with two salvos left: two full salvos, then refused), then a move (how long packing up took).

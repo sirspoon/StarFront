@@ -175,7 +175,7 @@ func _build_touch_bar() -> void:
 	# orders for what's selected (only those that apply are shown), then a gap, then the
 	# buttons that are always there
 	for spec in [["Pace", false], ["Gun", false], ["Target", true], ["Grenade", true], ["Unload", false], ["Face", true], ["Halt", false],
-			["|", false], ["Cover", true], ["Squads", true], ["Pause", true], ["Menu", false]]:
+			["|", false], ["Support", true], ["Cover", true], ["Squads", true], ["Pause", true], ["Menu", false]]:
 		if spec[0] == "|":
 			var gap := VSeparator.new()
 			gap.custom_minimum_size = Vector2(10, 0)
@@ -212,12 +212,13 @@ var bar_panel: PanelContainer
 var bar_icons := {}
 var last_sel_sig := ""
 var bar_gap: Control
-const HINTS := {"Pace": "R/G", "Target": "F", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "Menu": "Esc"}
+const HINTS := {"Pace": "R/G", "Target": "F", "Support": "Q", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "Menu": "Esc"}
 const TIPS := {"Pace": "Pace (tap to change): crouched and walking; running (faster, charge into close combat, but fire less and easier to hit); or lying down (much harder to hit, crawl when moving)",
 		"Gun": "Switch the gun setting: a tank's main gun (beam / pulse, AP / HE), or the round a carrier's launchers fire (HE / smoke)",
 		"Grenade": "Then tap a spot: infantry throw frags at men, tank-breakers at armour, smoke on open ground; carriers fire a salvo of the loaded round",
 		"Target": "Then tap a spot: the mortars shell it (no sight needed). Halt or a move order ends the mission",
 		"Unload": "Passengers get out", "Face": "Then drag: which way the squad faces", "Halt": "Stop and forget orders",
+		"Support": "Call in support from above: press, then draw a line on the map. Hits everyone on the line",
 		"Cover": "Show where the cover is", "Squads": "Show the squad list", "Pause": "Pause (orders still work)", "Menu": "Restart, options, controls"}
 
 
@@ -292,6 +293,18 @@ func _context_buttons() -> void:
 				b.button_pressed = false  # (switches the mode off too)
 		bar_icons[k].set_variant(mode if k == "Gun" else (main.pace_state() if k == "Pace" else ("on" if b.button_pressed else "")))
 	bar_icons["Pause"].set_variant("paused" if main.paused else "")
+	if main.support != null:
+		var st = main.support
+		var pt: int = main.player_team
+		var si: BarIcon = bar_icons["Support"]
+		si.set_variant(st.kind[pt])
+		si.badge = str(st.left[pt])
+		si.progress = 1.0 - st.wait[pt] / float(st.info(pt).cooldown) if st.left[pt] > 0 else 0.0
+		si.queue_redraw()
+		var sb: Button = touch_buttons["Support"]
+		sb.disabled = not st.ready_for(pt) and not sb.button_pressed
+		sb.tooltip_text = "%s: %d left%s. Press, then draw a line on the map; it hits everyone on the line  [Q]" % [st.info(pt).name, st.left[pt],
+				("" if st.ready_for(pt) else (", ready in %d s" % ceili(st.wait[pt]) if st.left[pt] > 0 else ""))]
 	bar_gap.visible = any
 	if changed:
 		bar_panel.reset_size()
