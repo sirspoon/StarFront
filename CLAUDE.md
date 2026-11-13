@@ -97,6 +97,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   beam; `--shot-tank --shot-team=0|1 --shot-zoom=5` for a close look at either tank.
 - `--log-mem` prints graphics memory, object / node / resource counts and map patches every 30 s of battle time,
   to find what grows over a long battle (try with `--phonetest`).
+- `--log-mem` also prints FRAME lines: draw calls, triangles, process time and the number of ground marks. `--hide-decals`,
+  `--decals-unlit`, `--hide-roofs` switch parts off to see what they cost (use `--shot-zoom=0.5` to have the whole map in view).
 - `--log-guns` prints each change of a tank's main gun setting (beam / pulse, AP / HE), each carrier launcher
   salvo (LAUNCH) and each barricade or sandbag cell a vehicle crashes through (BASH).
 - `--log-slots` prints, for each squad order, how good the best gun's firing spot is against the squad's average

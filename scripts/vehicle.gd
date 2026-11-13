@@ -168,6 +168,7 @@ func _set_mode(sl: Dictionary, w: Dictionary) -> void:
 		return
 	sl.weapon = w
 	sl.beam_t = 0.0  # cut the beam
+	main.beam_stop(sl)
 	sl.burst_left = 0
 	sl.cooldown = maxf(sl.cooldown, 1.5)  # the crew change over
 	weapon = slots[0].weapon
@@ -304,6 +305,8 @@ func _shed(side: float) -> void:
 
 
 func _destroy(from: Soldier) -> void:
+	for sl in slots:
+		main.beam_stop(sl)  # (a lance cut off mid-beam)
 	state = State.DEAD
 	z_index = -1
 	moving = false
@@ -519,6 +522,8 @@ func _aim_and_fire(dt: float, now: float) -> void:
 		if sl.get("beam_t", 0.0) > 0.0:
 			# the lance is firing: hold the beam on the target (or the wall) as the turret tracks it
 			sl.beam_t -= dt
+			if sl.beam_t <= 0.0:
+				main.beam_stop(sl)
 			if sl.get("beam_point") != null and t == null:
 				turret_goal = (sl.beam_point - position).angle()
 			elif t == null:

@@ -660,10 +660,16 @@ func _build_world(seed_value: int) -> void:
 	if map_view.enabled:
 		roofs = Roofs.new()
 		add_child(roofs)
+		if "--hide-roofs" in OS.get_cmdline_user_args():
+			roofs.visible = false  # test aid
 		roofs.setup(self)
 	decals = DecalsScript.new()
 	decals.z_index = -5
 	add_child(decals)
+	for arg in OS.get_cmdline_user_args():  # test aids, for finding what the drawing costs
+		match arg:
+			"--hide-decals": decals.visible = false
+			"--decals-unlit": decals.light_mask = 0
 	units_layer = Node2D.new()
 	add_child(units_layer)
 	effects = Effects.new()
@@ -988,6 +994,10 @@ func _process(dt: float) -> void:
 				Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT),
 				Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT), map_view.patches_done,
 				Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)])
+		print("FRAME %d:%02d draw calls %d  primitives %d  process %.1f ms  decals %d small + %d tracks + %d scorches  lights %d" % [
+				int(time) / 60, int(time) % 60, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+				Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+				decals.small.size(), decals.tracks.size(), decals.marks.size(), light_fx.active.size()])
 	if int(time / crumb) != int((time - dt) / crumb):
 		# breadcrumbs in battle too, in case the browser's graphics give out mid-fight
 		Settings.stage("in battle at %d:%02d: %d lights lit, %d tracers, %d ground marks, %d smoke screens, %d fires, %d map repairs, graphics memory %d MB (%s)" % [int(time) / 60, int(time) % 60,
@@ -1385,6 +1395,7 @@ func beam_tick(v: Vehicle, sl: Dictionary, dt: float) -> void:
 	var show := v.visible or effects_visible_at(end)
 	if show:
 		effects.beam(from, end, w.tracer, w.width, v.get_instance_id())
+	_beam_lights(sl, from, end, show)
 	sl.beam_acc = float(sl.get("beam_acc", 0.0)) + dt
 	if sl.beam_acc < 0.2:
 		return
@@ -1393,11 +1404,6 @@ func beam_tick(v: Vehicle, sl: Dictionary, dt: float) -> void:
 	# spread over its length (dose: the share of the old 1.3 s beam's harm per tick)
 	var dose := float(w.get("dose", 1.0))
 	if show:
-		light_fx.flash(end, Color(1.0, 0.55, 0.25), 2.4, 110.0, 0.25)
-		# the beam lights the ground along its length, and the muzzle glares
-		var blen := from.distance_to(end)
-		light_fx.flash(from.lerp(end, 0.5), Color(1.0, 0.5, 0.22), 1.3, clampf(blen * 0.55, 60.0, 260.0), 0.25)
-		light_fx.flash(from, Color(1.0, 0.65, 0.35), 1.6, 70.0, 0.25)
 		effects.spark(end)
 		effects.puff(end, Color(0.35, 0.3, 0.27), 6.0)
 	decals.add_burn(end + Vector2(randf_range(-3, 3), randf_range(-3, 3)), 2.6)
@@ -1437,6 +1443,43 @@ func beam_tick(v: Vehicle, sl: Dictionary, dt: float) -> void:
 		var c := map.cell_of(end + Vector2(randf_range(-10, 10), randf_range(-10, 10)))
 		if map.flammable(c) and randf() < 0.25 * maxf(dose, 0.5):
 			ignite(c)
+
+
+## The lance's own lights (one at the strike, one along the beam, and on PCs one at the
+## muzzle), kept for the gun and moved with the beam every frame: steadier and much cheaper
+## than starting fresh flashes several times a second.
+func _beam_lights(sl: Dictionary, from: Vector2, end: Vector2, show: bool) -> void:
+	if not sl.has("beam_lights"):
+		var ls: Array = []
+		if light_fx.enabled_fx and light_fx.tex != null:
+			for k in (2 if Settings.is_phone() else 3):
+				var l := PointLight2D.new()
+				l.texture = light_fx.tex
+				l.height = 20.0
+				light_fx.add_child(l)
+				ls.append(l)
+		sl.beam_lights = ls
+	var ls: Array = sl.beam_lights
+	if ls.is_empty():
+		return
+	var boost: float = light_fx.boost
+	var flick := 0.85 + randf() * 0.3
+	var blen := from.distance_to(end)
+	var spots := [[end, Color(1.0, 0.55, 0.25), 2.6, 110.0], [from.lerp(end, 0.5), Color(1.0, 0.5, 0.22), 1.4, clampf(blen * 0.55, 60.0, 240.0)],
+			[from, Color(1.0, 0.65, 0.35), 1.7, 70.0]]
+	for k in ls.size():
+		var l: PointLight2D = ls[k]
+		l.enabled = show
+		l.position = spots[k][0]
+		l.color = spots[k][1]
+		l.energy = float(spots[k][2]) * 1.3 * boost * flick
+		l.texture_scale = float(spots[k][3]) / 128.0 * sqrt(boost)
+
+
+## The beam has stopped: its lights go out.
+func beam_stop(sl: Dictionary) -> void:
+	for l in sl.get("beam_lights", []):
+		l.enabled = false
 
 
 ## The main gun of a tank going off: a great flash, a shockwave ring, gunsmoke, dust kicked up

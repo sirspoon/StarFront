@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.82 (2026-11-13)
+Smoother as the battle goes on, and when the lumen lance fires.
+- Ground marks (blood, burns, scorches, track ruts) were one big drawing, redrawn whole whenever a
+  mark was added and drawn whole every frame; as the battle filled up it doubled the drawing work.
+  They're now kept in a grid of chunks: a new mark redraws only its own chunk, and chunks off screen
+  aren't drawn. The tiny drops and specks are drawn as small squares or octagons instead of full
+  circles (the same at that size), and track ruts with fewer tread marks. With the whole map in view
+  and the marks at their limit, the drawing work fell from about 200,000 to 120,000 triangles.
+- The lumen lance keeps three lights of its own that move with the beam (two on phones), instead of
+  starting three new flashes five times a second while it fires.
+
 ## v0.81 (2026-11-13)
 The Prime Factorium rebuilt as a works.
 - Bigger (30 x 20 cells against the chapel's 24 x 14) and L-shaped: a north wing joined to the main
