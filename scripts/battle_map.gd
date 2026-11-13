@@ -416,15 +416,25 @@ func _refresh_vastar(c: Vector2i) -> void:
 	if not in_bounds(c):
 		return
 	var clear := c.x > 0 and c.y > 0 and c.x < W - 1 and c.y < H - 1
+	var bash := 0.0  # how much it would rather not push through what's here (sandbags most)
 	for dx in range(-1, 2):
 		for dy in range(-1, 2):
-			var nt := get_t(c + Vector2i(dx, dy))
-			if clear and (solid(nt) or nt == T.LOW or nt == T.TRENCH):
-				clear = false  # vehicles drive round low cover and trenches
+			var n := c + Vector2i(dx, dy)
+			var nt := get_t(n)
+			if nt == T.LOW and vehicle_can_crush(n):
+				bash = maxf(bash, 3.0 if low_kind[n.y * W + n.x] == LowKind.SANDBAGS else 1.8)
+			elif clear and (solid(nt) or nt == T.LOW or nt == T.TRENCH):
+				clear = false  # vehicles drive round low walls and trenches
 	vastar.set_point_solid(c, not clear)
 	if clear:
 		var t := get_t(c)
-		vastar.set_point_weight_scale(c, 1.0 if t == T.OPEN or t == T.FLOOR else 1.8)
+		var w := 1.0 if t == T.OPEN or t == T.FLOOR else 1.8
+		vastar.set_point_weight_scale(c, maxf(w, bash))
+
+
+## Barricades, crates and sandbags give way under a vehicle (low stone walls don't).
+func vehicle_can_crush(c: Vector2i) -> bool:
+	return get_t(c) == T.LOW and low_kind[c.y * W + c.x] != LowKind.STONE
 
 
 # ---------------------------------------------------------------- generation

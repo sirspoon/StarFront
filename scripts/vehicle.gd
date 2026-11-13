@@ -28,6 +28,17 @@ var smoke_timer := 0.0
 var engine_sound: AudioStreamPlayer2D
 var was_moving := false
 var rev_cooldown := 0.0
+## Battle damage, drawn on the hull: [local point, went through?, seed], newest last.
+var hits: Array = []
+var plate_off := 0.0     # which side has lost an armour skirt plate (-1 / 1), 0 = none
+var track_off := 0.0     # which side's track is broken and trailing
+var last_hit_t := -99.0
+## Carriers' grenade launchers: three salvos of each, six grenades a salvo.
+var launcher := false
+var launch_kind := "he"
+var launch_ammo := {"he": 3, "smoke": 3}
+var launch_cool := 0.0
+var _launch_think := 0.0
 
 
 func setup_vehicle(m: Node, sq: Squad, t: int, kind_id: String) -> void:
@@ -62,6 +73,7 @@ func setup_vehicle(m: Node, sq: Squad, t: int, kind_id: String) -> void:
 				"angle": 0.0, "flash": 0.0,
 				"modes": [w, GameData.WEAPONS[wd.alt]] if wd.has("alt") else []})
 	weapon = slots[0].weapon
+	launcher = vdata.get("launcher", false)
 	engine_sound = m.sfx.make_engine()
 	if engine_sound != null:
 		add_child(engine_sound)
@@ -74,6 +86,8 @@ func gun_mode() -> String:
 	for sl in slots:
 		if not sl.modes.is_empty():
 			return sl.weapon.get("mode", "")
+	if launcher:
+		return "HE" if launch_kind == "he" else "Smoke"
 	return ""
 
 
@@ -82,7 +96,51 @@ func switch_gun() -> String:
 		if not sl.modes.is_empty():
 			_set_mode(sl, sl.modes[1] if sl.weapon == sl.modes[0] else sl.modes[0])
 			return sl.weapon.get("mode", "")
+	if launcher:
+		launch_kind = "smoke" if launch_kind == "he" else "he"
+		return gun_mode()
 	return ""
+
+
+## Fire a salvo from the grenade launchers: six grenades, three from each side, over the
+## ground ahead. Returns why not, or "" if it fired.
+func fire_launcher() -> String:
+	if not launcher or not is_alive():
+		return "no launchers"
+	if int(launch_ammo[launch_kind]) <= 0:
+		return "out of %s salvos" % gun_mode()
+	if launch_cool > 0.0:
+		return "reloading"
+	launch_ammo[launch_kind] = int(launch_ammo[launch_kind]) - 1
+	launch_cool = 3.0
+	main.grenades.launch(self, launch_kind)
+	if "--log-guns" in OS.get_cmdline_user_args():
+		print("LAUNCH %s %s %s at %.0f s (%s left)" % [faction, vdata.name, launch_kind, main.time, launch_ammo])
+	return ""
+
+
+## The computer's carriers: HE at a knot of enemy infantry close ahead, smoke when hit.
+func _auto_launch(dt: float) -> void:
+	_launch_think -= dt
+	if _launch_think > 0.0 or launch_cool > 0.0:
+		return
+	_launch_think = 1.0
+	if int(launch_ammo.smoke) > 0 and main.time - last_hit_t < 2.0:
+		launch_kind = "smoke"
+		fire_launcher()
+		return
+	if int(launch_ammo.he) <= 0:
+		return
+	var n := 0
+	for e in main.soldiers:
+		if e.team == team or e.is_vehicle or not e.is_alive() or not e.seen_by[team]:
+			continue
+		var d := position.distance_to(e.position)
+		if d > 60.0 and d < 160.0 and absf(wrapf((e.position - position).angle() - facing, -PI, PI)) < 0.8:
+			n += 1
+	if n >= 3:
+		launch_kind = "he"
+		fire_launcher()
 
 
 func _set_mode(sl: Dictionary, w: Dictionary) -> void:
@@ -179,13 +237,50 @@ func hurt_by(w: Dictionary) -> bool:
 ## Called when a shot hits the hull. Returns true if it got through the armour.
 func receive_hit(w: Dictionary, from_pos: Vector2, from: Soldier) -> bool:
 	var arm := armour_facing(from_pos)
+	if int(w.get("pen", 0)) >= 5:
+		last_hit_t = main.time  # (something that could hurt it: the crew think about smoke)
 	if randf() >= pen_chance(w.get("pen", 0), arm):
+		if int(w.get("pen", 0)) >= 4:
+			_mark_hit(from_pos, false)  # a gouge where it glanced off
 		return false
+	var before := float(hp) / max_hp
 	hp -= int(w.get("vdmg", w.dmg))
 	shaken = maxf(shaken, 2.5)
+	_mark_hit(from_pos, true)
+	var now_f := float(maxi(hp, 0)) / max_hp
+	var side := signf((from_pos - position).rotated(-facing).y)
+	if side == 0.0:
+		side = 1.0
+	# bits come off as it's hurt: a skirt plate, then a track
+	if before >= 0.7 and now_f < 0.7 and plate_off == 0.0:
+		plate_off = side
+		_shed(side)
+	if before >= 0.45 and now_f < 0.45 and track_off == 0.0:
+		track_off = side
+		speed *= 0.8  # limping on a damaged track
+		_shed(side)
 	if hp <= 0:
 		_destroy(from)
 	return true
+
+
+## Where on the hull a hit from from_pos lands (hull space), for drawing the damage.
+func _mark_hit(from_pos: Vector2, through: bool) -> void:
+	var d := (from_pos - position).rotated(-facing).normalized()
+	var t := minf(length * 0.5 / maxf(absf(d.x), 0.01), width * 0.5 / maxf(absf(d.y), 0.01)) * 0.8
+	var p := d * t + Vector2(randf_range(-5, 5), randf_range(-4, 4))
+	p.x = clampf(p.x, -length * 0.44, length * 0.44)
+	p.y = clampf(p.y, -width * 0.42, width * 0.42)
+	hits.append([p, through, randi()])
+	if hits.size() > 16:
+		hits.pop_front()
+
+
+## Metal torn off the hull flying away.
+func _shed(side: float) -> void:
+	if visible:
+		main.effects.debris(position + Vector2(0, side * width * 0.5).rotated(facing), 8)
+		main.sfx.play("clang", position, 2.0, 0.1)
 
 
 func _destroy(from: Soldier) -> void:
@@ -262,6 +357,16 @@ func tick(dt: float, now: float) -> void:
 			rev_cooldown = 4.0
 		was_moving = moving
 	recoil = maxf(0.0, recoil - dt * 3.0)
+	launch_cool = maxf(0.0, launch_cool - dt)
+	if hits.is_empty() and now > 1.0 and "--demo-vdamage" in OS.get_cmdline_user_args():
+		# test aid: knock every vehicle about to about a third of its hull, from all sides
+		var w := {"pen": 9, "vdmg": 1, "dmg": 1}
+		while hp > max_hp * 0.34:
+			receive_hit(w, position + Vector2.from_angle(randf() * TAU) * 100.0, null)
+		for k in 5:
+			_mark_hit(position + Vector2.from_angle(randf() * TAU) * 100.0, false)
+	if launcher and (team != main.player_team or main.autotest):
+		_auto_launch(dt)
 	hull_kick = maxf(0.0, hull_kick - dt * 4.0)
 	_drive(dt)
 	if last_track == Vector2.INF:
@@ -273,8 +378,12 @@ func tick(dt: float, now: float) -> void:
 	smoke_timer -= dt
 	if smoke_timer <= 0.0:
 		smoke_timer = 0.35
-		if visible and hp < max_hp * 0.5:
-			main.effects.puff(position + Vector2(randf_range(-8, 8), randf_range(-8, 8)), Color(0.12, 0.11, 0.1), 9.0)
+		if visible and hp < max_hp * 0.65:
+			# smoke from the hurt hull: grey at first, thick and black when it's badly hurt
+			var bad := hp < max_hp * 0.35
+			var back := -Vector2.from_angle(facing) * length * 0.25
+			main.effects.puff(position + back + Vector2(randf_range(-6, 6), randf_range(-6, 6)),
+					Color(0.1, 0.09, 0.08) if bad else Color(0.3, 0.29, 0.27), 11.0 if bad else 7.0)
 		if visible and moving:
 			main.effects.puff(position - Vector2.from_angle(facing) * length * 0.5, Color(0.45, 0.4, 0.33), 7.0)
 	if visible:
@@ -319,12 +428,22 @@ func _drive(dt: float) -> void:
 	track_phase += step * (-1.0 if reversing else 1.0)
 	_run_over(cur_speed)
 	var under: Array = []  # it flattens bushes, hedges and wire it drives over
-	for fx in [-0.4, 0.0, 0.4]:
-		for fy in [-0.35, 0.35]:
+	for fx in [-0.4, 0.0, 0.4, 0.55]:
+		for fy in [-0.35, 0.0, 0.35]:
 			var c := map.cell_of(position + Vector2(length * fx, width * fy).rotated(facing))
 			var t := map.get_t(c)
 			if (t == BattleMap.T.BUSH or t == BattleMap.T.HEDGE or t == BattleMap.T.WIRE) and not under.has(c):
 				under.append(c)
+			elif t == BattleMap.T.LOW and map.vehicle_can_crush(c):
+				# barricades, crates and sandbags: it shoves through them, slowing as it does
+				map.chip_low(c, 9999.0)
+				cur_speed *= 0.55
+				if "--log-guns" in OS.get_cmdline_user_args():
+					print("BASH %s %s through %s at %.0f s" % [faction, vdata.name, BattleMap.LOW_NAMES[map.low_kind[c.y * BattleMap.W + c.x]], main.time])
+				hull_kick = maxf(hull_kick, 0.6)
+				if visible:
+					main.effects.debris(map.center_of(c), 7)
+					main.sfx.play("collapse", map.center_of(c), -4.0, 0.15)
 	if not under.is_empty():
 		map.crush_cells(under)
 
@@ -662,19 +781,56 @@ func _draw_sworn_hull(L: float, Wd: float) -> void:
 			draw_line(Vector2(-L * 0.1, y), Vector2(L * 0.05, y), Color(1.0, 0.3, 0.12), 1.0)
 
 
-## Scorch marks and gouges as the hull is hurt.
+## Battle damage: scorched holes where rounds went through, bright gouges where they
+## glanced off, a skirt plate torn away (and one left hanging), a broken track trailing its
+## links, and fire on the engine deck when it's close to brewing up.
 func _draw_damage(L: float, Wd: float) -> void:
-	if hp >= max_hp:
-		return
-	var n := int(float(max_hp - hp) / max_hp * 8.0) + 1
-	var rng := RandomNumberGenerator.new()
-	rng.seed = get_instance_id()
-	for k in n:
-		var p := Vector2(rng.randf_range(-L * 0.4, L * 0.4), rng.randf_range(-Wd * 0.35, Wd * 0.35))
-		draw_circle(p, rng.randf_range(2.5, 5.0), Color(0.03, 0.03, 0.02, 0.45))
-		draw_circle(p, rng.randf_range(0.8, 1.6), Color(0.0, 0.0, 0.0, 0.8))
-		if rng.randf() < 0.5:
-			draw_line(p, p + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(3, 6), Color(0.55, 0.55, 0.5), 0.6)  # bright gouge
+	var tw := _tw(Wd)
+	var t: float = main.time
+	if plate_off != 0.0:
+		var y: float = plate_off * (Wd * 0.5 - tw * 0.5)
+		var bare := Rect2(-L * 0.12, y - tw * 0.55, L * 0.3, tw * 1.1)
+		draw_rect(bare, Color(0.11, 0.1, 0.09))  # the bare hull side under it
+		for k in 4:
+			draw_circle(Vector2(bare.position.x + 2 + k * bare.size.x / 4.0, y), 0.7, Color(0.35, 0.33, 0.3))  # empty bolt holes
+		# the next plate along, hanging off one bolt
+		var hp0 := Vector2(-L * 0.22, y + plate_off * tw * 0.5)
+		var hang := PackedVector2Array([hp0, hp0 + Vector2(-L * 0.12, plate_off * 2.5), hp0 + Vector2(-L * 0.13, plate_off * (tw * 0.9 + 3)),
+				hp0 + Vector2(-1, plate_off * tw * 0.8)])
+		draw_colored_polygon(hang, colors.coat.darkened(0.35))
+		draw_polyline(hang + PackedVector2Array([hp0]), DARK, 0.8)
+	if track_off != 0.0:
+		var yc: float = track_off * (Wd * 0.5 - tw * 0.5)
+		# the broken run: a gap, then links trailing out behind
+		draw_rect(Rect2(-L * 0.5, yc - tw * 0.5, L * 0.28, tw), Color(0.16, 0.14, 0.12))
+		var a := Vector2(-L * 0.5, yc)
+		for k in 6:
+			var p := a + Vector2(-3.6 * k, track_off * (k * k) * 0.35 + sin(k * 1.3) * 0.8)
+			draw_rect(Rect2(p - Vector2(1.6, tw * 0.45), Vector2(3.0, tw * 0.9)), Color(0.12, 0.11, 0.1))
+			draw_line(p - Vector2(0, tw * 0.4), p + Vector2(0, tw * 0.4), Color(0.25, 0.23, 0.2), 0.8)
+		draw_circle(Vector2(-L * 0.5 + tw * 0.45, yc), tw * 0.42, Color(0.2, 0.19, 0.17))  # the bare idler wheel
+	for h in hits:
+		var p: Vector2 = h[0]
+		var rng := RandomNumberGenerator.new()
+		rng.seed = h[2]
+		if h[1]:
+			draw_circle(p, rng.randf_range(4.0, 6.0), Color(0.02, 0.02, 0.015, 0.5))  # scorch
+			draw_circle(p, rng.randf_range(2.0, 3.0), Color(0.06, 0.05, 0.04, 0.8))
+			for k in 6:  # the metal splashed back round the hole
+				var ang := k * TAU / 6.0 + rng.randf() * 0.5
+				draw_line(p + Vector2.from_angle(ang) * 1.4, p + Vector2.from_angle(ang) * rng.randf_range(2.5, 4.0), Color(0.42, 0.3, 0.2), 0.7)
+			draw_circle(p, 1.2, Color(0, 0, 0))
+		else:
+			var ang := rng.randf() * TAU
+			draw_line(p, p + Vector2.from_angle(ang) * rng.randf_range(3.0, 6.0), Color(0.62, 0.6, 0.55), 0.9)
+			draw_circle(p, 1.6, Color(0.05, 0.05, 0.04, 0.45))
+	if hp < max_hp * 0.35:
+		# flames licking up from the engine deck
+		for k in 3:
+			var p := Vector2(-L * 0.32 + k * 4.0, sin(k * 2.1) * Wd * 0.15)
+			var f := 0.6 + 0.4 * sin(t * 13.0 + k * 1.7)
+			draw_circle(p, 3.2 * f + 1.0, Color(1.0, 0.45, 0.1, 0.75))
+			draw_circle(p, 1.6 * f + 0.5, Color(1.0, 0.85, 0.4, 0.9))
 
 
 func _draw_sunburst(c: Vector2, r: float, col: Color) -> void:

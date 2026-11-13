@@ -1925,7 +1925,21 @@ func switch_guns() -> void:
 		var v = sq.vehicle()
 		if sq.selected and v != null and v.is_alive() and v.gun_mode() != "":
 			var m: String = v.switch_gun()
-			log_message("[color=#e8c070]%s: main gun to %s[/color]" % [sq.name, m])
+			log_message("[color=#e8c070]%s: %s to %s[/color]" % [sq.name, "launchers" if v.launcher else "main gun", m])
+	if hud != null:
+		hud._gun_buttons()
+
+
+## The selected carriers fire a launcher salvo (the loaded kind: HE or smoke).
+func launch_selected() -> void:
+	for sq in _player_squads():
+		var v = sq.vehicle()
+		if sq.selected and v != null and v.launcher:
+			var why: String = v.fire_launcher()
+			if why != "":
+				log_message("[color=#e8c070]%s: %s[/color]" % [sq.name, why])
+	if hud != null:
+		hud._gun_buttons()
 
 
 func log_message(text: String) -> void:
@@ -2028,6 +2042,8 @@ func _unhandled_input(e: InputEvent) -> void:
 			hud.toggle_help()
 		elif k == KEY_V:
 			switch_guns()
+		elif k == KEY_B:
+			launch_selected()
 		elif k == KEY_U:
 			for sq in _player_squads():
 				var v = sq.vehicle()
@@ -2677,6 +2693,8 @@ func touch_button(key: String, on: bool) -> void:
 					v.unload()
 		"Gun":
 			switch_guns()
+		"Launch":
+			launch_selected()
 		"Squads":
 			hud.set_squads_visible(on)
 		"Pause":

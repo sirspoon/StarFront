@@ -100,7 +100,8 @@ func setup(m: Node) -> void:
 			+ "Right click an enemy: focus fire   your carrier: board\n" \
 			+ "Right click a wall (tank / lance team): shell it\n" \
 			+ "R assault   G get down   H halt   U unload\n" \
-			+ "V tank main gun: beam / pulse (Legion), AP / HE (Sworn)\n" \
+			+ "V switch gun setting: tank beam / pulse or AP / HE,\n" \
+			+ "   carrier launchers HE / smoke.  B fire a launcher salvo\n" \
 			+ "C cover view: green low cover, blue windows,\n" \
 			+ "   white standing walls, yellow rubble, red wire\n" \
 			+ "T then click: grenades. At armour: tank-breakers,\n" \
@@ -167,10 +168,10 @@ func _build_touch_bar() -> void:
 	touch_bar = HBoxContainer.new()
 	touch_bar.add_theme_constant_override("separation", 6)
 	panel.add_child(touch_bar)
-	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Grenade", true], ["Cover", true], ["Pick", true], ["Halt", false], ["Unload", false], ["Gun", false],
+	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Grenade", true], ["Cover", true], ["Pick", true], ["Halt", false], ["Unload", false], ["Gun", false], ["Launch", false],
 			["Squads", true], ["Pause", true], ["?", false], ["Menu", false]]:
 		var b := Button.new()
-		var hints := {"Assault": "R", "Down": "G", "Pick": "Alt", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "?": "F1", "Menu": "Esc"}
+		var hints := {"Assault": "R", "Down": "G", "Pick": "Alt", "Halt": "H", "Unload": "U", "Gun": "V", "Launch": "B", "Grenade": "T", "Cover": "C", "Pause": "Space", "?": "F1", "Menu": "Esc"}
 		b.text = spec[0] if main.touch_mode or not hints.has(spec[0]) else "%s (%s)" % [spec[0], hints[spec[0]]]
 		b.toggle_mode = spec[1]
 		b.focus_mode = Control.FOCUS_NONE
@@ -190,6 +191,31 @@ func _build_touch_bar() -> void:
 func sync_touch(key: String, on: bool) -> void:
 	if touch_buttons.has(key):
 		touch_buttons[key].set_pressed_no_signal(on)
+
+
+## The Gun and Launch buttons say what they'd do for the selected vehicles, and are
+## greyed out when nothing selected has a gun setting or launchers.
+func _gun_buttons() -> void:
+	if not touch_buttons.has("Gun"):
+		return
+	var mode := ""
+	var launch := ""
+	for sq in main.squads:
+		var v = sq.vehicle()
+		if sq.team == main.player_team and sq.selected and v != null and v.is_alive():
+			if mode == "" and v.gun_mode() != "":
+				mode = v.gun_mode()
+			if launch == "" and v.launcher:
+				launch = "%s %d" % [v.gun_mode(), int(v.launch_ammo[v.launch_kind])]
+	var hint: bool = not main.touch_mode
+	var g: Button = touch_buttons["Gun"]
+	g.text = ("Gun: %s" % mode if mode != "" else "Gun") + (" (V)" if hint else "")
+	g.disabled = mode == ""
+	g.tooltip_text = "Switch the selected vehicle's gun setting (tank main gun, or the carrier's launcher rounds)"
+	var l: Button = touch_buttons["Launch"]
+	l.text = ("Launch: %s" % launch if launch != "" else "Launch") + (" (B)" if hint else "")
+	l.disabled = launch == ""
+	l.tooltip_text = "Fire a salvo of six grenades from the selected carrier's launchers over the ground ahead"
 
 
 ## Keep the card's bottom edge just above the command bar as its contents change.
@@ -352,6 +378,7 @@ func _refresh() -> void:
 				if gr != "":
 					r.label.text += "  " + gr
 			r.button.modulate = Color(0.6, 1.0, 0.6) if sq.selected else Color.WHITE
+	_gun_buttons()
 	# the unit card replaces the list while a squad of ours is selected
 	var sel: Array = main.squads.filter(func(q): return q.team == main.player_team and q.selected and q.alive().size() > 0)
 	if sel.is_empty() or not main.started or main.over:

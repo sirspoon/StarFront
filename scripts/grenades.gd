@@ -176,6 +176,27 @@ func _throw(m: Soldier, kind: String, spot: Vector2) -> void:
 	main.grenades_thrown[m.team] += 1
 
 
+## A carrier's launcher salvo: six grenades, three from each side of the hull, spread over
+## a forward arc (smoke lands closer, as a wall in front; HE further out).
+func launch(v: Vehicle, kind: String) -> void:
+	for i in 6:
+		var side := -1.0 if i < 3 else 1.0
+		var k := i % 3
+		var ang := v.facing + side * (0.12 + k * 0.3)
+		var dist := (80.0 + k * 8.0) if kind == "smoke" else randf_range(95.0, 145.0)
+		var from := v.position + Vector2(-v.length * 0.05, side * v.width * 0.5).rotated(v.facing)
+		var to := v.position + Vector2.from_angle(ang) * dist
+		var wall: Vector2 = main.map.first_obstacle(from, to)
+		if wall != to:
+			to = wall.move_toward(from, 6.0)
+		flying.append({"from": from, "to": to, "t": -0.09 * k - (0.04 if side > 0.0 else 0.0), "dur": 0.55 + dist / 420.0,
+				"kind": kind, "thrower": v})
+	if v.visible or main.effects_visible_at(v.position):
+		for side in [-1.0, 1.0]:
+			main.effects.puff(v.position + Vector2(0, side * v.width * 0.55).rotated(v.facing), Color(0.55, 0.52, 0.48), 6.0)
+		main.sfx.play("lance", v.position, -2.0, 0.1)
+
+
 func _burst(g: Dictionary) -> void:
 	var at: Vector2 = g.to
 	var thrower: Soldier = g.thrower if is_instance_valid(g.thrower) else null
@@ -232,6 +253,8 @@ func _smoke_node(at: Vector2) -> Node2D:
 
 func _draw() -> void:
 	for g in flying:
+		if g.t < 0.0:
+			continue  # not out of the tube yet
 		var k: float = g.t / g.dur
 		var p: Vector2 = g.from.lerp(g.to, k)
 		var h: float = sin(k * PI) * g.from.distance_to(g.to) * 0.25  # the arc of the throw

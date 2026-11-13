@@ -2,7 +2,7 @@ class_name GameData
 extends RefCounted
 ## Factions, soldier types and weapons. Balance tuning lives here.
 
-const VERSION := "0.68"
+const VERSION := "0.69"
 
 ## range in pixels (16 px = 1 map cell); cooldown = seconds between bursts;
 ## acc = base hit chance; ap = how much infantry armour it ignores; supp = suppression per shot;
@@ -139,13 +139,13 @@ const SOLDIERS := {
 ## armour = [front, side, rear]. Carriers hold a squad; one starts the battle inside.
 ## Weapons marked turret turn with the turret; the others can fire all round.
 const VEHICLES := {
-	"drudge": {"name": "Drudge Carrier", "role": "carrier", "hp": 9, "armour": [6, 5, 4], "speed": 56.0,
+	"drudge": {"name": "Drudge Carrier", "role": "carrier", "hp": 9, "armour": [6, 5, 4], "speed": 56.0, "launcher": true,
 		"turn": 1.6, "length": 50.0, "width": 30.0, "capacity": 8,
 		"weapons": [{"weapon": "heavy_stubber", "mount": Vector2(10, -7)}]},
 	"vigil": {"name": "Vigil Tank", "role": "tank", "hp": 14, "armour": [9, 7, 5], "speed": 36.0,
 		"turn": 1.0, "length": 62.0, "width": 38.0, "capacity": 0,
 		"weapons": [{"weapon": "lumen_lance", "alt": "lumen_pulse", "turret": true}, {"weapon": "heavy_stubber", "mount": Vector2(22, 9)}]},
-	"pilgrim": {"name": "Pilgrim Carrier", "role": "carrier", "hp": 9, "armour": [6, 5, 4], "speed": 50.0,
+	"pilgrim": {"name": "Pilgrim Carrier", "role": "carrier", "hp": 9, "armour": [6, 5, 4], "speed": 50.0, "launcher": true,
 		"turn": 1.5, "length": 52.0, "width": 32.0, "capacity": 6,
 		"weapons": [{"weapon": "rotor_cannon", "mount": Vector2(8, 0)}]},
 	"verdict": {"name": "Verdict Tank", "role": "tank", "hp": 14, "armour": [9, 8, 6], "speed": 32.0,

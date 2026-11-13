@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.69 (2026-11-13)
+Vehicles: barging through, grenade launchers, battle damage.
+- Tanks and carriers push through barricades, crates and sandbags instead of driving a long way
+  round, flattening them and slowing as they do (low stone walls and trenches still turn them).
+  They'll still go round sandbagged positions when the detour is short.
+- Carriers have grenade launchers: B fires a salvo of six (three from each side) over a forward arc,
+  HE further out, smoke closer in as a wall ahead. Three salvos of each; V switches between them.
+  The computer's carriers fire smoke when hit by something that can hurt them, and HE at a knot of
+  infantry close ahead.
+- The Gun and Launch buttons now show what they'll do (e.g. "Gun: Beam", "Launch: HE 3") and are
+  greyed out unless a vehicle that has them is selected.
+- Battle damage: scorched holes where rounds went through and bright gouges where they glanced off,
+  marked where they hit; a skirt plate torn away (and the next left hanging) at 70% hull; a broken
+  track trailing its links at 45% (the vehicle slows to 80%); grey smoke from 65%, thick black smoke
+  and flames on the engine deck from 35%.
+- The unit card shows the launchers and the salvos left.
+
 ## v0.68 (2026-11-13)
 Unit card redrawn: fewer words, more pictures.
 - Icons for men, armour (one to three bands for light / medium / heavy, a plate for vehicles), pace

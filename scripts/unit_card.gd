@@ -26,6 +26,7 @@ const SPECIALS := {
 	"breach": ["Breacher", "Breaks walls: can shell or blast a way through buildings"],
 	"carrier": ["Carrier", "Carrier: men board it (right click it) and unload (U)"],
 	"modes": ["2 settings", "Main gun has two settings: V switches them"],
+	"launcher": ["Launchers", "Grenade launchers: B fires six (three a side) over the ground ahead; V switches HE / smoke. Three salvos of each"],
 }
 static var _refs := []  # the strongest full-strength unit's power: [infantry, -, -, armour, close combat]
 
@@ -59,7 +60,7 @@ func show_squad(sq: Squad, others: int) -> void:
 	var v = sq.vehicle()
 	var s := "%d|%d|%d|%d|%s|%s|%s" % [sq.get_instance_id(), sq.alive().size(), _aboard(sq), others,
 			sq.grenade_count("he") * 100 + sq.grenade_count("ap") * 10 + sq.grenade_count("smoke"),
-			v.gun_mode() if v != null else "", str(v.passengers.size()) if v != null else ""]
+			v.gun_mode() if v != null else "", (str(v.passengers.size()) + str(v.launch_ammo) + str(v.plate_off) + str(v.track_off)) if v != null else ""]
 	if s != sig or squad != sq:
 		sig = s
 		squad = sq
@@ -289,7 +290,10 @@ func _build(sq: Squad, others: int) -> void:
 	if not sp.is_empty():
 		var f := _flow()
 		for k in sp:
-			f.add_child(_tag(SPECIALS[k][0], SPECIALS[k][1], k))
+			var name: String = SPECIALS[k][0]
+			if k == "launcher":
+				name = "HE %d · Smoke %d" % [int(v.launch_ammo.he), int(v.launch_ammo.smoke)]
+			f.add_child(_tag(name, SPECIALS[k][1], k))
 		box.add_child(_row([_icon("star", 0, "Special abilities (hover or tap for details)"), f]))
 	# how hard it hits each kind of target
 	for t in TARGETS:
@@ -395,7 +399,9 @@ func _specials(sq: Squad) -> Array:
 			out.append("carrier")
 		if v.can_breach():
 			out.append("breach")
-		if v.gun_mode() != "":
+		if v.launcher:
+			out.append("launcher")
+		elif v.gun_mode() != "":
 			out.append("modes")
 		return out
 	for m in sq.members:
@@ -695,6 +701,10 @@ class CardIcon:
 				draw_rect(Rect2(1, 5, 14, 7), C)
 				draw_rect(Rect2(1, 12, 14, 2.5), D)
 				draw_rect(Rect2(10, 6.5, 3, 3), D)
+			"launcher":
+				for k in 3:
+					draw_rect(Rect2(2 + k * 4.2, 5 + absf(k - 1) * 2.0, 3.2, 8), C)
+					draw_circle(Vector2(3.6 + k * 4.2, 4 + absf(k - 1) * 2.0), 1.4, Color(0.55, 0.6, 0.4))
 			"modes":
 				draw_line(Vector2(2, 5), Vector2(12, 5), C, 1.6)
 				draw_colored_polygon(PackedVector2Array([Vector2(11, 2), Vector2(15, 5), Vector2(11, 8)]), C)
