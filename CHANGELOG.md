@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.79 (2026-11-13)
+Unit card: details in their own window; tighter on phones.
+- Hovering or tapping a tag or icon on the unit card shows its details in a small window just above
+  the card (or beside it if there's no room), instead of adding a line to the card. Tap the window to
+  close it; a tapped one closes by itself after 4 seconds.
+- On phones the card is more compact: health and morale side by side, the four attack bars two to a
+  row with pictures only, close combat, grenades and special abilities on one wrapping line, the range
+  lines closer together, and tighter spacing. The PC card keeps its fuller layout.
+
 ## v0.78 (2026-11-13)
 Outlines on your troops; lighting strength option.
 - Your own men have a faint pale ring round them, and your vehicles a faint frame, so they stand out

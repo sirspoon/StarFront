@@ -40,16 +40,17 @@ var men_lbl: Label
 var health: CardBar
 var morale: CardBar
 var attack: Array = []  # CardBar per target
-var info: Label
+var info: Label             # the details of whatever was hovered or tapped...
+var popup: PanelContainer   # ...shown in a small window over the card, not in it
 var info_hold := 0.0
 var W := 330.0
 
 
 func _init(touch: bool) -> void:
 	small = touch
-	W = 300.0 if small else 330.0
+	W = 270.0 if small else 330.0
 	box = VBoxContainer.new()
-	box.add_theme_constant_override("separation", 3)
+	box.add_theme_constant_override("separation", 1 if small else 3)
 	add_child(box)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -87,7 +88,7 @@ func _icon(kind: String, level := 0, tip := "") -> CardIcon:
 	var ic := CardIcon.new()
 	ic.kind = kind
 	ic.level = level
-	ic.custom_minimum_size = Vector2(18, 18)
+	ic.custom_minimum_size = Vector2(16, 16) if small else Vector2(18, 18)
 	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	if tip != "":
 		_hover(ic, tip)
@@ -107,18 +108,43 @@ func _hover(c: Control, tip: String) -> void:
 
 
 func _show_info(t: String, hold: float) -> void:
-	if info == null or not is_instance_valid(info):
-		return
+	if popup == null:
+		if get_parent() == null:
+			return
+		popup = PanelContainer.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.09, 0.075, 0.055, 0.96)
+		sb.border_color = BRASS
+		sb.set_border_width_all(1)
+		sb.set_corner_radius_all(4)
+		sb.set_content_margin_all(7)
+		popup.add_theme_stylebox_override("panel", sb)
+		info = _label("", 12, Color(0.95, 0.88, 0.65))
+		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		info.custom_minimum_size = Vector2(W - 14, 0)
+		popup.add_child(info)
+		popup.mouse_filter = Control.MOUSE_FILTER_STOP
+		popup.gui_input.connect(func(e):
+			if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+				_show_info("", 0.0))  # tap the window to close it
+		get_parent().add_child(popup)
 	info.text = t
-	info.visible = t != ""
+	popup.visible = t != "" and visible
 	info_hold = hold
-	_replace.call_deferred()
+	if popup.visible:
+		_place_popup.call_deferred()
 
 
-func _replace() -> void:
-	var hud := get_parent().get_parent() if get_parent() != null else null
-	if hud != null and hud.has_method("place_card"):
-		hud.place_card()
+## The details window sits just above the card (or beside it if there's no room above).
+func _place_popup() -> void:
+	if popup == null or not popup.visible:
+		return
+	var ms := popup.get_combined_minimum_size()
+	popup.size = ms
+	var p := Vector2(position.x, position.y - ms.y - 6.0)
+	if p.y < 44.0:
+		p = Vector2(position.x + size.x + 6.0, maxf(44.0, position.y + size.y - ms.y))
+	popup.position = p
 
 
 func _row(parts: Array, sep := 6) -> HBoxContainer:
@@ -185,10 +211,10 @@ func _build(sq: Squad, others: int) -> void:
 		box.remove_child(c)
 		c.queue_free()
 	attack.clear()
-	info = null
+	_show_info("", 0.0)
 	var v = sq.vehicle()
 	# title and what they're doing
-	title = _label(sq.name + ("  +%d" % others if others > 0 else ""), 16, GOLD)
+	title = _label(sq.name + ("  +%d" % others if others > 0 else ""), 15 if small else 16, GOLD)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_lbl = _label("", 13)
 	box.add_child(_row([title, status_lbl]))
@@ -229,10 +255,16 @@ func _build(sq: Squad, others: int) -> void:
 	box.add_child(top)
 	# health and morale
 	health = _bar("status")
-	box.add_child(_row([_icon("health", 0, "Hull left" if v != null else "Wounds left across the squad"), health]))
+	var hrow := _row([_icon("health", 0, "Hull left" if v != null else "Wounds left across the squad"), health])
+	box.add_child(hrow)
 	if v == null:
 		morale = _bar("status")
-		box.add_child(_row([_icon("morale", 0, "Morale: low morale pins men down, then they run"), morale]))
+		var mi := _icon("morale", 0, "Morale: low morale pins men down, then they run")
+		if small:  # side by side on a phone
+			hrow.add_child(mi)
+			hrow.add_child(morale)
+		else:
+			box.add_child(_row([mi, morale]))
 	else:
 		morale = null
 	# weapons as tags, and their reach on one scale
@@ -246,7 +278,8 @@ func _build(sq: Squad, others: int) -> void:
 	box.add_child(_row([_icon("gun", 0, "Weapons (hover or tap one for details)"), wf]))
 	var rb := CardRange.new()
 	rb.ranges = ranges
-	rb.custom_minimum_size = Vector2(0, 8 + 8 * ranges.size())
+	rb.step = 6.0 if small else 8.0
+	rb.custom_minimum_size = Vector2(0, 8 + rb.step * ranges.size())
 	rb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var rtip: Array[String] = []
@@ -255,8 +288,8 @@ func _build(sq: Squad, others: int) -> void:
 	var rt := "Range, on a scale to %d (the longest in the battle): %s" % [int(MAX_RANGE), ", ".join(rtip)]
 	_hover(rb, rt)
 	box.add_child(_row([_icon("range", 0, rt), rb]))
-	# close combat and grenades on one line
-	var cc := _row([], 4)
+	# close combat and grenades on one line (on a phone, the special abilities join them)
+	var cc: Container = _flow() if small else _row([], 4)
 	if v == null:
 		var blades := {}
 		for m in sq.members:
@@ -288,29 +321,33 @@ func _build(sq: Squad, others: int) -> void:
 	# special abilities as tags
 	var sp := _specials(sq)
 	if not sp.is_empty():
-		var f := _flow()
+		var f: Container = cc if small else _flow()
 		for k in sp:
 			var name: String = SPECIALS[k][0]
 			if k == "launcher":
 				name = "HE %d · Smoke %d" % [int(v.launch_ammo.he), int(v.launch_ammo.smoke)]
 			f.add_child(_tag(name, SPECIALS[k][1], k))
-		box.add_child(_row([_icon("star", 0, "Special abilities (hover or tap for details)"), f]))
+		if not small:
+			box.add_child(_row([_icon("star", 0, "Special abilities (hover or tap for details)"), f]))
 	# how hard it hits each kind of target
+	var pair: HBoxContainer = null
 	for t in TARGETS:
-		var b := _bar("attack", 11.0)
+		var b := _bar("attack", 10.0 if small else 11.0)
 		attack.append(b)
-		var lbl := _label(t[1], 12)
-		lbl.custom_minimum_size = Vector2(52, 0)
 		var what: String = t[1].to_lower() + (" infantry" if t[0] != "vehicle" else "")
 		var ic := _icon(t[0], 0, "Attack against %s: bright = the men still standing, dim = the full unit" % what)
-		box.add_child(_row([ic, lbl, b], 4))
-	info = _label("", 12, Color(0.95, 0.88, 0.65))
-	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info.custom_minimum_size = Vector2(W, 0)
-	info.visible = false
-	box.add_child(info)
+		if small:  # two to a row, pictures only
+			if pair == null or pair.get_child_count() >= 4:
+				pair = _row([], 3)
+				box.add_child(pair)
+			pair.add_child(ic)
+			pair.add_child(b)
+		else:
+			var lbl := _label(t[1], 12)
+			lbl.custom_minimum_size = Vector2(52, 0)
+			box.add_child(_row([ic, lbl, b], 4))
 	if "--shot-tag" in OS.get_cmdline_user_args() and not guns.is_empty():
-		_show_info(_weapon_info(guns[0][0], guns[0][2]), 9999.0)  # test aid: a weapon's details in the shot
+		_show_info.call_deferred(_weapon_info(guns[0][0], guns[0][2]), 9999.0)  # test aid: a weapon's details in the shot
 
 
 func _update(sq: Squad) -> void:
@@ -342,6 +379,8 @@ func _update(sq: Squad) -> void:
 
 
 func _process(dt: float) -> void:
+	if popup != null and popup.visible and not visible:
+		popup.visible = false
 	if info_hold > 0.0:
 		info_hold -= dt
 		if info_hold <= 0.0:
@@ -570,6 +609,7 @@ class CardBar:
 class CardRange:
 	extends Control
 	var ranges: Array = []  # [range, name]
+	var step := 8.0
 
 	func _draw() -> void:
 		var w := size.x - 26.0  # room for the number at the end of the longest line
@@ -580,7 +620,7 @@ class CardRange:
 			var x := w * k / MAX_RANGE
 			draw_line(Vector2(x, 0), Vector2(x, 3), Color(0.62, 0.5, 0.28, 0.9), 1.0)
 		for i in ranges.size():
-			var y := 7.0 + i * 8.0
+			var y := 7.0 + i * step
 			var x: float = w * minf(float(ranges[i][0]) / MAX_RANGE, 1.0)
 			draw_line(Vector2(0, y), Vector2(x, y), Color(0.88, 0.72, 0.4), 3.0)
 			draw_circle(Vector2(x, y), 2.5, Color(1.0, 0.9, 0.6))

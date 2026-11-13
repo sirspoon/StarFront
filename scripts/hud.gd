@@ -315,7 +315,7 @@ func set_squads_visible(on: bool) -> void:
 ## True if a screen position is over a panel or button, so a touch there
 ## isn't also taken as an order on the battlefield.
 func is_over_ui(pos: Vector2) -> bool:
-	for c in [top_panel, squad_panel, unit_card, help_panel, touch_bar.get_parent() if touch_bar else null,
+	for c in [top_panel, squad_panel, unit_card, unit_card.popup if unit_card != null else null, help_panel, touch_bar.get_parent() if touch_bar else null,
 			menu_panel, end_panel]:
 		if c != null and is_instance_valid(c) and c.is_visible_in_tree() and c.get_global_rect().has_point(pos):
 			return true
