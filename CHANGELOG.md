@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.97 (2026-11-13)
+- New Legion lines. Moving: "Onwards, comrades!", "Get moving, you dogs!", "We move together.",
+  "Advance!". Attacking: "Let them have it!", "Fire!", "Safety off, boys!", "Not one step backwards!"
+  and "Urrah!". The accent keeps its Russian consonants (v for w, z / s for th, a rolled r, kh for h)
+  but no longer changes the vowels, which made the shouted lines hard to follow.
+
 ## v0.96 (2026-11-13)
 Legion voices.
 - Your Legion squads answer orders ("Yes, sir!", "Moving out.", "At once!", "Understood. Moving.") and

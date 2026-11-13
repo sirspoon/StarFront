@@ -37,14 +37,14 @@ VOICES = os.environ.get("PIPER_VOICES", "/tmp/claude-0/voices")
 
 # kind: [(text, mood)]   mood: calm / shout / fear. Text in Cyrillic is said as Russian.
 LINES = {
-    "legion_move": [("Yes, sir!", "calm"), ("Moving out.", "calm"), ("At once!", "shout"), ("Understood. Moving.", "calm")],
-    "legion_attack": [("Open fire!", "shout"), ("For the Dominion!", "shout"), ("Kill them all!", "shout"), ("Ура!", "shout")],
+    "legion_move": [("Onwards, comrades!", "shout"), ("Get moving, you dogs!", "shout"), ("We move together.", "calm"), ("Advance!", "shout")],
+    "legion_attack": [("Let them have it!", "shout"), ("Fire!", "shout"), ("Safety off, boys!", "shout"), ("Not one step backwards!", "shout"), ("Ура!", "shout")],
     "legion_pinned": [("We are pinned down!", "fear"), ("Heads down! Heads down!", "fear"), ("They are everywhere!", "fear")],
     "legion_rout": [("Fall back! Fall back!", "fear"), ("Get back! Get back!", "fear"), ("We cannot hold!", "fear")],
 }
 # English sounds a Russian speaker swaps for his own (the accent)
-SWAP = {"w": "v", "θ": "s", "ð": "z", "æ": "e", "ɪ": "i", "ʊ": "u", "ɹ": "r", "h": "x", "ŋ": "n",
-        "ɜ": "e", "ʌ": "a", "ɒ": "o", "ə": "a", "ɐ": "a", "ɔ": "o"}
+SWAP = {"w": "v", "θ": "s", "ð": "z", "ɪ": "i", "ʊ": "u", "ɹ": "r", "h": "x", "ŋ": "n",
+        "ɜ": "e", "ɒ": "o", "ɔ": "o"}  # (the vowels of "advance", "have", "comrades" kept: shouted, they got lost)
 
 
 # ---------------------------------------------------------------- small tools
