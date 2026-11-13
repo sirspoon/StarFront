@@ -25,7 +25,7 @@ const SPECIALS := {
 	"flame": ["Flamer", "Flamer: a jet of fire round cover; sets the scenery alight"],
 	"breach": ["Breacher", "Breaks walls: can shell or blast a way through buildings"],
 	"carrier": ["Carrier", "Carrier: men board it (right click it) and unload (U)"],
-	"indirect": ["Indirect fire", "Mortars: lob rounds over walls, no sight needed (but not from under a roof). Target (F) then tap: a fire mission; otherwise they shell enemies your side can see. Inaccurate, tighter with each salvo on a mission. Gun (V): HE or smoke (one salvo, then back to HE)"],
+	"indirect": ["Indirect fire", "Mortars: lob rounds over walls, no sight needed (but not from under a roof). Target (F) then tap: a fire mission; otherwise they shell enemies your side can see. Inaccurate, tighter with each salvo on a mission. Gun (V): HE or smoke. Smoke ends the current mission and waits for a new target, fires one salvo there, then goes back to HE"],
 	"modes": ["2 settings", "Main gun has two settings: V switches them"],
 	"launcher": ["Launchers", "Grenade launchers: Grenade (T) then tap a spot to fire six of the loaded round there (it turns to face the spot); Gun (V) switches HE / smoke. Three salvos of each"],
 }

@@ -2093,7 +2093,12 @@ func switch_guns() -> void:
 	for sq in _player_squads():
 		if sq.selected and sq.has_mortars():
 			sq.mortar_kind = "smoke" if sq.mortar_kind == "he" else "he"
-			log_message("[color=#e8c070]%s: mortars loaded with %s[/color]" % [sq.name, "smoke" if sq.mortar_kind == "smoke" else "HE"])
+			if sq.mortar_kind == "smoke" and sq.fire_mission != null:
+				# smoke goes only where it's next told: the old mission ends, it isn't smoked
+				sq.fire_mission = null
+				sq.ranging = 0
+			log_message("[color=#e8c070]%s: mortars loaded with %s%s[/color]" % [sq.name, "smoke" if sq.mortar_kind == "smoke" else "HE",
+					" - pick a target" if sq.mortar_kind == "smoke" else ""])
 		var v = sq.vehicle()
 		if sq.selected and v != null and v.is_alive() and v.gun_mode() != "":
 			var m: String = v.switch_gun()

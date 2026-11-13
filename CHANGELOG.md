@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.84 (2026-11-13)
+- Mortars: switching to smoke ends the current fire mission, so the smoke goes only where you next
+  target (Target, then tap), not onto the spot they were shelling; the log says "pick a target". As
+  before, one smoke salvo, then back to HE, and they never fire smoke on their own.
+
 ## v0.83 (2026-11-13)
 New units: the Legion's Mortar Team and the Sworn's Outrider Squadron.
 - Mortar Team (Legion): three mortars, each with a gunner and a loader (one is the sergeant). They
