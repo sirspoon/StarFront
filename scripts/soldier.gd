@@ -227,7 +227,7 @@ func refresh_look() -> void:
 	# size, and far fewer redraws when a whole army is on the move
 	var k := hash([int(facing * 12.0), posture, int(lean * 4.0), squad.selected, squad.sub.has(self), state, hp,
 			flash > 0.0, int(swing * 4.0), int(walk * 0.6) if moving else -1, int(setup_t * 4.0), in_melee,
-			charging != null, squad.prone, reload_t > 0.0, main.camera.zoom.x < LOD_ZOOM])
+			charging != null, squad.prone, reload_t > 0.0, main.camera.zoom.x < LOD_ZOOM, main.paused and team == main.player_team])
 	if k != _look or main.always_draw:
 		_look = k
 		queue_redraw()
@@ -698,8 +698,10 @@ func _draw_body() -> void:
 		_draw_corpse()
 		return
 	if squad.selected:
-		var picked := squad.sub.has(self)
-		draw_arc(Vector2.ZERO, radius + 5.0, 0, TAU, 28, Color(1.0, 0.85, 0.3, 0.95) if picked else Color(0.45, 1.0, 0.45, 0.85), 2.0 if picked else 1.5)
+		draw_arc(Vector2.ZERO, radius + 5.0, 0, TAU, 28, Color(0.45, 1.0, 0.45, 0.85), 1.5)
+	elif team == main.player_team and not main.autotest_hide_outline:
+		# a faint ring round your own men so they stand out from the ground (stronger while paused)
+		draw_arc(Vector2.ZERO, radius + 3.5, 0, TAU, 24, Color(1.0, 0.97, 0.88, 0.5 if main.paused else 0.22), 1.6 if main.paused else 1.2)
 	var prone := posture == "prone"
 	var crouch := posture == "crouch"
 	var r := radius

@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.78 (2026-11-13)
+Outlines on your troops; lighting strength option.
+- Your own men have a faint pale ring round them, and your vehicles a faint frame, so they stand out
+  from the ground; both show more strongly while the game is paused.
+- Options: "Lighting effects: normal / strong / very strong". Stronger makes combat lights (muzzle
+  flashes, explosions, the lumen lance, fires) brighter and reach further, and their wall shadows
+  deeper.
+- The lumen lance now lights the ground along the whole beam and at its muzzle, not only where it
+  strikes.
+
 ## v0.77 (2026-11-13)
 - The Pace button follows the squad you select: it shows that squad's own pace (crouched, running or
   lying down), and new orders keep that pace, instead of carrying over the last squad's setting.

@@ -573,6 +573,15 @@ func show_options() -> void:
 	mtype.focus_mode = Control.FOCUS_NONE
 	mtype.custom_minimum_size = Vector2(420, 44 if main.touch_mode else 30)
 	v.add_child(mtype)
+	var lightfx := OptionButton.new()
+	for d in [["Lighting effects: normal", 1.0], ["Lighting effects: strong", 1.6], ["Lighting effects: very strong (bright flashes, deep shadows)", 2.4]]:
+		lightfx.add_item(d[0])
+		lightfx.set_item_metadata(lightfx.item_count - 1, d[1])
+	var curl := Settings.light_boost()
+	lightfx.select(0 if curl < 1.3 else (1 if curl < 2.0 else 2))
+	lightfx.focus_mode = Control.FOCUS_NONE
+	lightfx.custom_minimum_size = Vector2(420, 44 if main.touch_mode else 30)
+	v.add_child(lightfx)
 	var checks := {}
 	for o in [["trenches", "Trench lines dug across the battlefield", false],
 			["shadows", "Wall shadows from fires and explosions", not Settings.is_phone()],
@@ -605,6 +614,7 @@ func show_options() -> void:
 	_menu_button(row, "Apply", func():
 		Settings.save_option("detail", detail.get_item_metadata(detail.selected))
 		Settings.save_option("map_type", mtype.get_item_metadata(mtype.selected))
+		Settings.save_option("light_boost", lightfx.get_item_metadata(lightfx.selected))
 		for k in checks:
 			Settings.save_option(k, checks[k].button_pressed)
 		if main.started:

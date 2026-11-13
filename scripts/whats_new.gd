@@ -5,6 +5,7 @@ extends RefCounted
 ## When a whole version is reached (1.0, 2.0 ...), start a new heading for it.
 
 const TEXT := """PROTOTYPE (before 1.0)
+- Faint outlines on your own troops (stronger when paused); a lighting strength option for brighter flashes and deeper shadows
 - Tidier command bar with icons: only the orders for what's selected, showing what each is set to; solid facing arrows
 - Squads put their best guns (heavy weapons, machine guns) at the windows and best firing spots; Pick removed
 - Vehicles crash through barricades, crates and sandbags; carriers fire HE or smoke salvos (Grenade button); visible battle damage

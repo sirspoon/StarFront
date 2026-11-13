@@ -13,16 +13,18 @@ var active: Array = []  # {light, t, dur, e0, s0, from, to, moving}
 var next := 0
 var enabled_fx := true
 var shadows_ok := true
+var boost := 1.0  # the Options' lighting strength: brighter, wider flashes and deeper shadows
 
 
 func setup(light_tex: Texture2D) -> void:
 	tex = light_tex
+	boost = Settings.light_boost()
 	for i in (PHONE_POOL if Settings.is_phone() else POOL):
 		var l := PointLight2D.new()
 		l.texture = tex
 		l.enabled = false
 		l.shadow_filter = Light2D.SHADOW_FILTER_PCF5
-		l.shadow_color = Color(0, 0, 0, 0.75)
+		l.shadow_color = Color(0, 0, 0, minf(0.95, 0.75 + (boost - 1.0) * 0.15))
 		add_child(l)
 		pool.append(l)
 
@@ -60,9 +62,9 @@ func _start(a: Vector2, b: Vector2, color: Color, energy: float, radius: float, 
 	var l := _take()
 	l.position = a
 	l.color = color
-	energy *= 1.3  # normal-mapped surfaces take a little less light, so push it up
+	energy *= 1.3 * boost  # (normal-mapped surfaces take a little less light, so push it up)
 	l.energy = energy
-	l.texture_scale = radius / 128.0
+	l.texture_scale = radius / 128.0 * sqrt(boost)
 	l.shadow_enabled = shadows and shadows_ok
 	l.enabled = true
 	active.append({"light": l, "t": 0.0, "dur": dur, "e0": energy, "from": a, "to": b, "moving": moving})

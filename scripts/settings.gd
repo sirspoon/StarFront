@@ -100,6 +100,15 @@ static func last_stage() -> String:
 	return str(v) if v != null else ""
 
 
+## How strong combat lights are (and how deep their shadows): 1 normal, up to 2.5.
+static func light_boost() -> float:
+	var q := _q()
+	for pair in [["lightfx=normal", 1.0], ["lightfx=strong", 1.6], ["lightfx=max", 2.4]]:
+		if q.contains(pair[0]):
+			return pair[1]
+	return float(saved("light_boost", 1.0))
+
+
 static func batch() -> int:
 	var q := _q()
 	for n in [1, 2, 4, 8]:

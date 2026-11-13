@@ -623,6 +623,8 @@ func _draw() -> void:
 		return
 	if squad.selected:
 		draw_rect(Rect2(-L * 0.5 - 5, -Wd * 0.5 - 5, L + 10, Wd + 10), Color(0.45, 1.0, 0.45, 0.85), false, 1.5)
+	elif team == main.player_team:
+		draw_rect(Rect2(-L * 0.5 - 4, -Wd * 0.5 - 4, L + 8, Wd + 8), Color(1.0, 0.97, 0.88, 0.5 if main.paused else 0.2), false, 1.6 if main.paused else 1.2)
 	_draw_tracks(L, Wd)
 	if faction == "sworn":
 		_draw_sworn_hull(L, Wd)

@@ -102,6 +102,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - `--log-slots` prints, for each squad order, how good the best gun's firing spot is against the squad's average
   (`--no-gun-slots` turns off giving the best guns first pick, to compare).
 - `--demo-vdamage` knocks every vehicle down to about a third of its hull a second in (to see the battle damage).
+- `--lightfx=normal|strong|max` (or `?lightfx=`) sets the lighting strength for a test; `--shot-paused` pauses for a
+  screenshot (your men's outlines show more strongly).
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for

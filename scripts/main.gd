@@ -65,6 +65,7 @@ var t_mode := ""              # "" (maybe a tap), "line", "pan", "pinch" or "don
 var pinch_prev_dist := 0.0
 var pinch_prev_center := Vector2.ZERO
 var run_toggle := false
+var autotest_hide_outline := false  # (kept false; a switch for comparison screenshots)
 const DOUBLE_TAP_MS := 450
 var tap_pending := false  # a lone tap on the ground that may become a double tap
 var tap_time := 0
@@ -748,16 +749,16 @@ func add_fire(p: Vector2) -> void:
 	var light := PointLight2D.new()
 	light.texture = light_tex
 	light.color = Color(1.0, 0.55, 0.25)
-	light.energy = 1.6
-	light.texture_scale = 1.6
+	light.energy = 1.6 * Settings.light_boost()
+	light.texture_scale = 1.6 * sqrt(Settings.light_boost())
 	light.position = p
 	light.enabled = Settings.on("lights", true)
 	light.height = 36.0  # flames stand above the ground, so they light surfaces at an angle
 	light.shadow_enabled = Settings.on("shadows", not Settings.is_phone())
 	light.shadow_filter = Light2D.SHADOW_FILTER_PCF5
-	light.shadow_color = Color(0, 0, 0, 0.7)
+	light.shadow_color = Color(0, 0, 0, minf(0.95, 0.7 + (Settings.light_boost() - 1.0) * 0.15))
 	add_child(light)
-	fire_lights.append([light, 1.6, randf() * TAU])
+	fire_lights.append([light, 1.6 * Settings.light_boost(), randf() * TAU])
 
 	var fire := SimpleParticles.new()
 	fire.texture = dot
@@ -901,7 +902,16 @@ func _spawn_vehicle(team: int, kind_id: String, cy: int, counts: Dictionary) -> 
 
 # ---------------------------------------------------------------- main loop
 
+var _was_paused := false
+
+
 func _process(dt: float) -> void:
+	if paused != _was_paused:
+		# your men's outlines show more strongly while paused: redraw them
+		_was_paused = paused
+		for s in soldiers:
+			if s.team == player_team and s.is_alive():
+				s.queue_redraw()
 	if perf_log:
 		var now_us := Time.get_ticks_usec()
 		if perf_last > 0:
@@ -1092,6 +1102,10 @@ func _take_shot() -> void:
 		if a.begins_with("--shot-squad="):  # centre on one of the player's squads (by number)
 			var q: Squad = _player_squads()[int(a.trim_prefix("--shot-squad="))]
 			camera.position = q.center()
+			if "--shot-paused" in OS.get_cmdline_user_args():
+				paused = true
+				for s2 in soldiers:
+					s2.queue_redraw()
 			if "--shot-pick" in OS.get_cmdline_user_args():
 				q.selected = true
 				if "--shot-pace=run" in OS.get_cmdline_user_args():
@@ -1378,6 +1392,10 @@ func beam_tick(v: Vehicle, sl: Dictionary, dt: float) -> void:
 	var dose := float(w.get("dose", 1.0))
 	if show:
 		light_fx.flash(end, Color(1.0, 0.55, 0.25), 2.4, 110.0, 0.25)
+		# the beam lights the ground along its length, and the muzzle glares
+		var blen := from.distance_to(end)
+		light_fx.flash(from.lerp(end, 0.5), Color(1.0, 0.5, 0.22), 1.3, clampf(blen * 0.55, 60.0, 260.0), 0.25)
+		light_fx.flash(from, Color(1.0, 0.65, 0.35), 1.6, 70.0, 0.25)
 		effects.spark(end)
 		effects.puff(end, Color(0.35, 0.3, 0.27), 6.0)
 	decals.add_burn(end + Vector2(randf_range(-3, 3), randf_range(-3, 3)), 2.6)
@@ -1526,8 +1544,8 @@ func ignite(c: Vector2i) -> void:
 			var l := PointLight2D.new()
 			l.texture = _light_tex if _light_tex != null else _soft_dot(256)
 			l.color = Color(1.0, 0.55, 0.25)
-			l.energy = 1.1
-			l.texture_scale = 0.8
+			l.energy = 1.1 * Settings.light_boost()
+			l.texture_scale = 0.8 * sqrt(Settings.light_boost())
 			l.position = p
 			l.enabled = Settings.on("lights", true)
 			l.height = 24.0
@@ -1587,7 +1605,7 @@ func _update_burning(dt: float) -> void:
 		e.t -= 0.5
 		var p := map.center_of(c)
 		if e.light != null:
-			e.light.energy = 0.9 + randf() * 0.4
+			e.light.energy = (0.9 + randf() * 0.4) * Settings.light_boost()
 		for s in soldiers:  # men caught in the flames
 			if s.is_alive() and not s.is_vehicle and s.state != Soldier.State.EMBARKED and s.position.distance_to(p) < 12.0:
 				s.add_suppression(10.0, time)
