@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.01 (2026-11-13)
+- Legion line "Get moving, dogs!" is now just "Get moving!".
+- "They are everywhere!" is now a desperate "They're everywhere! Everywhere!": a gasp for breath
+  first, faster and a little higher, the voice shaking hard.
+
 ## v1.00 (2026-11-13)
 - Legion line "Get moving, you dogs!" is now "Get moving, dogs!", which flows better.
 

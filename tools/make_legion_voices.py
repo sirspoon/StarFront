@@ -36,9 +36,9 @@ VOICES = os.environ.get("PIPER_VOICES", "/tmp/claude-0/voices")
 
 # kind: [(text, mood)]   mood: calm / shout / fear. Text in Cyrillic is said as Russian.
 LINES = {
-    "legion_move": [("Onwards, comrades!", "shout"), ("Get moving, dogs!", "shout"), ("We move together.", "calm"), ("Advance!", "shout")],
+    "legion_move": [("Onwards, comrades!", "shout"), ("Get moving!", "shout"), ("We move together.", "calm"), ("Advance!", "shout")],
     "legion_attack": [("Let them have it!", "shout"), ("Fire!", "shout"), ("Safety off, boys!", "shout"), ("Not one step backwards!", "shout"), ("Ура!", "shout")],
-    "legion_pinned": [("We are pinned down!", "fear"), ("Heads down! Heads down!", "fear"), ("They are everywhere!", "fear")],
+    "legion_pinned": [("We are pinned down!", "fear"), ("Heads down! Heads down!", "fear"), ("They're everywhere! Everywhere!", "panic")],
     "legion_rout": [("Fall back! Fall back!", "fear"), ("Get back! Get back!", "fear"), ("We cannot hold!", "fear")],
 }
 # English sounds a Russian speaker swaps for his own (the accent)
@@ -136,6 +136,15 @@ def moods(x, sr, mood, rng):
     x = resample(x, sr, 1.0)
     if mood == "shout":
         return np.tanh(norm(x) * 1.5) / np.tanh(1.5), 1.5
+    if mood == "panic":
+        # desperate: a little higher and quicker, the voice shaking hard, a gasp for breath first
+        x = resample(x, SR, 1.05)
+        t = np.arange(len(x)) / SR
+        x = norm(x) * (1 + 0.2 * np.sin(2 * np.pi * rng.uniform(7, 9) * t))
+        gn = int(0.24 * SR)
+        gasp = bp(rng.standard_normal(gn), 700, 3000) * np.sin(np.linspace(0, np.pi, gn)) ** 1.5 * 0.35
+        x = np.concatenate([gasp, np.zeros(int(0.03 * SR)), x])
+        return np.tanh(x * 1.5) / np.tanh(1.5), 1.6
     if mood == "fear":
         t = np.arange(len(x)) / SR
         x = x * (1 + 0.1 * np.sin(2 * np.pi * rng.uniform(6, 8) * t))  # a slight shake
@@ -337,7 +346,7 @@ def main():
         for text, mood in lines:
             for take in range(2):  # two men saying each line
                 rng = np.random.default_rng(zlib.crc32(("%s%d" % (text, take)).encode()))
-                speed = {"calm": 1.0, "shout": 1.12, "fear": 1.18}[mood]
+                speed = {"calm": 1.0, "shout": 1.12, "fear": 1.18, "panic": 1.28}[mood]
                 x, sr = kokoro_say(k, text, take, speed)
                 x, drive = moods(x, sr, mood, rng)
                 save("%s_%d" % (kind, i), mask_and_radio(x, rng, breath=mood != "shout", drive=drive, light=True))
