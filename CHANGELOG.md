@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.93 (2026-11-13)
+Deployment before the battle.
+- Every battle now opens with deployment: time stands still, your end of the map (about the first
+  quarter) is shaded with its edge marked, and the enemy is out of sight. Order your squads as usual
+  (moves, line-ups, facing; vehicles too) and they go straight to their places; anything sent past the
+  edge stops at it. "Begin battle" (top of the screen) starts the fight.
+- Heavy guns and mortars placed during deployment start the battle set up and laid.
+
 ## v0.92 (2026-11-13)
 - Muster screen: the unit preview is now part of the screen and always open (across the top on a
   PC, picture and unit card side by side; to the right of the list on a phone). Tapping a unit's

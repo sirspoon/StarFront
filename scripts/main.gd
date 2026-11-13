@@ -174,6 +174,8 @@ func _ready() -> void:
 			_test_follow()
 		if "--test-voice" in args:
 			_test_voice()
+		if "--test-deploy" in args:
+			_test_deploy()
 		if "--test-support" in args:
 			_test_support()
 		if "--test-mortar" in args:
@@ -267,6 +269,33 @@ func _test_carrier() -> void:
 ## seconds and report any soldier who didn't go, and why.
 ## Test aid: a squad told to lay smoke out of its reach moves up and throws two grenades;
 ## the screen then blocks sight through it.
+## Test aid: during deployment, send one squad to a spot inside the zone and one far past it;
+## they should be there at once (the second held at the zone's edge), with time stopped.
+func _test_deploy() -> void:
+	await get_tree().create_timer(1.0).timeout
+	var mine := _player_squads().filter(func(q): return q.vehicle() == null and q.carrier() == null)
+	var a: Squad = mine[0]
+	var b: Squad = mine[1]
+	var t0 := time
+	a.order_move(map, Vector2(500, 900), false)
+	b.order_move(map, Vector2(1600, 600), false)
+	await get_tree().create_timer(0.5).timeout
+	print("deploy test: deploying=%s time %.1f->%.1f; A at %s (asked 500,900); B furthest x %d (asked 1600, zone ends %d)" % [deploying, t0, time,
+			a.center().round(), int(b.members.map(func(m): return m.position.x).max()), int(DEPLOY_X)])
+	print("  enemy visible during deployment: %d" % soldiers.filter(func(x): return x.team != player_team and x.visible).size())
+	if shot_path != "":
+		camera.position = Vector2(560, 820)
+		camera.zoom = Vector2(0.75, 0.75)
+		await get_tree().create_timer(0.5).timeout
+		_take_shot()
+		return
+	begin_battle()
+	var mort := soldiers.filter(func(x): return x.team == player_team and x.mortar)
+	print("  at Begin: mortars set up %d of %d" % [mort.filter(func(x): return x.mortar_set >= 1.0).size(), mort.size()])
+	await get_tree().create_timer(2.0).timeout
+	print("  2 s later: time %.1f" % time)
+
+
 ## Test aid: call the player's support on a line through the enemy's nearest knot of men
 ## at once (its timer skipped), and report; with --shot, the screenshot catches it.
 func _test_support() -> void:
@@ -933,6 +962,8 @@ func start_battle(player_faction: String) -> void:
 		ais.append(AICommander.new(self, 0))
 	hud.build_squad_cards()
 	started = true
+	if not autotest or "--test-deploy" in OS.get_cmdline_user_args():
+		_begin_deploy()
 	Settings.stage("battle started (%s)" % Settings.summary())
 	# start looking at your own force
 	var c := Vector2.ZERO
@@ -1102,14 +1133,16 @@ func _process(dt: float) -> void:
 	for fl in fire_lights:
 		fl[2] += dt * 9.0
 		fl[0].energy = fl[1] + sin(fl[2]) * 0.12 + randf() * 0.12
-	if paused and started:
+	if deploying:
+		_deploy_snap()
+	if (paused or deploying) and started:
 		# soldiers only redraw as they act; while paused, keep their selection rings up to date
 		for s in soldiers:
 			if not s.is_vehicle:
 				s.refresh_look()
 			elif s.visible:
 				s.queue_redraw()
-	if not started or over or paused:
+	if not started or over or paused or deploying:
 		return
 	time += dt
 	var crumb := 5.0 if phone else 20.0
@@ -2152,6 +2185,76 @@ func _end(winner: int, reason: String) -> void:
 			left[player_team], start_counts[player_team], left[1 - player_team], start_counts[1 - player_team]])
 
 
+# ---------------------------------------------------------------- deployment
+
+## Before the battle: time stands still while the player places their squads within their
+## end of the map. Orders work as usual, but the men go straight to their places (kept inside
+## the deployment zone); "Begin battle" starts the fight. Guns placed now start set up.
+var deploying := false
+const DEPLOY_X := 44 * BattleMap.CELL  # the zone: this far in from your edge of the map
+
+
+func _begin_deploy() -> void:
+	deploying = true
+	for s in soldiers:
+		if s.team != player_team:
+			s.visible = false  # the enemy is somewhere beyond, unseen
+	hud.show_deploy(true)
+	log_message("[color=#ffd070]Deploy your force within the shaded ground, then Begin battle.[/color]")
+
+
+func deploy_zone() -> Rect2:
+	return Rect2(0, 0, DEPLOY_X, BattleMap.H * BattleMap.CELL)
+
+
+## Each frame while deploying: anyone given an order is put straight where it would take them.
+func _deploy_snap() -> void:
+	for sq in _player_squads():
+		var moved := false
+		for m in sq.members:
+			if not m.is_alive() or m.state == Soldier.State.EMBARKED or m.path_i >= m.path.size():
+				continue
+			var dest: Vector2 = m.path[m.path.size() - 1]
+			dest.x = minf(dest.x, DEPLOY_X - 10.0)
+			var c := map.cell_of(dest)
+			c = map.nearest_vehicle_cell(c) if m.is_vehicle else map.nearest_walkable(c)
+			if map.center_of(c).x > DEPLOY_X:
+				c.x = int(DEPLOY_X / BattleMap.CELL) - 2
+				c = map.nearest_vehicle_cell(c) if m.is_vehicle else map.nearest_walkable(c)
+			m.position = map.center_of(c) if map.cell_of(dest) != c else dest
+			m.path = PackedVector2Array()
+			m.path_i = 0
+			m.moving = false
+			if m.is_vehicle:
+				m.cur_speed = 0.0
+			moved = true
+		if moved:
+			sq.queue.clear()
+			sq.current = null
+			if sq.facing != Vector2.ZERO:
+				for m in sq.members:
+					if m.is_alive() and not m.is_vehicle:
+						m.facing = sq.facing.angle()
+			for m in sq.members:
+				m.queue_redraw()
+
+
+func begin_battle() -> void:
+	if not deploying:
+		return
+	deploying = false
+	hud.show_deploy(false)
+	# guns placed during deployment are already set up and laid
+	for s in soldiers:
+		if s.is_alive() and not s.is_vehicle and not s.moving:
+			if s.heavy and s.can_brace():
+				s.setup_t = 1.0
+				s.deploy_dir = s.facing
+			if s.mortar and map.roof_at(map.cell_of(s.position)) <= 0.0:
+				s.mortar_set = 1.0
+	log_message("[color=#ffd070]The battle begins![/color]")
+
+
 ## Switch the main gun setting of the selected tanks (beam / pulse, AP / HE).
 ## (test aid) switch a squad's mortar round as the Gun button would.
 func switch_guns_for(sq: Squad) -> void:
@@ -2325,7 +2428,7 @@ func _unhandled_input(e: InputEvent) -> void:
 			_right_motion(mm)
 	elif e is InputEventKey and e.is_pressed() and not e.is_echo():
 		var k := (e as InputEventKey).keycode
-		if k == KEY_SPACE and started and not over:
+		if k == KEY_SPACE and started and not over and not deploying:
 			paused = not paused
 			hud.sync_touch("Pause", paused)
 		elif k == KEY_ESCAPE and started and not over:
@@ -3017,8 +3120,10 @@ func touch_button(key: String, on: bool) -> void:
 		"Squads":
 			hud.set_squads_visible(on)
 		"Pause":
-			if started and not over:
+			if started and not over and not deploying:
 				paused = on
+			elif deploying:
+				hud.sync_touch("Pause", false)
 		"?":
 			hud.toggle_help()
 		"Menu":

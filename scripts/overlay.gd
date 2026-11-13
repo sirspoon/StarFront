@@ -85,6 +85,12 @@ func _draw() -> void:
 		_draw_links(sq)
 		if sq.facing != Vector2.ZERO and not sq.alive().is_empty():
 			_arrow(sq.center(), sq.center() + sq.facing * 46.0, Color(0.6, 0.8, 1.0, 0.75))
+	if main.deploying:
+		# the deployment zone: your end of the map, shaded, with its edge marked
+		var dz: Rect2 = main.deploy_zone()
+		draw_rect(dz, Color(0.45, 0.8, 0.45, 0.07))
+		var zz: float = 1.0 / main.camera.zoom.x
+		draw_dashed_line(Vector2(dz.end.x, 0), Vector2(dz.end.x, dz.end.y), Color(0.55, 0.95, 0.55, 0.7), 3.0 * zz, 16.0 * zz)
 	if main.support_drag:
 		# the strike's line as it's drawn, clipped to the longest allowed
 		var sa: Vector2 = main.support_a

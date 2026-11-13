@@ -338,6 +338,36 @@ func set_objective(name: String, word: String) -> void:
 		help_label.text = help_label.text.replace("the Ashen Chapel", name).replace("the Prime Factorium", name)
 
 
+## The deployment banner: what to do, and the Begin battle button.
+var deploy_panel: PanelContainer = null
+
+
+func show_deploy(on: bool) -> void:
+	if deploy_panel != null and is_instance_valid(deploy_panel):
+		deploy_panel.queue_free()
+		deploy_panel = null
+	if not on:
+		return
+	deploy_panel = PanelContainer.new()
+	deploy_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	deploy_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	deploy_panel.position.y += 48
+	root.add_child(deploy_panel)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 14)
+	deploy_panel.add_child(h)
+	var l := Label.new()
+	l.text = "DEPLOYMENT  ·  Move your squads within the shaded ground" if not main.touch_mode else "DEPLOYMENT  ·  place your squads"
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(l)
+	var b := Button.new()
+	b.text = "Begin battle"
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(150, 44 if main.touch_mode else 32)
+	b.pressed.connect(main.begin_battle)
+	h.add_child(b)
+
+
 func set_squads_visible(on: bool) -> void:
 	squads_on = on
 	squad_panel.visible = on and not unit_card.visible
@@ -346,7 +376,7 @@ func set_squads_visible(on: bool) -> void:
 ## True if a screen position is over a panel or button, so a touch there
 ## isn't also taken as an order on the battlefield.
 func is_over_ui(pos: Vector2) -> bool:
-	for c in [top_panel, squad_panel, unit_card, unit_card.popup if unit_card != null else null, help_panel, touch_bar.get_parent() if touch_bar else null,
+	for c in [top_panel, deploy_panel, squad_panel, unit_card, unit_card.popup if unit_card != null else null, help_panel, touch_bar.get_parent() if touch_bar else null,
 			menu_panel, end_panel]:
 		if c != null and is_instance_valid(c) and c.is_visible_in_tree() and c.get_global_rect().has_point(pos):
 			return true
@@ -459,7 +489,7 @@ func _refresh() -> void:
 				int(main.hold_streak), int(main.HOLD_TO_WIN)]
 	top_label.text = "STARFRONT v%s      %s  vs  %s      Time %s      %s: %s%s" % [
 			GameData.VERSION, f0.name, f1.name, clock, obj_word.capitalize(), chapel,
-			"      [ PAUSED ]" if main.paused else ""]
+			"      [ DEPLOYMENT ]" if main.deploying else ("      [ PAUSED ]" if main.paused else "")]
 	for sq in main.squads:
 		var st: String = sq.status()
 		if last_status.get(sq, "") != st:
