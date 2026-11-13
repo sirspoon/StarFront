@@ -100,12 +100,12 @@ func setup(m: Node) -> void:
 			+ "Right click an enemy: focus fire   your carrier: board\n" \
 			+ "Right click a wall (tank / lance team): shell it\n" \
 			+ "R assault   G get down   H halt   U unload\n" \
-			+ "V tank gun setting: beam / pulse (Legion), AP / HE (Sworn)\n" \
+			+ "V gun setting: beam / pulse, AP / HE, carrier HE / smoke\n" \
 			+ "C cover view: green low cover, blue windows,\n" \
 			+ "   white standing walls, yellow rubble, red wire\n" \
 			+ "T then click: grenades. At armour: tank-breakers,\n" \
 			+ "   at infantry: frags, at open ground: smoke screen.\n" \
-			+ "   Carriers fire a launcher salvo (HE or smoke) there\n" \
+			+ "   Carriers fire a salvo of their loaded round there\n" \
 			+ "1-9: select squads\n" \
 			+ "Space: pause (orders still work)\n" \
 			+ "WASD / arrows / screen edge / middle-drag: scroll\n" \
@@ -209,7 +209,8 @@ var bar_icons := {}
 var bar_gap: Control
 const HINTS := {"Pace": "R/G", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "Menu": "Esc"}
 const TIPS := {"Pace": "Pace (tap to change): crouched and walking; running (faster, charge into close combat, but fire less and easier to hit); or lying down (much harder to hit, crawl when moving)",
-		"Gun": "Switch the selected tank's main gun setting", "Grenade": "Then tap a spot: frags at men, tank-breakers at armour, smoke on open ground; carriers fire a launcher salvo",
+		"Gun": "Switch the gun setting: a tank's main gun (beam / pulse, AP / HE), or the round a carrier's launchers fire (HE / smoke)",
+		"Grenade": "Then tap a spot: infantry throw frags at men, tank-breakers at armour, smoke on open ground; carriers fire a salvo of the loaded round",
 		"Unload": "Passengers get out", "Face": "Then drag: which way the squad faces", "Halt": "Stop and forget orders",
 		"Cover": "Show where the cover is", "Squads": "Show the squad list", "Pause": "Pause (orders still work)", "Menu": "Restart, options, controls"}
 

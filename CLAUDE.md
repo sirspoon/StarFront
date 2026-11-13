@@ -66,7 +66,7 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   `--debug-assault` prints where the assault squads are and what they're doing every 10 s. Test
   results also print close-combat blows, melee kills and each assault squad's kills.
 - `--test-grenades` (with `--autotest`) orders a smoke screen out of a squad's reach and prints whether
-  it moved up, threw both grenades and blocked sight, then has a carrier smoke a spot off to its side (it should turn and fire there). `--no-ai-grenades`: the computer throws none.
+  it moved up, threw both grenades and blocked sight, then has a carrier (loaded with smoke) smoke a spot off to its side (it should turn and fire there). `--no-ai-grenades`: the computer throws none.
 - `--shot-menu` / `--shot-whatsnew` (with `--shot=file.png`, under xvfb, no `--autotest`) save the
   title screen, without or with the "What's new" box open.
 - `--shot-heavy` (with `--shot-team=0|1`) waits for a set-up heavy gun firing and centres on it. Test

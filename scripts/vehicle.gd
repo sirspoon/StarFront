@@ -87,6 +87,8 @@ func gun_mode() -> String:
 	for sl in slots:
 		if not sl.modes.is_empty():
 			return sl.weapon.get("mode", "")
+	if launcher:
+		return "HE" if launch_kind == "he" else "Smoke"  # the launchers' loaded round
 	return ""
 
 
@@ -95,6 +97,9 @@ func switch_gun() -> String:
 		if not sl.modes.is_empty():
 			_set_mode(sl, sl.modes[1] if sl.weapon == sl.modes[0] else sl.modes[0])
 			return sl.weapon.get("mode", "")
+	if launcher:
+		launch_kind = "smoke" if launch_kind == "he" else "he"
+		return gun_mode()
 	return ""
 
 

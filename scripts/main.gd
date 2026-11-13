@@ -281,6 +281,7 @@ func _test_grenades() -> void:
 		if v != null and v.launcher and v.is_alive():
 			v.go_to(v.position, false)  # stop where it is
 			var spot2: Vector2 = v.position + Vector2.from_angle(v.facing + PI * 0.5) * 110.0
+			v.launch_kind = "smoke"  # (as if the player had switched it with Gun)
 			var smoke0: int = v.launch_ammo.smoke
 			var screens0 := grenades.screens.size()
 			print("launcher test: %s facing %.2f, ordered at %s (%.2f off its front): %s" % [q.name, v.facing, spot2.round(),
@@ -1939,7 +1940,7 @@ func switch_guns() -> void:
 		var v = sq.vehicle()
 		if sq.selected and v != null and v.is_alive() and v.gun_mode() != "":
 			var m: String = v.switch_gun()
-			log_message("[color=#e8c070]%s: main gun to %s[/color]" % [sq.name, m])
+			log_message("[color=#e8c070]%s: %s to %s[/color]" % [sq.name, "launchers loaded" if v.launcher else "main gun", m])
 	if hud != null:
 		hud._gun_buttons()
 

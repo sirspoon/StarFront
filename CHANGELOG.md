@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.76 (2026-11-13)
+- Carriers: you choose the launcher round. With a carrier selected the Gun button (V) shows the loaded
+  round (a burst for HE, a cloud for smoke) and switches it; Grenade then fires that round at the spot
+  you tap, instead of the carrier guessing from what's there. The computer's carriers still choose
+  for themselves.
+
 ## v0.75 (2026-11-13)
 - The Halt icon redrawn as a more natural raised hand: rounded fingers of different lengths, spread a
   little, a fuller palm and the thumb angled out.

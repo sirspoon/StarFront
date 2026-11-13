@@ -89,6 +89,9 @@ func _icon(c: Color) -> void:
 				"AP":  # a pointed armour-piercing round
 					draw_colored_polygon(PackedVector2Array([Vector2(3, 9), Vector2(15, 9), Vector2(22, 12), Vector2(15, 15), Vector2(3, 15)]), c)
 					draw_line(Vector2(6, 8), Vector2(6, 16), EDGE if c == W else c, 1.0)
+				"Smoke":  # a cloud
+					for q in [Vector2(7, 14), Vector2(12, 10), Vector2(17, 13.5), Vector2(10, 16), Vector2(15, 17)]:
+						draw_circle(q, 4.6, c)
 				"HE":  # a burst
 					var pts := PackedVector2Array()
 					for k in 16:

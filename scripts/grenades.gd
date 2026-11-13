@@ -60,14 +60,10 @@ func order(sq: Squad, p: Vector2) -> String:
 	return "%s: %s!" % [sq.name, {"he": "frag out", "ap": "tank-breaker", "smoke": "smoke screen"}[c[0]]]
 
 
-## A carrier told to put grenades on p: HE if there's an enemy there, smoke on open ground.
+## A carrier told to put grenades on p: whichever round its launchers have loaded (the Gun
+## button switches HE / smoke).
 func _order_launch(sq: Squad, v: Vehicle, p: Vector2) -> String:
-	var kind := "smoke"
-	for e in main.soldiers:
-		if e.team != sq.team and e.is_alive() and e.seen_by[sq.team] and e.state != Soldier.State.EMBARKED \
-				and e.position.distance_to(p) < (e.radius + 30.0 if e.is_vehicle else 60.0):
-			kind = "he"
-			break
+	var kind: String = v.launch_kind
 	if int(v.launch_ammo[kind]) <= 0:
 		return "%s: no %s salvos left." % [sq.name, "HE" if kind == "he" else "smoke"]
 	v.launch_order = {"point": p, "kind": kind, "age": 0.0}
