@@ -5,6 +5,7 @@ extends RefCounted
 ## When a whole version is reached (1.0, 2.0 ...), start a new heading for it.
 
 const TEXT := """PROTOTYPE (before 1.0)
+- Smarter enemy: it spreads its squads across several lanes, moves under cover of its other squads and swings wide round your flanks
 - Watch a battle: the computer commands both sides, at up to four times speed
 - Legion vehicle crews answer orders over the intercom
 - Legion voices: Russian-accented replies, battle cries, cries when pinned or breaking, and yelps and screams of pain

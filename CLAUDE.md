@@ -117,6 +117,9 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   events and taps a unit, and prints whether the list scrolled and the preview changed only on the tap.
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
+- AI: `AICommander` (lanes, fire and movement, flanking, support); `--ai-old=0|1|all` gives that side the old commander.
+  Test results print `AI spread=[legion, sworn]` (how widely the infantry spread north-south on the way in, px) and
+  `flank_share` (the share of shots fired from a flank).
 - `--no-flank` / `--no-ai-flank` turn off flanking (and crossfire) / the computer's flanking moves, for
   balance comparisons. Balance needs ~48 battles per setting to see a real difference.
 - `--test-follow` orders the player's squads to move every few seconds during a real battle and prints any

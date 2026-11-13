@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.08 (2026-11-13)
+A smarter computer commander.
+- Lanes: it splits its infantry between northern, central and southern routes (assault troops always
+  out on a flank) and comes at the objective from several sides instead of straight at you.
+- Fire and movement: squads in the same lane take turns, one moving up while another that's in place
+  covers it.
+- Flanking: when one of its squads is in a firefight, others nearby swing out wide (on their lane's
+  side) and come at the enemy from the side, running the open stretches.
+- Base of fire: heavy guns, stubber teams and mortars hang back and fire in support rather than
+  walking in with the infantry.
+- In test battles its squads spread about 66% wider on the way in (239 against 144 px) and fired from
+  a flank more than twice as often; battles are a little shorter. It is no stronger or weaker against
+  the old commander (6-6 both ways), and the sides stay even (15-10 over 25 battles).
+
 ## v1.07 (2026-11-13)
 - Watch a battle: a new button on the title screen. The computer commands both sides, each with a
   force it picks itself, with no deployment and everything in view (no fog). A banner at the top has

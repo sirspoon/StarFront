@@ -113,6 +113,7 @@ var cover_time := [0.0, 0.0] # soldier-seconds spent in cover, per side
 var field_time := [0.0, 0.0]
 var last_wall_down = null
 var flank_shots := [0, 0]
+var ai_spread := [[0.0, 0], [0.0, 0]]  # test aid: the computer's north-south spread (sum, samples)
 var no_flank := "--no-flank" in OS.get_cmdline_user_args()  # test aid: flanking off
 var crossfire_time := [0.0, 0.0]
 var blows := [0, 0]          # close-combat blows struck by each side
@@ -2202,6 +2203,8 @@ func _end(winner: int, reason: String) -> void:
 				factions[winner] if winner >= 0 else "draw", int(time), shots, hits,
 				left[0], left[1], dead[0], dead[1], fled[0], fled[1], vlost[0], vlost[1], walls_destroyed, int(100 * cover_time[0] / maxf(field_time[0], 1)), int(100 * cover_time[1] / maxf(field_time[1], 1)), cover_blocks, flank_shots, int(100 * crossfire_time[0] / maxf(field_time[0], 1)), int(100 * crossfire_time[1] / maxf(field_time[1], 1)), blows, melee_kills, assault_kills[0], assault_kills[1], grenades_thrown, heavy_kills, int(100 * heavy_set_time[0] / maxf(heavy_time[0], 1)), int(100 * heavy_set_time[1] / maxf(heavy_time[1], 1)), friendly_kills, bastion_kills, peeks, reason])
 		print("KILLS " + JSON.stringify(kill_sources))
+		print("AI spread=[%d, %d] flank_share=[%d%%, %d%%]" % [ai_spread[0][0] / maxi(ai_spread[0][1], 1), ai_spread[1][0] / maxi(ai_spread[1][1], 1),
+				100 * flank_shots[0] / maxi(shots[0], 1), 100 * flank_shots[1] / maxi(shots[1], 1)])
 		print("SUPPORT calls used [%d, %d], kills [%d, %d] (counts own men too)" % [support.info(0).uses - support.left[0],
 				support.info(1).uses - support.left[1], support.kills[0], support.kills[1]])
 		get_tree().quit()
