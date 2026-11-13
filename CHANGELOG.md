@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.68 (2026-11-13)
+Unit card redrawn: fewer words, more pictures.
+- Icons for men, armour (one to three bands for light / medium / heavy, a plate for vehicles), pace
+  (one to four chevrons), health, morale, weapons, range, close combat, grenades (frag, tank-breaker,
+  smoke, with counts) and special abilities.
+- New range row: each weapon's reach as a line on one scale (to the longest range in the battle),
+  over shaded short / medium / long bands, with its range in numbers.
+- Weapons and special abilities are tags: hover or tap one and its details show on the card's bottom
+  line (range, bursts and rate, damage, how much body armour it pierces, pen against vehicles, blast,
+  gun settings). The icons do the same.
+- Close combat strength as five pips; attack rows with target pictures (light, medium, heavy
+  infantry and a tank).
+
 ## v0.67 (2026-11-12)
 Unit cards.
 - Selecting one of your squads shows its unit card in place of the squad list (the list comes back

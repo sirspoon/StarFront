@@ -192,6 +192,13 @@ func sync_touch(key: String, on: bool) -> void:
 		touch_buttons[key].set_pressed_no_signal(on)
 
 
+## Keep the card's bottom edge just above the command bar as its contents change.
+func place_card() -> void:
+	var ms := unit_card.get_combined_minimum_size()
+	unit_card.size = ms
+	unit_card.position = Vector2(10, root.size.y - ms.y - (76 if main.touch_mode else 56))
+
+
 func set_squads_visible(on: bool) -> void:
 	squads_on = on
 	squad_panel.visible = on and not unit_card.visible
@@ -353,6 +360,7 @@ func _refresh() -> void:
 	else:
 		unit_card.show_squad(sel[0], sel.size() - 1)
 		unit_card.visible = true
+		place_card()
 		squad_panel.visible = false
 
 
