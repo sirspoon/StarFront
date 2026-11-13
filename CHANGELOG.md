@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.71 (2026-11-13)
+One Grenade button for infantry and carriers.
+- With a carrier selected, Grenade (T) then a tap fires its launchers at that spot, choosing like
+  infantry do: HE if there are enemies there, smoke on open ground. The salvo is centred on the spot.
+  The launchers only fire forward, so the carrier turns to face it first (once stopped, if driving).
+- The Launch button (B) and the carrier's HE / smoke setting on the Gun button are gone; Gun (V) is
+  now only for the tanks' main guns.
+
 ## v0.70 (2026-11-13)
 Best guns to the best spots; Pick removed.
 - When a squad moves or lines up, its best guns (heavy weapons, machine guns, the longest-reaching

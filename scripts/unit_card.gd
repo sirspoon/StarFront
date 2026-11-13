@@ -26,7 +26,7 @@ const SPECIALS := {
 	"breach": ["Breacher", "Breaks walls: can shell or blast a way through buildings"],
 	"carrier": ["Carrier", "Carrier: men board it (right click it) and unload (U)"],
 	"modes": ["2 settings", "Main gun has two settings: V switches them"],
-	"launcher": ["Launchers", "Grenade launchers: B fires six (three a side) over the ground ahead; V switches HE / smoke. Three salvos of each"],
+	"launcher": ["Launchers", "Grenade launchers: Grenade (T) then tap a spot: six HE at enemies, or six smoke on open ground (it turns to face the spot). Three salvos of each"],
 }
 static var _refs := []  # the strongest full-strength unit's power: [infantry, -, -, armour, close combat]
 

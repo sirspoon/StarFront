@@ -6,7 +6,7 @@ extends RefCounted
 
 const TEXT := """PROTOTYPE (before 1.0)
 - Squads put their best guns (heavy weapons, machine guns) at the windows and best firing spots; Pick removed
-- Vehicles crash through barricades, crates and sandbags; carriers fire HE or smoke salvos (B); visible battle damage
+- Vehicles crash through barricades, crates and sandbags; carriers fire HE or smoke salvos (Grenade button); visible battle damage
 - Unit cards: select a squad to see its men, armour, pace, health, morale, weapons and their range, close combat, grenades, specials and attack strengths (hover or tap for details)
 - Tank main guns have two settings (V): the lance's 4-second beam or rapid pulses; the Sworn cannon's AP or HE
 - Vehicles redrawn and handling smoothly; the Legion tank's lumen lance beam; big guns that shake the ground

@@ -275,6 +275,28 @@ func _test_grenades() -> void:
 	await get_tree().create_timer(3.0).timeout
 	var s0: Vector2 = grenades.screens[0].pos if not grenades.screens.is_empty() else spot
 	print("  sight through the smoke: %s (should be false); beside it: %s" % [map.los_clear(s0 - Vector2(0, 120), s0 + Vector2(0, 120)), map.los_clear(s0 + Vector2(120, -120), s0 + Vector2(120, 120))])
+	# a carrier told to smoke a spot off to its side: it should turn, then fire six
+	for q in _player_squads():
+		var v = q.vehicle()
+		if v != null and v.launcher and v.is_alive():
+			v.go_to(v.position, false)  # stop where it is
+			var spot2: Vector2 = v.position + Vector2.from_angle(v.facing + PI * 0.5) * 110.0
+			var smoke0: int = v.launch_ammo.smoke
+			var screens0 := grenades.screens.size()
+			print("launcher test: %s facing %.2f, ordered at %s (%.2f off its front): %s" % [q.name, v.facing, spot2.round(),
+					wrapf((spot2 - v.position).angle() - v.facing, -PI, PI), grenades.order(q, spot2)])
+			for i in 16:
+				await get_tree().create_timer(1.0).timeout
+				if v.launch_order == null:
+					break
+			await get_tree().create_timer(2.0).timeout
+			var near := 0
+			for sc in grenades.screens.slice(screens0):
+				if sc.pos.distance_to(spot2) < 70.0:
+					near += 1
+			print("  after: off its front %.2f, smoke salvos %d -> %d, new screens %d (%d near the spot)" % [
+					wrapf((spot2 - v.position).angle() - v.facing, -PI, PI), smoke0, v.launch_ammo.smoke, grenades.screens.size() - screens0, near])
+			break
 
 
 func _web_mass() -> void:
@@ -1912,19 +1934,7 @@ func switch_guns() -> void:
 		var v = sq.vehicle()
 		if sq.selected and v != null and v.is_alive() and v.gun_mode() != "":
 			var m: String = v.switch_gun()
-			log_message("[color=#e8c070]%s: %s to %s[/color]" % [sq.name, "launchers" if v.launcher else "main gun", m])
-	if hud != null:
-		hud._gun_buttons()
-
-
-## The selected carriers fire a launcher salvo (the loaded kind: HE or smoke).
-func launch_selected() -> void:
-	for sq in _player_squads():
-		var v = sq.vehicle()
-		if sq.selected and v != null and v.launcher:
-			var why: String = v.fire_launcher()
-			if why != "":
-				log_message("[color=#e8c070]%s: %s[/color]" % [sq.name, why])
+			log_message("[color=#e8c070]%s: main gun to %s[/color]" % [sq.name, m])
 	if hud != null:
 		hud._gun_buttons()
 
@@ -2027,8 +2037,7 @@ func _unhandled_input(e: InputEvent) -> void:
 			hud.toggle_help()
 		elif k == KEY_V:
 			switch_guns()
-		elif k == KEY_B:
-			launch_selected()
+
 		elif k == KEY_U:
 			for sq in _player_squads():
 				var v = sq.vehicle()
@@ -2654,8 +2663,7 @@ func touch_button(key: String, on: bool) -> void:
 					v.unload()
 		"Gun":
 			switch_guns()
-		"Launch":
-			launch_selected()
+
 		"Squads":
 			hud.set_squads_visible(on)
 		"Pause":

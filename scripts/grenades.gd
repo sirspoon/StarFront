@@ -46,7 +46,10 @@ func choose(sq: Squad, p: Vector2) -> Array:
 
 ## The player's order: the squad throws at p. Returns a line for the battle log.
 func order(sq: Squad, p: Vector2) -> String:
-	if sq.vehicle() != null or sq.effective().is_empty():
+	var v = sq.vehicle()
+	if v != null and v.launcher and v.is_alive():
+		return _order_launch(sq, v, p)
+	if v != null or sq.effective().is_empty():
 		return ""
 	var c := choose(sq, p)
 	if c[1] == null and c[0] != "smoke":
@@ -55,6 +58,20 @@ func order(sq: Squad, p: Vector2) -> String:
 	sq.grenade_order = {"point": p, "kind": c[0], "target": c[1], "left": mini(n, sq.grenade_count(c[0])),
 			"next": 0.0, "moved": false, "age": 0.0, "thrown": 0}
 	return "%s: %s!" % [sq.name, {"he": "frag out", "ap": "tank-breaker", "smoke": "smoke screen"}[c[0]]]
+
+
+## A carrier told to put grenades on p: HE if there's an enemy there, smoke on open ground.
+func _order_launch(sq: Squad, v: Vehicle, p: Vector2) -> String:
+	var kind := "smoke"
+	for e in main.soldiers:
+		if e.team != sq.team and e.is_alive() and e.seen_by[sq.team] and e.state != Soldier.State.EMBARKED \
+				and e.position.distance_to(p) < (e.radius + 30.0 if e.is_vehicle else 60.0):
+			kind = "he"
+			break
+	if int(v.launch_ammo[kind]) <= 0:
+		return "%s: no %s salvos left." % [sq.name, "HE" if kind == "he" else "smoke"]
+	v.launch_order = {"point": p, "kind": kind, "age": 0.0}
+	return "%s: %s!" % [sq.name, "launchers, HE" if kind == "he" else "launchers, smoke"]
 
 
 func _process(dt: float) -> void:
@@ -178,12 +195,17 @@ func _throw(m: Soldier, kind: String, spot: Vector2) -> void:
 
 ## A carrier's launcher salvo: six grenades, three from each side of the hull, spread over
 ## a forward arc (smoke lands closer, as a wall in front; HE further out).
-func launch(v: Vehicle, kind: String) -> void:
+func launch(v: Vehicle, kind: String, at = null) -> void:
+	var centre := v.facing
+	var reach := 84.0 if kind == "smoke" else 120.0
+	if at != null:
+		centre = v.facing + clampf(wrapf((at - v.position).angle() - v.facing, -PI, PI), -0.45, 0.45)
+		reach = clampf(v.position.distance_to(at), 60.0, 170.0)
 	for i in 6:
 		var side := -1.0 if i < 3 else 1.0
 		var k := i % 3
-		var ang := v.facing + side * (0.12 + k * 0.3)
-		var dist := (80.0 + k * 8.0) if kind == "smoke" else randf_range(95.0, 145.0)
+		var ang := centre + side * (0.12 + k * (0.3 if kind == "smoke" else 0.2))
+		var dist := reach + (k * 8.0 - 8.0 if kind == "smoke" else randf_range(-25.0, 25.0))
 		var from := v.position + Vector2(-v.length * 0.05, side * v.width * 0.5).rotated(v.facing)
 		var to := v.position + Vector2.from_angle(ang) * dist
 		var wall: Vector2 = main.map.first_obstacle(from, to)

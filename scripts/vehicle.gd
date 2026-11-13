@@ -38,6 +38,7 @@ var launcher := false
 var launch_kind := "he"
 var launch_ammo := {"he": 3, "smoke": 3}
 var launch_cool := 0.0
+var launch_order = null  # the player's: {point, kind, age}: turn to face it if need be, then fire
 var _launch_think := 0.0
 
 
@@ -86,8 +87,6 @@ func gun_mode() -> String:
 	for sl in slots:
 		if not sl.modes.is_empty():
 			return sl.weapon.get("mode", "")
-	if launcher:
-		return "HE" if launch_kind == "he" else "Smoke"
 	return ""
 
 
@@ -96,27 +95,43 @@ func switch_gun() -> String:
 		if not sl.modes.is_empty():
 			_set_mode(sl, sl.modes[1] if sl.weapon == sl.modes[0] else sl.modes[0])
 			return sl.weapon.get("mode", "")
-	if launcher:
-		launch_kind = "smoke" if launch_kind == "he" else "he"
-		return gun_mode()
 	return ""
 
 
 ## Fire a salvo from the grenade launchers: six grenades, three from each side, over the
-## ground ahead. Returns why not, or "" if it fired.
-func fire_launcher() -> String:
+## ground ahead (centred on at, if given). Returns why not, or "" if it fired.
+func fire_launcher(at = null) -> String:
 	if not launcher or not is_alive():
 		return "no launchers"
 	if int(launch_ammo[launch_kind]) <= 0:
-		return "out of %s salvos" % gun_mode()
+		return "no %s salvos left" % ("HE" if launch_kind == "he" else "smoke")
 	if launch_cool > 0.0:
 		return "reloading"
 	launch_ammo[launch_kind] = int(launch_ammo[launch_kind]) - 1
 	launch_cool = 3.0
-	main.grenades.launch(self, launch_kind)
+	main.grenades.launch(self, launch_kind, at)
 	if "--log-guns" in OS.get_cmdline_user_args():
 		print("LAUNCH %s %s %s at %.0f s (%s left)" % [faction, vdata.name, launch_kind, main.time, launch_ammo])
 	return ""
+
+
+## The player's grenade order for a carrier: the launchers only fire forward, so it turns to
+## face the spot (once it has stopped, if it's driving) and fires when it lines up.
+func _carry_out_launch(dt: float) -> void:
+	launch_order.age += dt
+	if launch_order.age > 15.0:
+		launch_order = null
+		return
+	var p: Vector2 = launch_order.point
+	var diff := wrapf((p - position).angle() - facing, -PI, PI)
+	if absf(diff) < 0.45:
+		if launch_cool <= 0.0:
+			launch_kind = launch_order.kind
+			fire_launcher(p)
+			launch_order = null
+	elif path_i >= path.size():
+		facing += clampf(diff, -turn_rate * dt, turn_rate * dt)  # pivot on the spot
+		track_phase += turn_rate * dt * 12.0
 
 
 ## The computer's carriers: HE at a knot of enemy infantry close ahead, smoke when hit.
@@ -358,6 +373,8 @@ func tick(dt: float, now: float) -> void:
 		was_moving = moving
 	recoil = maxf(0.0, recoil - dt * 3.0)
 	launch_cool = maxf(0.0, launch_cool - dt)
+	if launch_order != null:
+		_carry_out_launch(dt)
 	if hits.is_empty() and now > 1.0 and "--demo-vdamage" in OS.get_cmdline_user_args():
 		# test aid: knock every vehicle about to about a third of its hull, from all sides
 		var w := {"pen": 9, "vdmg": 1, "dmg": 1}
