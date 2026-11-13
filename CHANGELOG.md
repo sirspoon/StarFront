@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.92 (2026-11-13)
+- Muster screen: the unit preview is now part of the screen and always open (across the top on a
+  PC, picture and unit card side by side; to the right of the list on a phone). Tapping a unit's
+  name changes who it shows, so it never covers the list. It starts on the first unit.
+
 ## v0.91 (2026-11-13)
 - Muster screen: tap or click a unit's name to see it up close: its men (or vehicles) drawn as they
   look in battle, the carrier they ride in on a row of its own, and the unit card, whose tags and
