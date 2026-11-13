@@ -71,7 +71,7 @@ func _order_launch(sq: Squad, v: Vehicle, p: Vector2) -> String:
 
 
 func _process(dt: float) -> void:
-	if main.paused or not main.started:
+	if main.paused or not main.started or main.deploying:
 		return
 	for g in flying.duplicate():
 		g.t += dt

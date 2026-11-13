@@ -94,7 +94,7 @@ func call_strike(team: int, a: Vector2, b: Vector2) -> String:
 
 
 func _process(dt: float) -> void:
-	if main.paused or not main.started or main.over:
+	if main.paused or not main.started or main.over or main.deploying:
 		return
 	if main.time < 1.0:
 		_arm()

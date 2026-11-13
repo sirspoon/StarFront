@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.94 (2026-11-13)
+- Fix: support strikes, mortars and grenades no longer carry on during deployment (the computer
+  could call its orbital bombardment on you while you were still setting up). Their timers start
+  with the battle.
+
 ## v0.93 (2026-11-13)
 Deployment before the battle.
 - Every battle now opens with deployment: time stands still, your end of the map (about the first

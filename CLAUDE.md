@@ -121,7 +121,7 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   destination spots. All print anyone who did not move.
 - Deployment: battles open in `main.deploying` (the zone is `DEPLOY_X` from the player's edge); test battles skip it.
   `--test-deploy` (with `--autotest`) runs it: sends one squad inside the zone and one far past it, prints where they
-  went, then begins and checks the mortars start set up (with `--shot=file.png`, saves the deployment screen instead).
+  went and that the support timers stood still, then begins and checks the mortars start set up (with `--shot=file.png`, saves the deployment screen instead).
 - `--test-support` (with `--autotest`) calls the player's support at 30 s on the enemy's nearest men and centres any
   screenshot there (gunship at ~36 s, Sworn rods land at ~40 s). Test results end with a SUPPORT line: calls used and men
   killed by each side's strikes.

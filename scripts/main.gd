@@ -283,6 +283,9 @@ func _test_deploy() -> void:
 	print("deploy test: deploying=%s time %.1f->%.1f; A at %s (asked 500,900); B furthest x %d (asked 1600, zone ends %d)" % [deploying, t0, time,
 			a.center().round(), int(b.members.map(func(m): return m.position.x).max()), int(DEPLOY_X)])
 	print("  enemy visible during deployment: %d" % soldiers.filter(func(x): return x.team != player_team and x.visible).size())
+	var w0: Array = support.wait.duplicate()
+	await get_tree().create_timer(3.0).timeout
+	print("  support timers during 3 s of deployment: %s -> %s, strikes called %d" % [w0, support.wait, support.strikes.size()])
 	if shot_path != "":
 		camera.position = Vector2(560, 820)
 		camera.zoom = Vector2(0.75, 0.75)

@@ -18,7 +18,7 @@ func setup(m: Node) -> void:
 
 
 func _process(dt: float) -> void:
-	if main.paused or not main.started or main.over:
+	if main.paused or not main.started or main.over or main.deploying:
 		return
 	var now: float = main.time
 	for p in pending.duplicate():
