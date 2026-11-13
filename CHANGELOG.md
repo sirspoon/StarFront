@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.77 (2026-11-13)
+- The Pace button follows the squad you select: it shows that squad's own pace (crouched, running or
+  lying down), and new orders keep that pace, instead of carrying over the last squad's setting.
+
 ## v0.76 (2026-11-13)
 - Carriers: you choose the launcher round. With a carrier selected the Gun button (V) shows the loaded
   round (a burst for HE, a cloud for smoke) and switches it; Grenade then fires that round at the spot

@@ -167,6 +167,8 @@ func _ready() -> void:
 			_test_follow()
 		if "--test-voice" in args:
 			_test_voice()
+		if "--test-pace" in args:
+			_test_pace()
 		if "--test-grenades" in args:
 			_test_grenades()
 		if "--demo-flame" in args:
@@ -254,6 +256,21 @@ func _test_carrier() -> void:
 ## seconds and report any soldier who didn't go, and why.
 ## Test aid: a squad told to lay smoke out of its reach moves up and throws two grenades;
 ## the screen then blocks sight through it.
+## Test aid: three squads at different paces; selecting each should show its own pace.
+func _test_pace() -> void:
+	await get_tree().create_timer(2.0).timeout
+	var inf := _player_squads().filter(func(q): return q.vehicle() == null and not q.alive().is_empty())
+	inf[0].set_assault(true)
+	inf[1].set_assault(false)
+	inf[1].prone = false
+	inf[2].set_prone(true)
+	var out := []
+	for i in [0, 1, 2, 0, 1]:
+		select_squad(inf[i], false)
+		out.append("%s=%s/%s run_toggle=%s" % [inf[i].name, pace_state(), hud.bar_icons.Pace.variant, run_toggle])
+	print("pace test: " + ";  ".join(out))
+
+
 func _test_grenades() -> void:
 	await get_tree().create_timer(2.0).timeout
 	var sq: Squad = null
@@ -1950,9 +1967,19 @@ func pace_state() -> String:
 	var sel := _player_squads().filter(func(q): return q.selected and q.vehicle() == null)
 	if sel.any(func(q): return q.prone):
 		return "down"
-	if run_toggle or sel.any(func(q): return q.running):
+	if sel.is_empty():
+		return "run" if run_toggle else "walk"
+	if sel.any(func(q): return q.running):
 		return "run"
 	return "walk"
+
+
+## When the selection changes, new orders follow the selected squads' own pace (so a squad
+## you pick up keeps walking or running as it was, rather than taking the last one's).
+func sync_pace_to_selection() -> void:
+	var sel := _player_squads().filter(func(q): return q.selected and q.vehicle() == null)
+	if not sel.is_empty():
+		run_toggle = sel.any(func(q): return q.running and not q.prone)
 
 
 ## The Pace button: crouched and walking -> running -> lying down -> crouched again.
@@ -1988,6 +2015,9 @@ func select_squad(sq: Squad, add: bool) -> void:
 		for o in squads:
 			o.selected = false
 	sq.selected = not sq.selected if add else true
+	sync_pace_to_selection()
+	if hud != null:
+		hud._context_buttons()
 
 
 func _player_squads() -> Array[Squad]:

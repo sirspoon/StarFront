@@ -206,6 +206,7 @@ func _build_touch_bar() -> void:
 
 var bar_panel: PanelContainer
 var bar_icons := {}
+var last_sel_sig := ""
 var bar_gap: Control
 const HINTS := {"Pace": "R/G", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "Menu": "Esc"}
 const TIPS := {"Pace": "Pace (tap to change): crouched and walking; running (faster, charge into close combat, but fire less and easier to hit); or lying down (much harder to hit, crawl when moving)",
@@ -262,6 +263,13 @@ func _context_buttons() -> void:
 			for k in ["he", "ap", "smoke"]:
 				if sq.grenade_count(k) > 0:
 					grenades = true
+	var sel_sig := ""
+	for sq in main.squads:
+		if sq.selected:
+			sel_sig += str(sq.get_instance_id()) + ","
+	if sel_sig != last_sel_sig:
+		last_sel_sig = sel_sig
+		main.sync_pace_to_selection()
 	var show := {"Pace": inf, "Gun": mode != "", "Grenade": grenades, "Unload": unload,
 			"Face": any, "Halt": any}
 	var changed := false
