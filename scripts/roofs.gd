@@ -180,7 +180,7 @@ class RoofPiece:
 		var is_chapel := r == map.chapel
 		var kind: String = map.building_kind[index] if index < map.building_kind.size() else "home"
 		var flat := kind == "shop" or kind == "office" or kind == "bunker"  # flat roofs: tar paper or concrete
-		var metal := kind == "industry" or kind == "warehouse"  # corrugated iron on the works and warehouses
+		var metal := kind == "industry" or kind == "warehouse" or kind == "factorium"  # corrugated iron on the works
 		var slate := Color(0.23, 0.235, 0.245) if not is_chapel else Color(0.31, 0.31, 0.3)  # chapel: old lead
 		match kind:
 			"tavern": slate = Color(0.3, 0.2, 0.17)  # old clay tiles
@@ -188,6 +188,7 @@ class RoofPiece:
 			"office": slate = Color(0.27, 0.26, 0.25)
 			"industry": slate = Color(0.33, 0.3, 0.27)
 			"warehouse": slate = Color(0.3, 0.31, 0.3)
+			"factorium": slate = Color(0.28, 0.27, 0.26)
 			"bunker": slate = Color(0.33, 0.33, 0.3)
 		slate = slate.lightened((_h(index, 0, 1) - 0.5) * 0.1)
 		var has := func(c: Vector2i) -> bool: return map.in_bounds(c) and map.roof_at(c) > 0.0 and r.has_point(c)
@@ -340,6 +341,8 @@ class RoofPiece:
 			draw_circle(p, s * 0.3, Color(0.04, 0.03, 0.03))  # the flue, sooty
 		if kind == "chapel":
 			_chapel_spire(map, r)
+		if kind == "factorium":
+			_factorium_crown(map, r)
 		if kind == "bunker":
 			# sandbags laid along the roof's edges (a gap at the doorway), and an armoured periscope cupola
 			var rr := Rect2(Vector2(r.position * C), Vector2(r.size * C))
@@ -493,6 +496,47 @@ class RoofPiece:
 		draw_circle(tc - Vector2(0.8, 0.8), 1.6, gold.lightened(0.2))
 		draw_line(tc - Vector2(4, 0), tc + Vector2(4, 0), gold, 1.2)  # a gilded sunburst cross-piece
 		draw_line(tc - Vector2(0, 4), tc + Vector2(0, 4), gold, 1.2)
+
+
+	## The Prime Factorium's roof: rows of sawtooth skylights (their glass mostly gone), a great
+	## brass drive-wheel emblem on the ridge, and two tall round smokestacks at the west end
+	## throwing long shadows.
+	func _factorium_crown(map: BattleMap, r: Rect2i) -> void:
+		var rr := Rect2(Vector2(r.position * C), Vector2(r.size * C))
+		var cy := rr.get_center().y
+		# sawtooth skylight rows across the hall
+		var x := rr.position.x + 5.5 * C
+		var k := 0
+		while x < rr.end.x - 2.0 * C:
+			var band := Rect2(x, rr.position.y + C, 6.0, rr.size.y - 2.0 * C)
+			draw_rect(band, Color(0.1, 0.11, 0.12))
+			for gy in range(int(band.position.y) + 2, int(band.end.y) - 2, 5):
+				if _h(k, gy, 41) < 0.35:  # a few panes still in, catching the moon
+					draw_rect(Rect2(band.position.x + 1, gy, 4, 3), Color(0.45, 0.5, 0.55, 0.7))
+			draw_line(Vector2(band.end.x, band.position.y), Vector2(band.end.x, band.end.y), Color(0.42, 0.41, 0.4), 1.4)
+			x += 2.2 * C
+			k += 1
+		# the drive-wheel emblem
+		var ec := Vector2(rr.get_center().x + C, cy)
+		var brass := Color(0.72, 0.56, 0.26)
+		for i in 10:
+			var a := i * TAU / 10.0
+			draw_colored_polygon(PackedVector2Array([ec + Vector2.from_angle(a - 0.15) * 11, ec + Vector2.from_angle(a + 0.15) * 11,
+					ec + Vector2.from_angle(a + 0.1) * 15, ec + Vector2.from_angle(a - 0.1) * 15]), brass)
+		draw_circle(ec, 11.0, brass.darkened(0.1))
+		draw_circle(ec, 6.0, Color(0.15, 0.12, 0.09))
+		draw_circle(ec, 3.0, brass.lightened(0.15))
+		# smokestacks
+		for sy in [cy - 2.4 * C, cy + 2.4 * C]:
+			var sc := Vector2(rr.position.x + 2.6 * C, sy)
+			var sr := 1.6 * C
+			draw_colored_polygon(PackedVector2Array([sc + Vector2(-sr, -sr * 0.3), sc + Vector2(sr * 0.3, -sr), sc + Vector2(sr, sr * 0.3) + Vector2(60, 80),
+					sc + Vector2(-sr * 0.3, sr) + Vector2(60, 80)]), Color(0, 0, 0, 0.28))  # the long shadow
+			draw_circle(sc, sr, Color(0.36, 0.24, 0.18))
+			for band in [0.75, 0.9]:
+				draw_arc(sc, sr * band, 0, TAU, 20, Color(0.22, 0.14, 0.1), 1.0)
+			draw_circle(sc, sr * 0.6, Color(0.05, 0.04, 0.04))  # the sooty mouth
+			draw_arc(sc, sr, 0, TAU, 24, Color(0.1, 0.07, 0.05), 1.0)
 
 
 	## A pointed roof seen from above: facets meeting at the apex, lit from the top left, with a

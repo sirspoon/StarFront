@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.80 (2026-11-13)
+The Foundry District's objective is the Prime Factorium.
+- On the Foundry District map the building in the middle is the Prime Factorium, not the chapel: soot-dark
+  brick and iron walls, a corrugated iron roof with rows of sawtooth skylights, a brass drive-wheel
+  emblem and two tall smokestacks; inside, riveted iron deck plates, a hazard-striped lane, gantry
+  rails and a great brass drive-wheel inlaid in the floor. Round it, an oil-stained concrete yard with
+  painted lanes, and great iron cog-wheels on plinths where the chapel has its saints.
+- The top bar ("Factorium: ..."), the title screen, the help, the battle log and the end of battle all
+  name the factorium on that map. The Old Town keeps the Ashen Chapel.
+
 ## v0.79 (2026-11-13)
 Unit card: details in their own window; tighter on phones.
 - Hovering or tapping a tag or icon on the unit card shows its details in a small window just above

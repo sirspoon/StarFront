@@ -651,6 +651,8 @@ func _build_world(seed_value: int) -> void:
 	if map.map_type == "random":
 		map.map_type = "town" if (seed_value % 2) == 0 else "foundry"
 	map.generate(seed_value)
+	if hud != null:
+		hud.set_objective(map.objective_name(), map.objective_word())
 	map_view = MapView.new()
 	map_view.z_index = -10
 	add_child(map_view)
@@ -841,7 +843,7 @@ func start_battle(player_faction: String) -> void:
 	camera.position = Vector2(c.x / maxi(n, 1) + get_viewport_rect().size.x * 0.25 / camera.zoom.x, c.y / maxi(n, 1))
 	_clamp_camera()
 	var f: Dictionary = GameData.FACTIONS[factions[1]]
-	log_message("Scouts report %s advancing from the east. Take the chapel!" % f.name)
+	log_message("Scouts report %s advancing from the east. Take the %s!" % [f.name, map.objective_word()])
 
 
 func _spawn_team(team: int) -> void:
@@ -1908,7 +1910,7 @@ func _update_objective(dt: float) -> void:
 		objective_owner = holder
 		hold_streak = 0.0
 		var f: Dictionary = GameData.FACTIONS[factions[holder]]
-		log_message("[color=#ffd070]%s have taken the Ashen Chapel![/color]" % f.name)
+		log_message("[color=#ffd070]%s have taken %s![/color]" % [f.name, map.objective_name()])
 	if objective_owner >= 0:
 		if count[1 - objective_owner] == 0:
 			hold_streak += dt
@@ -1926,17 +1928,17 @@ func _check_end() -> void:
 		broken[t] = eff[t] <= int(start_counts[t] * 0.15)
 	var names := [GameData.FACTIONS[factions[0]].name, GameData.FACTIONS[factions[1]].name]
 	if broken[0] and broken[1]:
-		_end(-1, "Both forces are shattered. Nobody holds the chapel.")
+		_end(-1, "Both forces are shattered. Nobody holds the %s." % map.objective_word())
 	elif broken[0] or broken[1]:
 		var w := 1 if broken[0] else 0
 		_end(w, "%s have broken. %s hold the field." % [names[1 - w], names[w]])
 	elif objective_owner >= 0 and hold_streak >= HOLD_TO_WIN:
-		_end(objective_owner, "%s have held the Ashen Chapel unchallenged." % names[objective_owner])
+		_end(objective_owner, "%s have held %s unchallenged." % [names[objective_owner], map.objective_name()])
 	elif battle_length > 0.0 and time >= battle_length:
 		if objective_owner >= 0:
-			_end(objective_owner, "Time is up. %s hold the Ashen Chapel." % names[objective_owner])
+			_end(objective_owner, "Time is up. %s hold %s." % [names[objective_owner], map.objective_name()])
 		else:
-			_end(-1, "Time is up. The chapel is still contested.")
+			_end(-1, "Time is up. The %s is still contested." % map.objective_word())
 
 
 func _end(winner: int, reason: String) -> void:

@@ -299,9 +299,13 @@ func _draw_roads() -> void:
 			s += 64.0
 
 
-## The chapel square: big worn flagstones, cracked and stained.
+## The chapel square: big worn flagstones, cracked and stained. (Round the factorium: an
+## oil-stained concrete yard with painted lanes.)
 func _draw_plaza() -> void:
 	var pr := map.plaza
+	if map.map_type == "foundry":
+		_draw_factorium_yard()
+		return
 	for x in range(pr.position.x, pr.end.x, 2):
 		for y in range(pr.position.y, pr.end.y, 2):
 			var c := Vector2i(x, y)
@@ -607,6 +611,9 @@ func _crack(p0: Vector2, p1: Vector2, bounds: Rect2, width: float, surface: Colo
 
 
 func _draw_chapel_floor() -> void:
+	if map.map_type == "foundry":
+		_draw_factorium_floor()
+		return
 	var ch := map.chapel
 	var r := Rect2(Vector2(ch.position * C), Vector2(ch.size * C))
 	for y in range(ch.position.y * 2, ch.end.y * 2):
@@ -660,6 +667,90 @@ func _draw_chapel_floor() -> void:
 		var pts := PackedVector2Array([p, p + Vector2(rng.randf_range(0.8, 2.2), rng.randf_range(-0.6, 0.6)),
 				p + Vector2(rng.randf_range(-0.5, 1), rng.randf_range(0.8, 2))])
 		draw_colored_polygon(pts, Color(glass, 0.85))
+
+
+## The Prime Factorium's floor: riveted iron deck plates, a hazard-striped lane down the
+## hall with the great drive-wheel inlaid at its crossing, rails for the overhead gantry,
+## oil spills, and smashed lamp glass along the walls.
+func _draw_factorium_floor() -> void:
+	var ch := map.chapel
+	var r := Rect2(Vector2(ch.position * C), Vector2(ch.size * C))
+	for y in range(ch.position.y, ch.end.y):
+		for x in range(ch.position.x, ch.end.x):
+			var c := Vector2i(x, y)
+			if map.get_t(c) != T.FLOOR and not map.is_wall(map.get_t(c)):
+				continue
+			var tr := Rect2(Vector2(c) * C, Vector2(C, C))
+			var shade := 0.3 + (_h(x, y, 121) - 0.5) * 0.05
+			var col := Color(shade, shade * 1.02, shade * 1.06)
+			draw_rect(tr, col)
+			_tex_patch(ground_fine, tr, x, y, 0.6)
+			draw_rect(tr, Color(0.1, 0.1, 0.11, 0.7), false, 0.6)
+			for k in 4:  # rivets at the plate corners
+				draw_circle(tr.position + Vector2(2 + (k % 2) * (C - 4), 2 + (k / 2) * (C - 4)), 0.55, col.lightened(0.25))
+			if _h(x, y, 122) < 0.5:  # tread pattern
+				for k in 3:
+					var p := tr.position + Vector2(4 + k * 4, 5 + (k % 2) * 6)
+					draw_line(p, p + Vector2(2.5, 1.5), col.lightened(0.12), 0.6)
+	var cy := r.get_center().y
+	# the hazard lane down the hall
+	var lane := Rect2(r.position.x + C * 1.5, cy - C * 1.2, r.size.x - C * 5, C * 2.4)
+	for edge in [lane.position.y, lane.end.y - 3.0]:
+		var x := lane.position.x
+		var k := 0
+		while x < lane.end.x:
+			var col: Color = Color(0.75, 0.6, 0.15, 0.85) if k % 2 == 0 else Color(0.08, 0.08, 0.07, 0.85)
+			draw_colored_polygon(PackedVector2Array([Vector2(x, edge), Vector2(x + 5, edge), Vector2(x + 8, edge + 3), Vector2(x + 3, edge + 3)]), col)
+			x += 5.0
+			k += 1
+	# gantry rails along the hall
+	for yy in [r.position.y + C * 2.5, r.end.y - C * 2.5]:
+		draw_line(Vector2(r.position.x + C, yy), Vector2(r.end.x - C * 3, yy), Color(0.5, 0.48, 0.45), 1.4)
+		draw_line(Vector2(r.position.x + C, yy + 2), Vector2(r.end.x - C * 3, yy + 2), Color(0.5, 0.48, 0.45), 1.4)
+	# the great drive-wheel inlaid in brass at the crossing
+	var c0 := r.get_center() + Vector2(-C * 2, 0)
+	var brass := Color(0.7, 0.55, 0.25, 0.85)
+	for i in 12:
+		var a := i * TAU / 12.0
+		draw_colored_polygon(PackedVector2Array([c0 + Vector2.from_angle(a - 0.12) * 24, c0 + Vector2.from_angle(a + 0.12) * 24,
+				c0 + Vector2.from_angle(a + 0.09) * 30, c0 + Vector2.from_angle(a - 0.09) * 30]), brass)  # teeth
+	draw_arc(c0, 21.0, 0, TAU, 32, brass, 6.0)
+	for i in 6:
+		draw_line(c0, c0 + Vector2.from_angle(i * TAU / 6.0) * 19.0, brass.darkened(0.15), 2.4)  # spokes
+	draw_circle(c0, 6.0, brass.darkened(0.1))
+	draw_circle(c0, 2.5, Color(0.12, 0.1, 0.08))
+	# oil spills and smashed lamp glass
+	_seed(ch.position.x, ch.position.y, 126)
+	for k in 9:
+		var p := Vector2(rng.randf_range(r.position.x + C, r.end.x - C), rng.randf_range(r.position.y + C, r.end.y - C))
+		_poly(_blob(p, rng.randf_range(4, 10), 0.7, 0.5, k * 7), Color(0.04, 0.035, 0.03, 0.5))
+	for k in 40:
+		var p := Vector2(rng.randf_range(r.position.x + C, r.end.x - C), r.position.y + C + rng.randf() * 8) if k % 2 == 0 \
+				else Vector2(rng.randf_range(r.position.x + C, r.end.x - C), r.end.y - C - rng.randf() * 8)
+		draw_colored_polygon(PackedVector2Array([p, p + Vector2(1.6, 0.4), p + Vector2(0.4, 1.4)]), Color(0.85, 0.8, 0.6, 0.7))
+
+
+## The yard round the Prime Factorium: big concrete slabs, oil-stained, with painted lanes.
+func _draw_factorium_yard() -> void:
+	var pr := map.plaza
+	for x in range(pr.position.x, pr.end.x, 3):
+		for y in range(pr.position.y, pr.end.y, 3):
+			var c := Vector2i(x, y)
+			if not _cell_area().grow(2).has_point(c):
+				continue
+			var rr := Rect2(Vector2(c) * C, Vector2(C, C) * 3.0)
+			var shade := 0.36 + (_h(x, y, 131) - 0.5) * 0.06
+			draw_rect(rr, Color(shade, shade * 0.98, shade * 0.95, 0.9))
+			_tex_patch(ground_grit, rr, x, y, 0.4)
+			draw_rect(rr, Color(0.12, 0.12, 0.11, 0.6), false, 0.8)
+			if _h(x, y, 132) < 0.3:
+				_poly(_blob(rr.get_center() + Vector2(_h(x, y, 133) - 0.5, _h(x, y, 134) - 0.5) * 20.0, 6.0 + _h(x, y, 135) * 8.0, 0.7, 0.5, x * 7 + y),
+						Color(0.05, 0.045, 0.04, 0.35))  # oil
+	# painted lanes round the hall, worn
+	var ch := Rect2(Vector2(map.chapel.grow(2).position * C), Vector2(map.chapel.grow(2).size * C))
+	var lane := Color(0.75, 0.62, 0.2, 0.55)
+	draw_rect(ch, lane, false, 2.0)
+	draw_rect(ch.grow(10), lane, false, 1.2)
 
 
 ## Blast damage on a surface: layered soot that is heaviest at the centre, scorch
@@ -1028,6 +1119,8 @@ func _draw_low_remains(c: Vector2i) -> void:
 
 func _wall_base(c: Vector2i) -> Color:
 	if map.chapel.grow(1).has_point(c):
+		if map.map_type == "foundry":
+			return Color(0.4, 0.33, 0.29)  # the factorium: soot-dark brick and iron
 		return Color(0.52, 0.5, 0.47)  # pale, older ferrocrete
 	if map.is_bunker(c):
 		return Color(0.34, 0.34, 0.31)  # dark, heavy military concrete
@@ -1213,7 +1306,7 @@ func _draw_window(c: Vector2i) -> void:
 			else Rect2(gap.position + Vector2(gap.size.x - 1.4, 0), Vector2(1.4, gap.size.y))
 	draw_rect(sill, base.lightened(0.15))
 	_seed(c.x, c.y, 160)
-	if map.chapel.grow(1).has_point(c):
+	if map.chapel.grow(1).has_point(c) and map.map_type != "foundry":
 		# what's left of the stained glass: a few coloured shards in the lead
 		for k in 4:
 			var p := gap.position + Vector2(rng.randf() * gap.size.x, rng.randf() * gap.size.y)
@@ -1637,6 +1730,25 @@ func _draw_prop(pr: Dictionary) -> void:
 			draw_rect(body, Color(0.1, 0.07, 0.05), false, 1.0)
 			draw_rect(Rect2(body.get_center() - Vector2(8, body.size.y * 0.5), Vector2(16, body.size.y)), Color(0.28, 0.3, 0.24, 0.85))  # tarpaulin
 			draw_line(body.position + Vector2(0, 2), Vector2(body.end.x, body.position.y + 2), Color(0.45, 0.35, 0.25), 0.6)
+		"cogwheel":
+			# a great iron cog-wheel raised on a plinth, a monument to the works
+			draw_rect(Rect2(rr.position + Vector2(6, 8), rr.size), Color(0, 0, 0, 0.4))
+			draw_rect(rr, Color(0.36, 0.35, 0.33))
+			draw_rect(rr.grow(-4), Color(0.42, 0.41, 0.39))
+			draw_rect(rr, Color(0.15, 0.14, 0.13), false, 1.0)
+			var iron := Color(0.33, 0.32, 0.31) if (sd % 2) == 0 else Color(0.42, 0.33, 0.22)  # dark iron or old bronze
+			var rad := rr.size.x * 0.36
+			draw_circle(m + Vector2(6, 8), rad + 2.0, Color(0, 0, 0, 0.35))
+			for i in 10:
+				var a := i * TAU / 10.0 + float(sd % 7) * 0.1
+				draw_colored_polygon(PackedVector2Array([m + Vector2.from_angle(a - 0.16) * rad, m + Vector2.from_angle(a + 0.16) * rad,
+						m + Vector2.from_angle(a + 0.11) * (rad + 3.5), m + Vector2.from_angle(a - 0.11) * (rad + 3.5)]), iron)
+			draw_circle(m, rad, iron)
+			draw_circle(m - Vector2(1.5, 1.5), rad * 0.7, iron.lightened(0.12))
+			for i in 5:
+				draw_circle(m + Vector2.from_angle(i * TAU / 5.0) * rad * 0.55, rad * 0.16, iron.darkened(0.35))  # lightening holes
+			draw_circle(m, rad * 0.25, iron.darkened(0.2))
+			draw_arc(m, rad, 0, TAU, 24, Color(0.1, 0.1, 0.09), 0.8)
 		"statue":
 			# a saint on a stepped plinth: robe, head bowed, a sword or a candle held before him
 			draw_rect(Rect2(rr.position + Vector2(6, 8), rr.size), Color(0, 0, 0, 0.4))

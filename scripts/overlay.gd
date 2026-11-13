@@ -17,7 +17,7 @@ func _draw() -> void:
 	draw_rect(r.grow(4), col, false, 2.0)
 	for corner in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
 		draw_circle(corner, 4.0, col)
-	draw_string(ThemeDB.fallback_font, r.position + Vector2(0, -26), "THE ASHEN CHAPEL",
+	draw_string(ThemeDB.fallback_font, r.position + Vector2(0, -26), main.map.objective_name().to_upper(),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, col)
 	# orders of the selected squads
 	for sq in main.squads:

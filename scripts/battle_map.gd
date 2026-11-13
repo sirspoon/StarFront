@@ -563,11 +563,17 @@ func is_road(c: Vector2i) -> bool:
 
 ## The chapel's block: the square round it, with the rest of the block built up.
 func _make_square(b: Rect2i) -> void:
-	# saints on plinths flanking the chapel's west and east doors
+	# saints on plinths flanking the chapel's west and east doors (at the factorium: great iron
+	# cog-wheels raised on plinths, monuments to the works)
 	var cy := chapel.get_center().y
 	for x in [chapel.position.x - 3, chapel.end.x + 1]:
 		for dy in [-4, 3]:
-			_make_statue(Vector2i(x, cy + dy))
+			if map_type == "foundry":
+				var r := Rect2i(Vector2i(x, cy + dy), Vector2i(2, 2))
+				if _all_open(r):
+					_place_prop("cogwheel", r)
+			else:
+				_make_statue(Vector2i(x, cy + dy))
 	for side in 2:  # a building or two on the far edges of the block, clear of the square
 		var strip := Rect2i(b.position.x, b.position.y, b.size.x, plaza.position.y - b.position.y - 2) if side == 0 \
 				else Rect2i(b.position.x, plaza.end.y + 2, b.size.x, b.end.y - plaza.end.y - 2)
@@ -1238,10 +1244,20 @@ func _fill_room(r: Rect2i) -> void:
 			set_t(Vector2i(x, y), T.WALL if edge else T.FLOOR)
 
 
+## What the battle is for: the chapel in the Old Town, the Prime Factorium in the Foundry
+## District (the same building in the middle of the map, built and decorated for its district).
+func objective_name() -> String:
+	return "the Prime Factorium" if map_type == "foundry" else "the Ashen Chapel"
+
+
+func objective_word() -> String:
+	return "factorium" if map_type == "foundry" else "chapel"
+
+
 func _make_chapel() -> void:
 	chapel = Rect2i(W / 2 - 12, H / 2 - 7, 24, 14)
 	buildings.append(chapel)
-	_note_building("chapel")
+	_note_building("factorium" if map_type == "foundry" else "chapel")
 	_fill_room(chapel)
 	for side in 4:
 		var cells := _side_cells(chapel, side)

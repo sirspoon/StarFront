@@ -21,6 +21,9 @@ var last_status := {}
 var refresh_timer := 0.0
 var top_panel: PanelContainer
 var squad_panel: PanelContainer
+var help_label: Label
+var obj_name := "the Ashen Chapel"
+var obj_word := "chapel"
 var unit_card: UnitCard
 var squads_on := true
 var touch_bar: HBoxContainer
@@ -90,6 +93,7 @@ func setup(m: Node) -> void:
 	help_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(help_panel)
 	var help := Label.new()
+	help_label = help
 	help.text = "CONTROLS  (F1 hides)\n" \
 			+ "Left click / drag a box: select squads (Shift adds)\n" \
 			+ "Right click: move there   (Shift: add a waypoint)\n" \
@@ -307,6 +311,14 @@ func place_card() -> void:
 	unit_card.position = Vector2(10, root.size.y - ms.y - (76 if main.touch_mode else 56))
 
 
+## The battle's objective (the chapel, or the Prime Factorium on the Foundry District map).
+func set_objective(name: String, word: String) -> void:
+	obj_name = name
+	obj_word = word
+	if help_label != null:
+		help_label.text = help_label.text.replace("the Ashen Chapel", name).replace("the Prime Factorium", name)
+
+
 func set_squads_visible(on: bool) -> void:
 	squads_on = on
 	squad_panel.visible = on and not unit_card.visible
@@ -412,6 +424,8 @@ func _process(dt: float) -> void:
 
 
 func _refresh() -> void:
+	if main.map != null and obj_word != main.map.objective_word():
+		set_objective(main.map.objective_name(), main.map.objective_word())
 	_update_loading()
 	if loading_label.visible and (main.map_view.ready_drawn or not main.map_view.enabled):
 		loading_label.visible = false
@@ -420,12 +434,12 @@ func _refresh() -> void:
 	var t := int(main.time)
 	var total := int(main.battle_length)
 	var clock := "%d:%02d" % [t / 60, t % 60] + (" / %d:%02d" % [total / 60, total % 60] if total > 0 else "")
-	var chapel := "unclaimed"
+	var chapel := "unclaimed"  # (the objective: the chapel or the factorium)
 	if main.objective_owner >= 0:
 		chapel = "%s  (%d / %d s to win)" % [GameData.FACTIONS[main.factions[main.objective_owner]].short,
 				int(main.hold_streak), int(main.HOLD_TO_WIN)]
-	top_label.text = "STARFRONT v%s      %s  vs  %s      Time %s      Chapel: %s%s" % [
-			GameData.VERSION, f0.name, f1.name, clock, chapel,
+	top_label.text = "STARFRONT v%s      %s  vs  %s      Time %s      %s: %s%s" % [
+			GameData.VERSION, f0.name, f1.name, clock, obj_word.capitalize(), chapel,
 			"      [ PAUSED ]" if main.paused else ""]
 	for sq in main.squads:
 		var st: String = sq.status()
@@ -660,6 +674,8 @@ func _centre_panel() -> PanelContainer:
 
 
 func show_menu() -> void:
+	if main.map != null:
+		set_objective(main.map.objective_name(), main.map.objective_word())
 	backdrop = ColorRect.new()
 	backdrop.color = Color(0.06, 0.055, 0.05)
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -679,7 +695,7 @@ func show_menu() -> void:
 	sub_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(sub_row)
 	var sub := Label.new()
-	sub.text = "Battle for the Ashen Chapel   ·   "
+	sub.text = "Battle for %s   ·   " % obj_name
 	sub_row.add_child(sub)
 	var ver := LinkButton.new()  # the version: click it for what's new
 	ver.text = "prototype v%s  (what's new)" % GameData.VERSION
@@ -689,8 +705,10 @@ func show_menu() -> void:
 	ver.pressed.connect(_show_whats_new)
 	sub_row.add_child(ver)
 	var intro := Label.new()
-	intro.text = "The hive-city of Vell is ash and rubble. At its heart stands a ruined chapel\n" \
-			+ "that both sides have sworn to take. Choose who you command."
+	intro.text = ("The hive-city of Vell is ash and rubble. At its heart stands a ruined chapel\n" \
+			+ "that both sides have sworn to take. Choose who you command.") if obj_word == "chapel" else \
+			("The foundries of Vell lie cold and broken. At their heart stands the Prime Factorium,\n" \
+			+ "whose engines both sides have sworn to seize. Choose who you command.")
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(intro)
 	var prev: String = main.previous_stage
