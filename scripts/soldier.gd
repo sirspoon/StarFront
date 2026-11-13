@@ -707,6 +707,8 @@ func take_hit(dmg: int, from: Soldier) -> void:
 	else:
 		morale -= 10.0 * nerve
 		bleeding = 6.0  # a wounded man leaves a trail for a while
+		if faction == "legion":
+			main.sfx.play("legion_hurt", position, 0.0, 0.06)  # a yelp or a grunt as he's hit
 
 
 # ---------------------------------------------------------------- drawing

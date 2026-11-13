@@ -62,6 +62,9 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
 - Voice lines: `python3 tools/make_voices.py` (needs `pip install piper-tts` and the Piper voice
   en_GB-alan-medium, see the top of the script); `Sfx.voice()` plays acknowledgements. `--side=sworn
   --test-voice` (with `--autotest`, under xvfb) checks a move and a target order each get a reply.
+- Legion voices: `python3 tools/make_legion_voices.py` (needs `pip install piper-tts numpy scipy` and the Piper voices
+  en_GB-alan-medium and ru_RU-dmitri-medium, see the top of the script) makes `sounds/legion_*.wav`; the same
+  `--test-voice` checks them on the Legion side. Pain sounds are synthesised (a glottal-pulse voice through formants).
 - `--shot-melee` waits (after `--shot-time`) for a close fight and centres the screenshot on it;
   `--debug-assault` prints where the assault squads are and what they're doing every 10 s. Test
   results also print close-combat blows, melee kills and each assault squad's kills.

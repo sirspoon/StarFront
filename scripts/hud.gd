@@ -501,6 +501,8 @@ func _refresh() -> void:
 					var verb: String = {"Pinned": "is pinned down!", "Routing": "is breaking and running!",
 							"Lost": "has been wiped out."}[st]
 					main.log_message("[color=%s]%s %s[/color]" % [col, sq.name, verb])
+					if mine and sq.faction == "legion" and st != "Lost":
+						main.sfx.voice("legion_pinned" if st == "Pinned" else "legion_rout")  # the men cry out
 			last_status[sq] = st
 		if rows.has(sq):
 			var r: Dictionary = rows[sq]

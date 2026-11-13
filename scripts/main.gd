@@ -2070,6 +2070,8 @@ func on_death(s: Soldier, killer: Soldier) -> void:
 		assault_kills[killer.team] += 1
 	if s.faction == "sworn" and not s.is_vehicle:
 		sfx.play("sworn_death", s.position, 0.0, 0.04)
+	elif s.faction == "legion" and not s.is_vehicle and randf() < 0.7:
+		sfx.play("legion_death", s.position, 0.0, 0.05)
 	for o in soldiers:
 		if not o.is_alive() or o.team != s.team:
 			continue
@@ -2600,8 +2602,10 @@ func _order_grenade(wp: Vector2) -> void:
 
 
 func _acknowledge(kind: String) -> void:
-	if _player_squads().any(func(q): return q.selected and q.faction == "sworn" and (not q.alive().is_empty() or q.carrier() != null)):
-		sfx.voice("sworn_" + kind)
+	for f in ["sworn", "legion"]:
+		if _player_squads().any(func(q): return q.selected and q.faction == f and q.vehicle() == null and (not q.alive().is_empty() or q.carrier() != null)):
+			sfx.voice(f + "_" + kind)
+			return
 
 
 func _has_selection() -> bool:

@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.96 (2026-11-13)
+Legion voices.
+- Your Legion squads answer orders ("Yes, sir!", "Moving out.", "At once!", "Understood. Moving.") and
+  attack orders ("Open fire!", "For the Dominion!", "Kill them all!", and a Russian "Urrah!"), in
+  Russian-accented English through their rebreather masks and a crackly field radio, with the
+  rebreather's hiss after. Two men say each line, one deeper.
+- They cry out when one of your squads is pinned ("We are pinned down!", "Heads down!", "They are
+  everywhere!") or breaks ("Fall back!", "Get back!", "We cannot hold!"), frightened and shaking.
+- Wounded Legion men yelp, grunt or gasp when hit (8 different), and dying men scream or groan,
+  their voices breaking, then fall with a clatter of kit (6 different).
+- Made by tools/make_legion_voices.py.
+
 ## v0.95 (2026-11-13)
 - Muster screen: each unit is in its own box; tap or click anywhere on the box (apart from its - and +)
   to show it in the preview. The box being shown is highlighted, and boxes light up under the mouse.
