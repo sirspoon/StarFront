@@ -177,10 +177,10 @@ class RoofPiece:
 		var r: Rect2i = map.buildings[index]
 		var horiz := r.size.x >= r.size.y  # the ridge runs along the longer side
 		var ridge := (r.position.y + r.size.y * 0.5) * C if horiz else (r.position.x + r.size.x * 0.5) * C
-		var is_chapel := r == map.chapel
+		var is_chapel := map.chapel.encloses(r)
 		var kind: String = map.building_kind[index] if index < map.building_kind.size() else "home"
 		var flat := kind == "shop" or kind == "office" or kind == "bunker"  # flat roofs: tar paper or concrete
-		var metal := kind == "industry" or kind == "warehouse" or kind == "factorium"  # corrugated iron on the works
+		var metal := kind == "industry" or kind == "warehouse" or kind.begins_with("factorium")  # corrugated iron on the works
 		var slate := Color(0.23, 0.235, 0.245) if not is_chapel else Color(0.31, 0.31, 0.3)  # chapel: old lead
 		match kind:
 			"tavern": slate = Color(0.3, 0.2, 0.17)  # old clay tiles
@@ -188,7 +188,7 @@ class RoofPiece:
 			"office": slate = Color(0.27, 0.26, 0.25)
 			"industry": slate = Color(0.33, 0.3, 0.27)
 			"warehouse": slate = Color(0.3, 0.31, 0.3)
-			"factorium": slate = Color(0.28, 0.27, 0.26)
+			"factorium", "factorium_wing": slate = Color(0.28, 0.27, 0.26)
 			"bunker": slate = Color(0.33, 0.33, 0.3)
 		slate = slate.lightened((_h(index, 0, 1) - 0.5) * 0.1)
 		var has := func(c: Vector2i) -> bool: return map.in_bounds(c) and map.roof_at(c) > 0.0 and r.has_point(c)
@@ -502,22 +502,23 @@ class RoofPiece:
 	## brass drive-wheel emblem on the ridge, and two tall round smokestacks at the west end
 	## throwing long shadows.
 	func _factorium_crown(map: BattleMap, r: Rect2i) -> void:
-		var rr := Rect2(Vector2(r.position * C), Vector2(r.size * C))
+		var rr := Rect2(Vector2(r.position * C), Vector2(r.size * C))  # (the main hall)
 		var cy := rr.get_center().y
-		# sawtooth skylight rows across the hall
-		var x := rr.position.x + 5.5 * C
+		# sawtooth skylight rows across the machine hall (only where there's roof: not over the yard)
 		var k := 0
-		while x < rr.end.x - 2.0 * C:
-			var band := Rect2(x, rr.position.y + C, 6.0, rr.size.y - 2.0 * C)
-			draw_rect(band, Color(0.1, 0.11, 0.12))
-			for gy in range(int(band.position.y) + 2, int(band.end.y) - 2, 5):
-				if _h(k, gy, 41) < 0.35:  # a few panes still in, catching the moon
-					draw_rect(Rect2(band.position.x + 1, gy, 4, 3), Color(0.45, 0.5, 0.55, 0.7))
-			draw_line(Vector2(band.end.x, band.position.y), Vector2(band.end.x, band.end.y), Color(0.42, 0.41, 0.4), 1.4)
-			x += 2.2 * C
+		for cx in range(r.position.x + 11, r.end.x - 1, 3):
+			for cyy in range(r.position.y + 1, r.end.y - 1):
+				var cell := Vector2i(cx, cyy)
+				if map.roof_at(cell) <= 0.0:
+					continue
+				var o2 := Vector2(cell) * C
+				draw_rect(Rect2(o2.x + 4, o2.y, 7, C), Color(0.1, 0.11, 0.12))
+				if _h(cx, cyy, 41) < 0.35:  # a few panes still in, catching the moon
+					draw_rect(Rect2(o2.x + 5, o2.y + 5, 5, 6), Color(0.45, 0.5, 0.55, 0.7))
+				draw_line(Vector2(o2.x + 11, o2.y), Vector2(o2.x + 11, o2.y + C), Color(0.42, 0.41, 0.4), 1.4)
 			k += 1
 		# the drive-wheel emblem
-		var ec := Vector2(rr.get_center().x + C, cy)
+		var ec := Vector2(rr.position.x + 5.5 * C, cy)  # over the engine room
 		var brass := Color(0.72, 0.56, 0.26)
 		for i in 10:
 			var a := i * TAU / 10.0
@@ -527,7 +528,7 @@ class RoofPiece:
 		draw_circle(ec, 6.0, Color(0.15, 0.12, 0.09))
 		draw_circle(ec, 3.0, brass.lightened(0.15))
 		# smokestacks
-		for sy in [cy - 2.4 * C, cy + 2.4 * C]:
+		for sy in [rr.position.y + 2.6 * C, rr.end.y - 2.6 * C]:
 			var sc := Vector2(rr.position.x + 2.6 * C, sy)
 			var sr := 1.6 * C
 			draw_colored_polygon(PackedVector2Array([sc + Vector2(-sr, -sr * 0.3), sc + Vector2(sr * 0.3, -sr), sc + Vector2(sr, sr * 0.3) + Vector2(60, 80),

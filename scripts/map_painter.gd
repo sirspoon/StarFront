@@ -692,9 +692,9 @@ func _draw_factorium_floor() -> void:
 				for k in 3:
 					var p := tr.position + Vector2(4 + k * 4, 5 + (k % 2) * 6)
 					draw_line(p, p + Vector2(2.5, 1.5), col.lightened(0.12), 0.6)
-	var cy := r.get_center().y
-	# the hazard lane down the hall
-	var lane := Rect2(r.position.x + C * 1.5, cy - C * 1.2, r.size.x - C * 5, C * 2.4)
+	var o := Vector2(ch.position * C)
+	# hazard-striped edges along the main aisle of the machine hall
+	var lane := Rect2(o.x + 10 * C, o.y + 11 * C, 18 * C, 2 * C)
 	for edge in [lane.position.y, lane.end.y - 3.0]:
 		var x := lane.position.x
 		var k := 0
@@ -703,22 +703,20 @@ func _draw_factorium_floor() -> void:
 			draw_colored_polygon(PackedVector2Array([Vector2(x, edge), Vector2(x + 5, edge), Vector2(x + 8, edge + 3), Vector2(x + 3, edge + 3)]), col)
 			x += 5.0
 			k += 1
-	# gantry rails along the hall
-	for yy in [r.position.y + C * 2.5, r.end.y - C * 2.5]:
-		draw_line(Vector2(r.position.x + C, yy), Vector2(r.end.x - C * 3, yy), Color(0.5, 0.48, 0.45), 1.4)
-		draw_line(Vector2(r.position.x + C, yy + 2), Vector2(r.end.x - C * 3, yy + 2), Color(0.5, 0.48, 0.45), 1.4)
-	# the great drive-wheel inlaid in brass at the crossing
-	var c0 := r.get_center() + Vector2(-C * 2, 0)
+	# the engine room's floor: a painted safety line round where the engine stands
+	draw_rect(Rect2(o + Vector2(2, 6) * C, Vector2(7, 8) * C), Color(0.75, 0.6, 0.15, 0.6), false, 1.5)
+	# the great drive-wheel inlaid in brass in the aisle
+	var c0 := lane.get_center() + Vector2(C * 1.5, 0)
 	var brass := Color(0.7, 0.55, 0.25, 0.85)
-	for i in 12:
-		var a := i * TAU / 12.0
-		draw_colored_polygon(PackedVector2Array([c0 + Vector2.from_angle(a - 0.12) * 24, c0 + Vector2.from_angle(a + 0.12) * 24,
-				c0 + Vector2.from_angle(a + 0.09) * 30, c0 + Vector2.from_angle(a - 0.09) * 30]), brass)  # teeth
-	draw_arc(c0, 21.0, 0, TAU, 32, brass, 6.0)
-	for i in 6:
-		draw_line(c0, c0 + Vector2.from_angle(i * TAU / 6.0) * 19.0, brass.darkened(0.15), 2.4)  # spokes
-	draw_circle(c0, 6.0, brass.darkened(0.1))
-	draw_circle(c0, 2.5, Color(0.12, 0.1, 0.08))
+	for i2 in 12:
+		var a := i2 * TAU / 12.0
+		draw_colored_polygon(PackedVector2Array([c0 + Vector2.from_angle(a - 0.12) * 20, c0 + Vector2.from_angle(a + 0.12) * 20,
+				c0 + Vector2.from_angle(a + 0.09) * 25, c0 + Vector2.from_angle(a - 0.09) * 25]), brass)  # teeth
+	draw_arc(c0, 17.0, 0, TAU, 32, brass, 5.0)
+	for i2 in 6:
+		draw_line(c0, c0 + Vector2.from_angle(i2 * TAU / 6.0) * 15.0, brass.darkened(0.15), 2.0)  # spokes
+	draw_circle(c0, 5.0, brass.darkened(0.1))
+	draw_circle(c0, 2.0, Color(0.12, 0.1, 0.08))
 	# oil spills and smashed lamp glass
 	_seed(ch.position.x, ch.position.y, 126)
 	for k in 9:
@@ -946,6 +944,8 @@ func _draw_low(c: Vector2i) -> void:
 			_draw_barricade(c)
 		BattleMap.LowKind.CRATES:
 			_draw_crate_stack(c)
+		BattleMap.LowKind.MACHINE:
+			pass  # drawn whole, as a prop
 		_:
 			_draw_low_wall(c)
 
@@ -1730,6 +1730,55 @@ func _draw_prop(pr: Dictionary) -> void:
 			draw_rect(body, Color(0.1, 0.07, 0.05), false, 1.0)
 			draw_rect(Rect2(body.get_center() - Vector2(8, body.size.y * 0.5), Vector2(16, body.size.y)), Color(0.28, 0.3, 0.24, 0.85))  # tarpaulin
 			draw_line(body.position + Vector2(0, 2), Vector2(body.end.x, body.position.y + 2), Color(0.45, 0.35, 0.25), 0.6)
+		"engine":
+			# the great engine: a long iron bed, twin cylinders with their piston rods, a huge
+			# flywheel, steam pipes and a furnace door glowing at one end
+			draw_rect(Rect2(rr.position + Vector2(6, 8), rr.size), Color(0, 0, 0, 0.45))
+			draw_rect(rr.grow(-2), Color(0.25, 0.24, 0.23))
+			draw_rect(rr.grow(-2), Color(0.1, 0.1, 0.09), false, 1.2)
+			var fw := Vector2(rr.get_center().x, rr.position.y + rr.size.y * 0.3)
+			draw_circle(fw + Vector2(4, 5), rr.size.x * 0.42, Color(0, 0, 0, 0.35))
+			draw_arc(fw, rr.size.x * 0.38, 0, TAU, 32, Color(0.36, 0.34, 0.31), 6.0)  # the flywheel's rim
+			for i2 in 8:
+				draw_line(fw, fw + Vector2.from_angle(i2 * TAU / 8.0) * rr.size.x * 0.36, Color(0.32, 0.3, 0.28), 2.0)
+			draw_circle(fw, 6.0, Color(0.4, 0.38, 0.35))
+			draw_circle(fw, 2.5, Color(0.7, 0.55, 0.25))
+			for k in 2:  # cylinders and rods
+				var cx := rr.position.x + rr.size.x * (0.3 + k * 0.4)
+				var cyl := Rect2(cx - 7, rr.position.y + rr.size.y * 0.58, 14, rr.size.y * 0.28)
+				draw_rect(cyl, Color(0.34, 0.32, 0.3))
+				draw_rect(cyl, Color(0.12, 0.11, 0.1), false, 0.8)
+				for b in 3:
+					draw_line(Vector2(cyl.position.x, cyl.position.y + 4 + b * 7), Vector2(cyl.end.x, cyl.position.y + 4 + b * 7), Color(0.6, 0.48, 0.25), 1.0)
+				draw_line(Vector2(cx, cyl.position.y), fw + Vector2((k - 0.5) * 10, 6), Color(0.62, 0.6, 0.56), 1.6)
+			draw_line(rr.position + Vector2(4, 4), Vector2(rr.end.x - 4, rr.position.y + 4), Color(0.45, 0.3, 0.2), 2.4)  # a steam pipe
+			draw_rect(Rect2(rr.end.x - 14, rr.end.y - 10, 10, 6), Color(0.95, 0.5, 0.15))  # the firebox
+			draw_rect(Rect2(rr.end.x - 14, rr.end.y - 10, 10, 6), Color(0.15, 0.08, 0.05), false, 0.8)
+		"press":
+			# a heavy press: a square frame with the ram and its die block
+			if map.get_t(r.position) != T.LOW:
+				return  # wrecked: only scrap is left
+			draw_rect(Rect2(rr.position + Vector2(5, 6), rr.size), Color(0, 0, 0, 0.4))
+			var body := rr.grow(-2)
+			draw_rect(body, Color(0.3, 0.33, 0.3) if (sd % 2) == 0 else Color(0.35, 0.3, 0.24))
+			draw_rect(body, Color(0.1, 0.1, 0.09), false, 1.0)
+			draw_rect(body.grow(-6), Color(0.18, 0.18, 0.17))
+			draw_circle(body.get_center(), 4.0, Color(0.5, 0.48, 0.44))  # the ram
+			for k in 4:
+				draw_circle(body.position + Vector2(3 + (k % 2) * (body.size.x - 6), 3 + (k / 2) * (body.size.y - 6)), 1.4, Color(0.55, 0.45, 0.25))
+			draw_line(body.position + Vector2(2, body.size.y - 3), body.end - Vector2(2, 3), Color(0.75, 0.6, 0.15), 1.2)  # warning paint
+		"lathe":
+			# a lathe: a long bed, the headstock with its chuck, the tailstock, a half-turned shaft
+			if map.get_t(r.position) != T.LOW:
+				return
+			draw_rect(Rect2(rr.position + Vector2(5, 6), rr.size), Color(0, 0, 0, 0.4))
+			var bed := Rect2(rr.position.x + 2, rr.get_center().y - 6, rr.size.x - 4, 12)
+			draw_rect(bed, Color(0.3, 0.32, 0.31))
+			draw_rect(bed, Color(0.1, 0.1, 0.09), false, 0.8)
+			draw_rect(Rect2(rr.position.x + 2, rr.position.y + 3, 12, rr.size.y - 6), Color(0.36, 0.38, 0.36))  # headstock
+			draw_circle(Vector2(rr.position.x + 16, rr.get_center().y), 4.5, Color(0.5, 0.48, 0.45))  # chuck
+			draw_line(Vector2(rr.position.x + 16, rr.get_center().y), Vector2(rr.end.x - 10, rr.get_center().y), Color(0.65, 0.62, 0.58), 2.2)  # the work
+			draw_rect(Rect2(rr.end.x - 10, rr.get_center().y - 5, 7, 10), Color(0.36, 0.38, 0.36))  # tailstock
 		"cogwheel":
 			# a great iron cog-wheel raised on a plinth, a monument to the works
 			draw_rect(Rect2(rr.position + Vector2(6, 8), rr.size), Color(0, 0, 0, 0.4))

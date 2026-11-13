@@ -26,10 +26,10 @@ const BUNKER_WALL_HP := 320.0
 ## Low cover: chest-high things troops crouch behind and fire over. It doesn't block
 ## sight, infantry can clamber over it slowly, vehicles go round. It soaks up more
 ## punishment than a full wall before it is destroyed.
-enum LowKind { NONE, SANDBAGS, STONE, BARRICADE, CRATES }
-const LOW_COVER := [0.0, 0.7, 0.65, 0.5, 0.55]       # cover it gives from fire on its far side
-const LOW_HP := [0.0, 260.0, 220.0, 180.0, 150.0]
-const LOW_NAMES := ["", "Sandbags", "Low wall", "Barricade", "Crates"]
+enum LowKind { NONE, SANDBAGS, STONE, BARRICADE, CRATES, MACHINE }
+const LOW_COVER := [0.0, 0.7, 0.65, 0.5, 0.55, 0.6]       # cover it gives from fire on its far side
+const LOW_HP := [0.0, 260.0, 220.0, 180.0, 150.0, 380.0]
+const LOW_NAMES := ["", "Sandbags", "Low wall", "Barricade", "Crates", "Machinery"]
 
 var grid := PackedByteArray()
 var astar := AStarGrid2D.new()
@@ -455,7 +455,8 @@ func _refresh_vastar(c: Vector2i) -> void:
 
 ## Barricades, crates and sandbags give way under a vehicle (low stone walls don't).
 func vehicle_can_crush(c: Vector2i) -> bool:
-	return get_t(c) == T.LOW and low_kind[c.y * W + c.x] != LowKind.STONE
+	var k := low_kind[c.y * W + c.x]
+	return get_t(c) == T.LOW and k != LowKind.STONE and k != LowKind.MACHINE
 
 
 # ---------------------------------------------------------------- generation
@@ -512,7 +513,7 @@ func _make_city() -> void:
 	for i in hy.size():
 		roads.append(Rect2(0, hy[i] * CELL, W * CELL, hw[i] * CELL))
 	_make_chapel()
-	plaza = chapel.grow(5)
+	plaza = chapel.grow(3 if map_type == "foundry" else 5)
 	# the city blocks: between the deployment strips, the avenues and the cross streets
 	var xs := [[16, vx[0] - 1]]
 	for i in range(vx.size() - 1):
@@ -690,6 +691,15 @@ func _place_prop(kind: String, r: Rect2i) -> void:
 	for x in range(r.position.x, r.end.x):
 		for y in range(r.position.y, r.end.y):
 			set_t(Vector2i(x, y), T.WRECK)
+	props.append({"kind": kind, "rect": r, "seed": rng.randi()})
+
+
+## A machine: waist-high, so men take cover behind it and shoot over it (like low cover),
+## heavy enough to take a lot of punishment.
+func _place_machine(kind: String, r: Rect2i) -> void:
+	for x in range(r.position.x, r.end.x):
+		for y in range(r.position.y, r.end.y):
+			_set_low(Vector2i(x, y), LowKind.MACHINE)
 	props.append({"kind": kind, "rect": r, "seed": rng.randi()})
 
 
@@ -1115,7 +1125,7 @@ func _init_roofs() -> void:
 				var t := get_t(c)
 				if collapsed[j] == 0 and t != T.OPEN and t != T.CRATER:
 					roof_hp[j] = 100.0
-		if b == chapel:
+		if chapel.encloses(b):
 			continue
 		for h in rng.randi_range(0, 2):  # shell holes from earlier fighting
 			var hc := Vector2i(rng.randi_range(b.position.x + 1, b.end.x - 2), rng.randi_range(b.position.y + 1, b.end.y - 2))
@@ -1193,7 +1203,7 @@ func _init_walls() -> void:
 			wall_max[y * W + x] = hp
 	# gaps in the ruins' outer walls are collapsed wall too (the chapel's doorways aren't)
 	for b in buildings:
-		var is_chapel := b == chapel
+		var is_chapel := chapel.encloses(b)
 		for side in 4:
 			for c in _side_cells(b, side) + [b.position, Vector2i(b.end.x - 1, b.position.y),
 					Vector2i(b.position.x, b.end.y - 1), b.end - Vector2i.ONE]:
@@ -1255,6 +1265,9 @@ func objective_word() -> String:
 
 
 func _make_chapel() -> void:
+	if map_type == "foundry":
+		_make_factorium()
+		return
 	chapel = Rect2i(W / 2 - 12, H / 2 - 7, 24, 14)
 	buildings.append(chapel)
 	_note_building("factorium" if map_type == "foundry" else "chapel")
@@ -1277,6 +1290,62 @@ func _make_chapel() -> void:
 	_add_buttresses(chapel)
 	objective_rect = Rect2(Vector2(chapel.position + Vector2i(1, 1)) * CELL,
 			Vector2(chapel.size - Vector2i(2, 2)) * CELL)
+
+
+## The Prime Factorium: bigger than the chapel (30 x 20) and laid out like a works. An engine
+## room at the west end behind a partition wall, round the great engine; the machine hall with
+## rows of presses and lathes (solid: cover, and they block sight); a loading yard cut out of
+## the north-east corner; and wide loading bays instead of doors.
+func _make_factorium() -> void:
+	chapel = Rect2i(W / 2 - 15, H / 2 - 10, 30, 20)  # (the whole site: what's held to win)
+	var o := chapel.position
+	var at := func(x: int, y: int) -> Vector2i: return o + Vector2i(x, y)
+	# two joined buildings: the north wing (with the loading yard beside it, in the corner the
+	# wing leaves open) and the main hall
+	var wing := Rect2i(o, Vector2i(22, 7))
+	var hall := Rect2i(o + Vector2i(0, 6), Vector2i(30, 14))
+	buildings.append(wing)
+	_note_building("factorium_wing")
+	buildings.append(hall)
+	_note_building("factorium")
+	_fill_room(wing)
+	_fill_room(hall)
+	for x in range(1, 21):
+		set_t(at.call(x, 6), T.FLOOR)  # wing and hall are one space inside
+	for x in [24, 25]:
+		set_t(at.call(x, 6), T.FLOOR)  # a door from the hall into the yard
+	# the engine room's partition, with three gaps
+	for y in range(1, 19):
+		if not y in [5, 6, 9, 10, 13, 14]:
+			set_t(at.call(9, y), T.WALL)
+	# wide loading bays in the outer walls
+	for x in range(13, 17):
+		set_t(at.call(x, 19), T.FLOOR)
+	for x in range(23, 27):
+		set_t(at.call(x, 19), T.FLOOR)
+	for x in range(14, 17):
+		set_t(at.call(x, 0), T.FLOOR)
+	for y in range(12, 15):
+		set_t(at.call(29, y), T.FLOOR)
+	for y in [9, 10]:
+		set_t(at.call(0, y), T.FLOOR)
+	# the great engine, and the machines in rows with aisles between
+	_place_prop("engine", Rect2i(at.call(3, 7), Vector2i(5, 6)))
+	for x in [11, 15, 19]:
+		_place_machine("press", Rect2i(at.call(x, 2), Vector2i(2, 2)))
+	for x in [11, 16, 22]:
+		_place_machine("lathe", Rect2i(at.call(x, 8), Vector2i(3, 2)))
+	for x in [11, 15, 19, 23, 27]:
+		_place_machine("press", Rect2i(at.call(x, 14), Vector2i(2, 2)))
+	# stacked crates in the loading yard
+	for c in [Vector2i(23, 2), Vector2i(26, 1), Vector2i(27, 3)]:
+		_set_low(at.call(c.x, c.y), LowKind.CRATES)
+	for side in 4:
+		for c in _side_cells(chapel, side):
+			if get_t(c) == T.WALL and rng.randf() < 0.06:
+				set_t(c, T.RUBBLE)
+	# what has to be held: the main hall (about the chapel's size), not the wing and yard as well
+	objective_rect = Rect2(Vector2(hall.position + Vector2i(1, 1)) * CELL, Vector2(hall.size - Vector2i(2, 2)) * CELL)
 
 
 func _make_ruin(r: Rect2i, kind := "") -> void:
@@ -1415,7 +1484,7 @@ func _make_windows() -> void:
 	if "--no-windows" in OS.get_cmdline_user_args():
 		return  # test aid
 	for b in buildings:
-		var is_chapel := b == chapel
+		var is_chapel := chapel.encloses(b)
 		for side in 4:
 			var cells := _side_cells(b, side)
 			var gap := 3 if is_chapel else rng.randi_range(4, 6)
@@ -1439,7 +1508,7 @@ func _crumble_walls() -> void:
 	for b in buildings:
 		for side in 4:
 			var cells := _side_cells(b, side)
-			if cells.size() < 5 or rng.randf() > (0.3 if b == chapel else 0.55):
+			if cells.size() < 5 or rng.randf() > (0.3 if chapel.encloses(b) else 0.55):
 				continue
 			var start := rng.randi_range(1, cells.size() - 4)
 			for k in rng.randi_range(2, 4):

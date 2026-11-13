@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.81 (2026-11-13)
+The Prime Factorium rebuilt as a works.
+- Bigger (30 x 20 cells against the chapel's 24 x 14) and L-shaped: a north wing joined to the main
+  hall, with a walled loading yard (stacked crates) in the corner the wing leaves open.
+- Inside: an engine room at the west end behind a partition wall with three gaps, round the great
+  engine (flywheel, cylinders, a glowing firebox; solid, it blocks sight); and the machine hall with
+  rows of heavy presses and lathes along the aisles. The machines are waist-high: men shelter behind
+  them and fire over them, and they take a lot of punishment before they're wrecked.
+- Wide loading bays in the outer walls instead of doors; a hazard-striped main aisle with the brass
+  drive-wheel inlaid in it; the roof's skylights over the machine hall, the smokestacks over the engine room.
+- What has to be held is the main hall (about the chapel's size). In test battles the bigger,
+  cluttered building first led to long stalemates; with the hall as the objective and the machines
+  as low cover, battles run 5 to 13 minutes again (1 of 12 went to time).
+
 ## v0.80 (2026-11-13)
 The Foundry District's objective is the Prime Factorium.
 - On the Foundry District map the building in the middle is the Prime Factorium, not the chapel: soot-dark
