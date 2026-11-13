@@ -26,6 +26,7 @@ var mortar_kind := "he"   # the round loaded: "he" or "smoke" (smoke: one salvo,
 var barrage_t := 0.0      # seconds until the next salvo
 var ranging := 0          # salvos fired at the current mission: each lands a little tighter
 var no_ai := false        # test aid: the computer leaves this squad alone
+var smoke_left := 5       # mortar smoke rounds for the whole battle (one per tube in a salvo)
 
 ## Squad coherency, as in Epik: every soldier must be within this distance of
 ## another, forming one connected group. Stragglers make their way back.

@@ -40,6 +40,13 @@ func _process(dt: float) -> void:
 			sq.barrage_t = 1.0
 			continue
 		var kind: String = sq.mortar_kind
+		if kind == "smoke":
+			if sq.smoke_left <= 0:
+				sq.mortar_kind = "he"  # (none left)
+				sq.fire_mission = null
+				continue
+			tubes = tubes.slice(0, mini(tubes.size(), sq.smoke_left))  # as many as there are rounds for
+			sq.smoke_left -= tubes.size()
 		# the salvo: each tube fires within half a second or so of the others
 		for i in tubes.size():
 			pending.append([now + i * 0.22 + randf() * 0.18, tubes[i], target, kind])
@@ -53,7 +60,7 @@ func _process(dt: float) -> void:
 			sq.fire_mission = null
 			sq.ranging = 0
 			if sq.team == main.player_team:
-				main.log_message("[color=#e8c070]%s: smoke on the way. Back to HE.[/color]" % sq.name)
+				main.log_message("[color=#e8c070]%s: smoke on the way (%d smoke rounds left). Back to HE.[/color]" % [sq.name, sq.smoke_left])
 
 
 ## Where the salvo goes: the fire mission, or the nearest enemy their side can see in range.

@@ -273,14 +273,17 @@ func _test_mortar() -> void:
 	sq.no_ai = true
 	var open_spot := sq.center() + Vector2(40 if player_team == 0 else -40, 0)
 	sq.order_move(map, open_spot, false)  # stop and set up (in the open) near where they are
-	await get_tree().create_timer(12.0).timeout
+	var tubes := sq.members.filter(func(m): return m.mortar)
+	var t0 := time
+	while not tubes.all(func(m): return not m.is_alive() or m.mortar_set >= 1.0) and time - t0 < 40.0:
+		await get_tree().create_timer(0.25).timeout
+	print("mortar test: set up after %.1f s (including the walk)" % (time - t0))
 	var c := sq.center()
 	var spot := c + Vector2(520 if player_team == 0 else -520, 0)
-	var set_up := sq.members.filter(func(m): return m.mortar and m.mortar_set >= 1.0).size()
-	print("mortar test: %d tubes set up; HE mission at %s: %s" % [set_up, spot.round(), mortars.order(sq, spot)])
+	print("  HE mission at %s: %s" % [spot.round(), mortars.order(sq, spot)])
 	var times: Array = []
 	var lands: Array = []
-	for i in 30:
+	for i in 40:
 		await get_tree().create_timer(0.5).timeout
 		for g in grenades.flying:
 			if g.kind == "mortar" and not g.has("seen"):
@@ -290,15 +293,25 @@ func _test_mortar() -> void:
 		if times.size() >= 6:
 			break
 	print("  rounds fired at %s; landed %s px from the aim" % [times, lands.map(func(d): return int(d))])
-	sq.mortar_kind = "smoke"
-	print("  smoke mission: %s" % mortars.order(sq, spot + Vector2(0, 80)))
-	var screens0 := grenades.screens.size()
-	for i in 30:
-		await get_tree().create_timer(0.5).timeout
-		if grenades.screens.size() >= screens0 + 3:
-			break
-	await get_tree().create_timer(2.0).timeout
-	print("  smoke screens made: %d; now loaded with %s; mission %s" % [grenades.screens.size() - screens0, sq.mortar_kind, "ended" if sq.fire_mission == null else "still on"])
+	for k in 3:  # smoke three times: 3 rounds, then 2, then none left
+		switch_guns_for(sq)
+		var screens0 := grenades.screens.size()
+		print("  smoke %d: loaded %s, %s" % [k + 1, sq.mortar_kind, mortars.order(sq, spot + Vector2(0, 60 * k))])
+		for i in 30:
+			await get_tree().create_timer(0.5).timeout
+			if sq.fire_mission == null:
+				break
+		await get_tree().create_timer(3.5).timeout
+		print("    screens made %d, smoke rounds left %d, now %s" % [grenades.screens.size() - screens0, sq.smoke_left, sq.mortar_kind])
+		sq.fire_mission = null
+		sq.mortar_kind = "he"
+	# pack up and move
+	var p0: Vector2 = tubes[0].position
+	sq.order_move(map, sq.center() + Vector2(0, 120), false)
+	t0 = time
+	while tubes[0].position.distance_to(p0) < 4.0 and time - t0 < 30.0:
+		await get_tree().create_timer(0.25).timeout
+	print("  packed up and moving after %.1f s" % (time - t0))
 
 
 ## Test aid: three squads at different paces; selecting each should show its own pace.
@@ -2089,16 +2102,34 @@ func _end(winner: int, reason: String) -> void:
 
 
 ## Switch the main gun setting of the selected tanks (beam / pulse, AP / HE).
+## (test aid) switch a squad's mortar round as the Gun button would.
+func switch_guns_for(sq: Squad) -> void:
+	var was := sq.selected
+	for q in squads:
+		if q != sq:
+			q.set_meta("was_sel", q.selected)
+			q.selected = false
+	sq.selected = true
+	switch_guns()
+	sq.selected = was
+	for q in squads:
+		if q != sq:
+			q.selected = q.get_meta("was_sel")
+
+
 func switch_guns() -> void:
 	for sq in _player_squads():
 		if sq.selected and sq.has_mortars():
+			if sq.mortar_kind == "he" and sq.smoke_left <= 0:
+				log_message("[color=#e8c070]%s: no smoke rounds left[/color]" % sq.name)
+				continue
 			sq.mortar_kind = "smoke" if sq.mortar_kind == "he" else "he"
 			if sq.mortar_kind == "smoke" and sq.fire_mission != null:
 				# smoke goes only where it's next told: the old mission ends, it isn't smoked
 				sq.fire_mission = null
 				sq.ranging = 0
 			log_message("[color=#e8c070]%s: mortars loaded with %s%s[/color]" % [sq.name, "smoke" if sq.mortar_kind == "smoke" else "HE",
-					" - pick a target" if sq.mortar_kind == "smoke" else ""])
+					" (%d left) - pick a target" % sq.smoke_left if sq.mortar_kind == "smoke" else ""])
 		var v = sq.vehicle()
 		if sq.selected and v != null and v.is_alive() and v.gun_mode() != "":
 			var m: String = v.switch_gun()

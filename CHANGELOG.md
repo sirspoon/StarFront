@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.85 (2026-11-13)
+Mortars: slower to set up and pack up; limited smoke.
+- Setting up takes about 10 seconds with a loader beside the gunner (15 alone). Told to move, the crew
+  first pack the mortar up (about 10 seconds from fully set up) and only then set off; running away,
+  they just go.
+- 5 smoke rounds for the whole battle (one per tube in a salvo: a full salvo of 3, then 2). With none
+  left the Gun button won't load smoke ("no smoke rounds left"). The unit card shows how many remain.
+
 ## v0.84 (2026-11-13)
 - Mortars: switching to smoke ends the current fire mission, so the smoke goes only where you next
   target (Target, then tap), not onto the spot they were shelling; the log says "pick a target". As

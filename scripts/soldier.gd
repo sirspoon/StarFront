@@ -208,12 +208,13 @@ func tick(dt: float, now: float) -> void:
 	if heavy:
 		_update_setup(dt)
 	if mortar:
-		# the base plate goes down and the tube is laid once he stops (quicker with a loader by him)
-		if moving or state == State.ROUTING or in_melee:
+		# the base plate goes down and the tube is laid once he stops (about 10 s with a loader by
+		# him, longer alone); told to move, he packs it up first (see _follow_path)
+		if state == State.ROUTING or in_melee:
 			mortar_set = 0.0
-		else:
+		elif not moving and path_i >= path.size():
 			var helper := squad.members.any(func(o): return o != self and o.is_alive() and o.data.get("mortar_loader", false) and o.position.distance_to(position) < 40.0)
-			mortar_set = minf(1.0, mortar_set + dt / (3.0 if helper else 4.5))
+			mortar_set = minf(1.0, mortar_set + dt / (MORTAR_SETUP if helper else MORTAR_SETUP * 1.5))
 	_update_posture(dt)
 	if bleeding > 0.0:
 		bleeding -= dt
@@ -360,7 +361,19 @@ func _start_rout() -> void:
 	path_i = 0
 
 
+## A mortar crew told to move first packs the mortar up (about as long as setting it up),
+## and only then sets off. (Running away, they leave it standing and go.)
+const MORTAR_SETUP := 10.0
+const MORTAR_PACK := 10.0
+
+
 func _follow_path(dt: float, fleeing: bool) -> void:
+	if mortar and not fleeing and mortar_set > 0.0 and path_i < path.size():
+		moving = false
+		mortar_set = maxf(0.0, mortar_set - dt / MORTAR_PACK)
+		if swing <= 0.0 and randf() < dt * 0.8:
+			swing = 1.0  # working the base plate loose
+		return
 	if path_i >= path.size():
 		moving = false
 		if fleeing:
