@@ -84,7 +84,6 @@ var board_carrier = null    # that carrier's squad
 var plan_fresh := true      # the next order replaces the selected squads' orders (else it's added to the route)
 var tap_pos := Vector2.ZERO
 var face_mode := false
-var pick_mode := false
 var pointer_world := Vector2.ZERO  # where the mouse or dragging finger is on the map
 var rdrag_start := Vector2.ZERO
 var drag_start := Vector2.ZERO
@@ -203,19 +202,7 @@ func _test_orders() -> void:
 	for m in sq.members:
 		out.append("(%d,%d)" % [m.position.x, m.position.y])
 	print("line order %s -> %s: %s coherent=%s" % [a, b, " ".join(out), sq.is_coherent()])
-	sq.sub = [sq.members[0], sq.members[1]]
-	sq.order_move(map, c + Vector2(600, 0), false)
-	await get_tree().create_timer(8.0).timeout
-	var far := 0.0
-	for m in sq.sub:
-		var nearest := INF
-		for o in sq.members:
-			if not sq.sub.has(o):
-				nearest = minf(nearest, o.position.distance_to(m.position))
-		far = maxf(far, nearest)
-	print("picked soldiers sent 600px away: furthest from the rest %d px (limit %d), coherent=%s" % [far, Squad.COH, sq.is_coherent()])
 	# a planned route: two waypoints then a line
-	sq.sub.clear()
 	var c2 := sq.center()
 	var w1 := c2 + Vector2(150, 0)
 	var w2 := c2 + Vector2(150, 150)
@@ -2009,8 +1996,6 @@ func _unhandled_input(e: InputEvent) -> void:
 					_order_face(wp)
 					face_mode = false
 					hud.sync_touch("Face", false)
-				elif mb.pressed and (mb.alt_pressed or pick_mode):
-					_pick_soldier(wp)
 				elif mb.pressed:
 					dragging = true
 					drag_start = wp
@@ -2075,22 +2060,6 @@ func _unhandled_input(e: InputEvent) -> void:
 				select_squad(mine[i], (e as InputEventKey).shift_pressed)
 				camera.position = mine[i].center()
 				_clamp_camera()
-
-
-## Alt+click: pick out individual soldiers of a squad to order on their own.
-func _pick_soldier(wp: Vector2) -> void:
-	var s := _soldier_at(wp, player_team)
-	if s == null or s.is_vehicle:
-		return
-	if not s.squad.selected:
-		for sq in squads:
-			sq.selected = false
-			sq.sub.clear()
-		s.squad.selected = true
-	if s.squad.sub.has(s):
-		s.squad.sub.erase(s)
-	else:
-		s.squad.sub.append(s)
 
 
 ## The facing a line order gets: square to the line, away from where the squad is now.
@@ -2538,9 +2507,6 @@ func _tap(wp: Vector2, screen := Vector2.ZERO) -> void:
 	var s := _soldier_at(wp, player_team, 16.0)
 	if s != null:
 		tap_pending = false
-		if pick_mode and not s.is_vehicle:
-			_pick_soldier(wp)
-			return
 		var infantry_selected := _player_squads().any(func(q): return q.selected and q.vehicle() == null)
 		if s.is_vehicle and s.free_space() > 0 and infantry_selected and not s.squad.selected:
 			# select the carrier straight away, but remember the infantry: if a second
@@ -2677,11 +2643,6 @@ func touch_button(key: String, on: bool) -> void:
 		"Cover":
 			cover_mode = on
 			hud.show_cover_key(on)
-		"Pick":
-			pick_mode = on
-			if not on:
-				for sq in squads:
-					sq.sub.clear()
 		"Halt":
 			for sq in _player_squads():
 				if sq.selected:

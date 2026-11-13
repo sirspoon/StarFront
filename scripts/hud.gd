@@ -106,7 +106,7 @@ func setup(m: Node) -> void:
 			+ "   white standing walls, yellow rubble, red wire\n" \
 			+ "T then click: grenades. At armour: tank-breakers,\n" \
 			+ "   at infantry: frags, at open ground: smoke screen\n" \
-			+ "Alt + click: pick single soldiers   1-9: squads\n" \
+			+ "1-9: select squads\n" \
 			+ "Space: pause (orders still work)\n" \
 			+ "WASD / arrows / screen edge / middle-drag: scroll\n" \
 			+ "Wheel: zoom\n\n" \
@@ -156,7 +156,7 @@ func setup(m: Node) -> void:
 	main.log_message("Battle plans ready.")
 
 
-## The button bar for phones and tablets: toggles for Run, Face and Pick,
+## The button bar: toggles for Run, Down, Face, Grenade and Cover,
 ## and one-tap orders.
 func _build_touch_bar() -> void:
 	var panel := PanelContainer.new()
@@ -168,10 +168,10 @@ func _build_touch_bar() -> void:
 	touch_bar = HBoxContainer.new()
 	touch_bar.add_theme_constant_override("separation", 6)
 	panel.add_child(touch_bar)
-	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Grenade", true], ["Cover", true], ["Pick", true], ["Halt", false], ["Unload", false], ["Gun", false], ["Launch", false],
+	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Grenade", true], ["Cover", true], ["Halt", false], ["Unload", false], ["Gun", false], ["Launch", false],
 			["Squads", true], ["Pause", true], ["?", false], ["Menu", false]]:
 		var b := Button.new()
-		var hints := {"Assault": "R", "Down": "G", "Pick": "Alt", "Halt": "H", "Unload": "U", "Gun": "V", "Launch": "B", "Grenade": "T", "Cover": "C", "Pause": "Space", "?": "F1", "Menu": "Esc"}
+		var hints := {"Assault": "R", "Down": "G", "Halt": "H", "Unload": "U", "Gun": "V", "Launch": "B", "Grenade": "T", "Cover": "C", "Pause": "Space", "?": "F1", "Menu": "Esc"}
 		b.text = spec[0] if main.touch_mode or not hints.has(spec[0]) else "%s (%s)" % [spec[0], hints[spec[0]]]
 		b.toggle_mode = spec[1]
 		b.focus_mode = Control.FOCUS_NONE

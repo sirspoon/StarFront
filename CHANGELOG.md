@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.70 (2026-11-13)
+Best guns to the best spots; Pick removed.
+- When a squad moves or lines up, its best guns (heavy weapons, machine guns, the longest-reaching
+  weapons, and so snipers when they come) get first pick of the firing spots: a window or bunker slit
+  first, then low cover or rubble. The rest take the nearest spot left. In test battles the best gun
+  ended up in a better-than-average firing spot 73% of the time, up from 41%.
+- Removed "Pick" (ordering single soldiers): the button, Alt + click and the phone tap.
+
 ## v0.69 (2026-11-13)
 Vehicles: barging through, grenade launchers, battle damage.
 - Tanks and carriers push through barricades, crates and sandbags instead of driving a long way

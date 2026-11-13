@@ -179,6 +179,27 @@ func cell_cover_dir(c: Vector2i, dir: Vector2) -> float:
 	return cov + best
 
 
+## How good a cell is to fire from towards dir: a window or bunker slit best, then low
+## cover and rubble; a plain wall in front is safe but no use to a gunner.
+func firing_score(c: Vector2i, dir: Vector2) -> float:
+	if dir == Vector2.ZERO:
+		return cell_cover(c)
+	var a := dir.angle()
+	var best := 0.0
+	for off in [0.0, -0.6, 0.6]:
+		var n := cell_of(center_of(c) + Vector2.from_angle(a + off) * CELL)
+		var nt := get_t(n)
+		var v := 0.0
+		if nt == T.WINDOW:
+			v = 1.3 if is_bunker(n) else 1.1
+		elif nt == T.LOW:
+			v = low_cover_at(n) + 0.2
+		elif nt == T.RUBBLE:
+			v = 0.45
+		best = maxf(best, v * (1.0 if off == 0.0 else 0.75))
+	return best + COVER[get_t(c)] * 0.5
+
+
 ## The low-cover cell shielding a target from a shooter, or (-1, -1).
 func cover_cell(target_pos: Vector2, shooter_pos: Vector2) -> Vector2i:
 	var dir := (shooter_pos - target_pos).normalized()

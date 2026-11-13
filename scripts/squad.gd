@@ -353,6 +353,42 @@ func _assign(ms: Array, slots: Array, run: bool) -> void:
 	for t in targets:
 		centre += t
 	centre /= maxi(targets.size(), 1)
+	# the squad's best guns (heavy weapons, machine guns, long-range weapons) get first pick of
+	# the firing spots: a window or slit, then low cover; the rest take the nearest spot left
+	var map: BattleMap = members[0].map if not members.is_empty() else null
+	var log_slots := "--log-slots" in OS.get_cmdline_user_args()
+	var all_spots: Array = targets.duplicate()
+	if map != null and targets.size() > 1 and not "--no-gun-slots" in OS.get_cmdline_user_args():
+		var guns := ms.filter(func(m): return gun_value(m) >= 3.5)
+		guns.sort_custom(func(a, b): return gun_value(a) > gun_value(b))
+		for m in guns:
+			var best := 0
+			var best_s := -INF
+			for i in targets.size():
+				var q := map.firing_score(map.cell_of(targets[i]), facing)
+				var s: float = q * 55.0 - m.position.distance_to(targets[i]) * 0.25
+				if s > best_s:
+					best_s = s
+					best = i
+			m.go_to(targets[best], run)
+			targets.remove_at(best)
+			ms = ms.filter(func(o): return o != m)
+	if log_slots and map != null and all_spots.size() > 2 and members.any(func(m): return gun_value(m) >= 3.5):
+		# test aid: how good the best gun's spot is against the squad's spots on average
+		var gun: Soldier = null
+		for m in members:
+			if m.is_alive() and (gun == null or gun_value(m) > gun_value(gun)):
+				gun = m
+		var avg := 0.0
+		for t in all_spots:
+			avg += map.firing_score(map.cell_of(t), facing)
+		avg /= all_spots.size()
+		var mine := 0.0
+		if gun != null and gun.path.size() > 0:
+			mine = map.firing_score(map.cell_of(gun.path[gun.path.size() - 1]), facing)
+		elif gun != null:
+			mine = -1.0
+		print("SLOTS gun=%.2f avg=%.2f" % [mine, avg])
 	ms.sort_custom(func(a, b): return a.position.distance_squared_to(centre) > b.position.distance_squared_to(centre))
 	for m in ms:
 		var best := 0
@@ -361,6 +397,20 @@ func _assign(ms: Array, slots: Array, run: bool) -> void:
 				best = i
 		m.go_to(targets[best], run)
 		targets.remove_at(best)
+
+
+## How much a man's weapon wants a good firing spot: long reach, a heavy gun, sustained fire.
+## (A sniper's long-range rifle will rank high on reach alone.)
+static func gun_value(m: Soldier) -> float:
+	var w: Dictionary = GameData.WEAPONS[m.data.weapon]
+	var v := float(w.range) / 150.0
+	if m.data.get("heavy", false):
+		v += 3.0
+	if int(w.burst) >= 5:
+		v += 1.5
+	if w.get("flame", false):
+		v -= 2.0  # a flamer goes where the fighting is, not to a window
+	return v
 
 
 ## Spread out along the line a-b, each man taking the best cover near his spot,

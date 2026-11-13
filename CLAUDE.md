@@ -99,6 +99,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   to find what grows over a long battle (try with `--phonetest`).
 - `--log-guns` prints each change of a tank's main gun setting (beam / pulse, AP / HE), each carrier launcher
   salvo (LAUNCH) and each barricade or sandbag cell a vehicle crashes through (BASH).
+- `--log-slots` prints, for each squad order, how good the best gun's firing spot is against the squad's average
+  (`--no-gun-slots` turns off giving the best guns first pick, to compare).
 - `--demo-vdamage` knocks every vehicle down to about a third of its hull a second in (to see the battle damage).
 - `--prone` puts the Legion in the Down stance (for screenshots and balance runs); `--shot-squad=N` centres a
   screenshot on the player's Nth squad.
@@ -110,8 +112,8 @@ layout and `docs/STYLE_GUIDE.md` for the setting.
   `--no-enemy` with `--test-follow` does the same for direct orders; `--test-reach` counts unreachable
   destination spots. All print anyone who did not move.
 - `--test-carrier` checks one tap on a carrier selects it and a double tap boards the selected infantry.
-- `--test-orders` (with `--autotest`, headless is fine) runs a line order and a picked-soldier move and
-  prints where the men ended up and whether the squad stayed in contact. `--shot-select` selects the
+- `--test-orders` (with `--autotest`, headless is fine) runs a line order and a planned route and
+  prints where the men ended up (and where the squad's best guns ended up) and whether the squad stayed in contact. `--shot-select` selects the
   player's squads for a screenshot (shows links and facing arrows).
 - Lighting checks: `--test-light=x,y` adds a strong light at a map position; `--debug-normals` shows
   the normal maps instead of the map colours. Normal maps come from `HeightPainter` +
