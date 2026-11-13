@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.02 (2026-11-13)
+- "They're everywhere! ... Everywhere!": a longer pause (about a third of a second) before the
+  second "Everywhere!".
+
 ## v1.01 (2026-11-13)
 - Legion line "Get moving, dogs!" is now just "Get moving!".
 - "They are everywhere!" is now a desperate "They're everywhere! Everywhere!": a gasp for breath

@@ -38,7 +38,7 @@ VOICES = os.environ.get("PIPER_VOICES", "/tmp/claude-0/voices")
 LINES = {
     "legion_move": [("Onwards, comrades!", "shout"), ("Get moving!", "shout"), ("We move together.", "calm"), ("Advance!", "shout")],
     "legion_attack": [("Let them have it!", "shout"), ("Fire!", "shout"), ("Safety off, boys!", "shout"), ("Not one step backwards!", "shout"), ("Ура!", "shout")],
-    "legion_pinned": [("We are pinned down!", "fear"), ("Heads down! Heads down!", "fear"), ("They're everywhere! Everywhere!", "panic")],
+    "legion_pinned": [("We are pinned down!", "fear"), ("Heads down! Heads down!", "fear"), ("They're everywhere! | Everywhere!", "panic")],
     "legion_rout": [("Fall back! Fall back!", "fear"), ("Get back! Get back!", "fear"), ("We cannot hold!", "fear")],
 }
 # English sounds a Russian speaker swaps for his own (the accent)
@@ -282,6 +282,14 @@ MEN = [("bm_george", "en-gb"), ("am_onyx", "en-us")]
 
 
 def kokoro_say(k, text, man, speed):
+    if "|" in text:  # "|": a deliberate pause there (the splicing would otherwise close it up)
+        parts = [kokoro_say(k, t.strip(), man, speed) for t in text.split("|")]
+        sr = parts[0][1]
+        gap = np.zeros(int(0.32 * sr))
+        out = parts[0][0]
+        for a, _ in parts[1:]:
+            out = np.concatenate([out, gap, a])
+        return out, sr
     voice, lang = MEN[man]
     if any(0x400 <= ord(ch) <= 0x4FF for ch in text):
         ph = "ʊrˈɑː!"  # "Ura!" (a Russian cheer), said the Russian way
