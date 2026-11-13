@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.72 (2026-11-13)
+Tidier command bar.
+- Only the orders that apply to the selected squads are shown: Pace and Stance for infantry, Gun for
+  tanks, Grenade when someone selected has grenades or launcher salvos left, Unload when a selected
+  carrier has men aboard (or selected men are aboard one), Face and Halt for any selection. Cover,
+  Squads, Pause and Menu are always there, after a gap. With nothing selected the bar is just those four.
+- The choices say what they're set to: "Pace: Walk / Run" (was Assault), "Stance: Up / Down" (was
+  Down), "Gun: Beam / Pulse".
+- Help moved into the battle menu ("Controls"); F1 still works. Buttons have tooltips.
+
 ## v0.71 (2026-11-13)
 One Grenade button for infantry and carriers.
 - With a carrier selected, Grenade (T) then a tap fires its launchers at that spot, choosing like

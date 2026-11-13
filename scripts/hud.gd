@@ -168,15 +168,23 @@ func _build_touch_bar() -> void:
 	touch_bar = HBoxContainer.new()
 	touch_bar.add_theme_constant_override("separation", 6)
 	panel.add_child(touch_bar)
-	for spec in [["Assault", true], ["Down", true], ["Face", true], ["Grenade", true], ["Cover", true], ["Halt", false], ["Unload", false], ["Gun", false],
-			["Squads", true], ["Pause", true], ["?", false], ["Menu", false]]:
+	# orders for what's selected (only those that apply are shown), then a gap, then the
+	# buttons that are always there
+	for spec in [["Assault", true], ["Down", true], ["Gun", false], ["Grenade", true], ["Unload", false], ["Face", true], ["Halt", false],
+			["|", false], ["Cover", true], ["Squads", true], ["Pause", true], ["Menu", false]]:
+		if spec[0] == "|":
+			var gap := VSeparator.new()
+			gap.custom_minimum_size = Vector2(10, 0)
+			touch_bar.add_child(gap)
+			bar_gap = gap
+			continue
 		var b := Button.new()
-		var hints := {"Assault": "R", "Down": "G", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "?": "F1", "Menu": "Esc"}
-		b.text = spec[0] if main.touch_mode or not hints.has(spec[0]) else "%s (%s)" % [spec[0], hints[spec[0]]]
+		b.text = _button_text(spec[0], false)
 		b.toggle_mode = spec[1]
 		b.focus_mode = Control.FOCUS_NONE
 		b.custom_minimum_size = Vector2(64, 44) if main.touch_mode else Vector2(0, 30)
 		b.add_theme_font_size_override("font_size", 16 if main.touch_mode else 13)
+		b.tooltip_text = TIPS.get(spec[0], "")
 		touch_bar.add_child(b)
 		touch_buttons[spec[0]] = b
 		var key: String = spec[0]
@@ -185,6 +193,84 @@ func _build_touch_bar() -> void:
 		else:
 			b.pressed.connect(func(): main.touch_button(key, true))
 	touch_buttons["Squads"].set_pressed_no_signal(true)
+	bar_panel = panel
+	_context_buttons()
+
+
+var bar_panel: PanelContainer
+var bar_gap: Control
+const HINTS := {"Assault": "R", "Down": "G", "Halt": "H", "Unload": "U", "Gun": "V", "Grenade": "T", "Cover": "C", "Pause": "Space", "Menu": "Esc"}
+const TIPS := {"Assault": "Pace: walking, or running (faster, and they charge into close combat, but fire less and are easier to hit)",
+		"Down": "Stance: standing, or down flat (much harder to hit; they crawl when they move)",
+		"Gun": "Switch the selected tank's main gun setting", "Grenade": "Then tap a spot: frags at men, tank-breakers at armour, smoke on open ground; carriers fire a launcher salvo",
+		"Unload": "Passengers get out", "Face": "Then drag: which way the squad faces", "Halt": "Stop and forget orders",
+		"Cover": "Show where the cover is", "Squads": "Show the squad list", "Pause": "Pause (orders still work)", "Menu": "Restart, options, controls"}
+
+
+## A button's words: what it's set to now where it's a choice ("Pace: Run"), plus the key on a PC.
+func _button_text(key: String, on: bool, extra := "") -> String:
+	var t: String = key
+	match key:
+		"Assault":
+			t = "Pace: Run" if on else "Pace: Walk"
+		"Down":
+			t = "Stance: Down" if on else "Stance: Up"
+		"Gun":
+			t = "Gun: " + extra if extra != "" else "Gun"
+	if not main.touch_mode and HINTS.has(key):
+		t += " (%s)" % HINTS[key]
+	return t
+
+
+## Show only the orders that apply to the selected squads (any of them), with words that
+## say what they're set to. Modes left on for something no longer selected are switched off.
+func _context_buttons() -> void:
+	if touch_buttons.is_empty():
+		return
+	var inf := false
+	var any := false
+	var grenades := false
+	var unload := false
+	var mode := ""
+	for sq in main.squads:
+		if sq.team != main.player_team or not sq.selected:
+			continue
+		var v = sq.vehicle()
+		if v != null:
+			if not v.is_alive():
+				continue
+			any = true
+			if v.gun_mode() != "" and mode == "":
+				mode = v.gun_mode()
+			if v.launcher and (int(v.launch_ammo.he) > 0 or int(v.launch_ammo.smoke) > 0):
+				grenades = true
+			if v.passengers.size() > 0:
+				unload = true
+		elif not sq.alive().is_empty() or sq.carrier() != null:
+			any = true
+			inf = true
+			if sq.carrier() != null:
+				unload = true
+			for k in ["he", "ap", "smoke"]:
+				if sq.grenade_count(k) > 0:
+					grenades = true
+	var show := {"Assault": inf, "Down": inf, "Gun": mode != "", "Grenade": grenades, "Unload": unload,
+			"Face": any, "Halt": any}
+	var changed := false
+	for k in show:
+		var b: Button = touch_buttons[k]
+		if b.visible != show[k]:
+			b.visible = show[k]
+			changed = true
+			if not show[k] and b.toggle_mode and b.button_pressed and k in ["Grenade", "Face"]:
+				b.button_pressed = false  # (switches the mode off too)
+		b.text = _button_text(k, b.button_pressed, mode)
+	bar_gap.visible = any
+	if changed:
+		bar_panel.reset_size()
+	var ms := bar_panel.get_combined_minimum_size()
+	bar_panel.size = ms
+	bar_panel.position = Vector2((root.size.x - ms.x) * 0.5, root.size.y - ms.y - 6.0)
 
 
 ## Keeps the toggle buttons in step when the game changes a mode itself.
@@ -193,19 +279,8 @@ func sync_touch(key: String, on: bool) -> void:
 		touch_buttons[key].set_pressed_no_signal(on)
 
 
-## The Gun button says the selected tank's setting, and is greyed out without one.
 func _gun_buttons() -> void:
-	if not touch_buttons.has("Gun"):
-		return
-	var mode := ""
-	for sq in main.squads:
-		var v = sq.vehicle()
-		if sq.team == main.player_team and sq.selected and v != null and v.is_alive() and mode == "" and v.gun_mode() != "":
-			mode = v.gun_mode()
-	var g: Button = touch_buttons["Gun"]
-	g.text = ("Gun: %s" % mode if mode != "" else "Gun") + ("" if main.touch_mode else " (V)")
-	g.disabled = mode == ""
-	g.tooltip_text = "Switch the selected tank's main gun setting"
+	_context_buttons()
 
 
 ## Keep the card's bottom edge just above the command bar as its contents change.
@@ -442,6 +517,9 @@ func toggle_battle_menu() -> void:
 	_menu_button(v, "Restart this battle", func(): main.restart(true))
 	_menu_button(v, "New battle", func(): main.restart(false))
 	_menu_button(v, "Options", show_options)
+	_menu_button(v, "Controls (F1)", func():
+		toggle_battle_menu()
+		toggle_help())
 
 
 ## Graphics and sound options, kept on the device. Applying them prepares the battlefield
